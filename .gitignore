@@ -14,3 +14,4 @@ build/android/
 
 # Downloaded libjxl toolchain for local dev/integration (not committed)
 develop-time/cjxl/
+**/do-not-commit/
