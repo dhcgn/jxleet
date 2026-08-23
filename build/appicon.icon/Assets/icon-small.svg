@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="jxleet application icon, small size variant">
+  <title>jxleet</title>
+  <!-- No plate: at 16-32 px the dark plate disappears into a dark taskbar.
+       The bare wedge reads on any background. Bands and gaps are proportionally
+       thicker than the full-size mark so they survive at 16 px. -->
+  <g stroke-linejoin="round" stroke-width="10">
+    <polygon points="16,24 240,24 218.5,80 37.5,80"        fill="#4FB286" stroke="#4FB286"/>
+    <polygon points="45.2,100 210.8,100 189.2,156 66.8,156" fill="#E0A33E" stroke="#E0A33E"/>
+    <polygon points="74.5,176 181.5,176 160,232 96,232"     fill="#46A8C4" stroke="#46A8C4"/>
+  </g>
+</svg>

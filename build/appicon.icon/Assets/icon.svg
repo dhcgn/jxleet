@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="jxleet application icon">
+  <title>jxleet</title>
+  <defs>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#20242C"/>
+      <stop offset="1" stop-color="#101318"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3B434F" stop-opacity=".9"/>
+      <stop offset=".55" stop-color="#3B434F" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- plate -->
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="url(#plate)"/>
+  <rect x="1.5" y="1.5" width="253" height="253" rx="54.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+
+  <!-- wedge: three bands, decreasing width.
+       Reads as three routes converging, and as a file getting smaller.
+       At 16 px the gaps close and it degrades to a clean triangle. -->
+  <g stroke-linejoin="round" stroke-width="6">
+    <polygon points="50,66 206,66 191.5,98 64.5,98"       fill="#4FB286" stroke="#4FB286"/>
+    <polygon points="70.8,112 185.2,112 170.8,144 85.2,144" fill="#E0A33E" stroke="#E0A33E"/>
+    <polygon points="91.5,158 164.5,158 150,190 106,190"   fill="#46A8C4" stroke="#46A8C4"/>
+  </g>
+</svg>
