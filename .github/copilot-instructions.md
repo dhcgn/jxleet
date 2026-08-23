@@ -8,8 +8,11 @@ libjxl's `cjxl`. **jxleet does not encode anything itself** — it decides which
 files to hand to `cjxl`, assembles arguments, runs the process, and reports
 results. Never add encoding logic; only orchestrate the libjxl tools.
 
-## Project status: design → early implementation
-- The repo is still largely the **stock Wails v3 template** plus the design docs.
+## Project status: scaffolding complete, feature work next
+- Phase 0 (CI) and Phase 1 (scaffold) are **done**: module renamed to
+  `github.com/dhcgn/jxleet`, demo code removed, Windows-only build, initial
+  `internal/{config,routes,app}` packages, GitHub Actions CI, and a green
+  `task check`. Remaining phases (2–11) are feature work — see the plan.
 - Authoritative documents (read these first):
   - `README.md` — product specification.
   - `FEATURES.md` — scope checklist (**living**, see rules below).

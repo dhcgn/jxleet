@@ -1,4 +1,4 @@
-module changeme
+module github.com/dhcgn/jxleet
 
 go 1.27
 

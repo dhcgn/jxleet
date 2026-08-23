@@ -1,106 +1,99 @@
 <script lang="ts">
-  import {onMount} from 'svelte';
-  import {Events, WML} from "@wailsio/runtime";
-  import {GreetService} from "../bindings/changeme";
+  import { onMount } from 'svelte';
+  import { Service } from '../bindings/github.com/dhcgn/jxleet/internal/app';
 
-  const wailsVersion = "v3.0.0-beta.11";
+  let ready = $state(false);
+  let unbound = $state<string[]>([]);
+  let loaded = $state(false);
 
-  let name: string = $state('');
-  let time: string = $state('Listening for Time event...');
-
-  let titleNameEl: HTMLElement;
-  let toastEl: HTMLElement;
-  let resultEl: HTMLElement;
-  let toastTimer: ReturnType<typeof setTimeout>;
-
-  onMount(() => {
-    Events.On('time', (v: any) => {
-      // On a narrow screen the full RFC1123 stamp is too wide for the footer, so
-      // show just the clock time there (matching the CSS breakpoint).
-      const full = v.data;
-      const compact = (full.match(/\d{1,2}:\d{2}:\d{2}/) || [full])[0];
-      time = window.matchMedia('(max-width: 640px)').matches ? compact : full;
-    });
-    // Wire up data-wml-openURL links (logos + footer "Docs" link).
-    WML.Reload();
+  onMount(async () => {
+    try {
+      const status = await Service.GetStatus();
+      ready = status.ready;
+      unbound = status.unboundEntryPoints ?? [];
+    } catch (e) {
+      console.error(e);
+    } finally {
+      loaded = true;
+    }
   });
 
-  // Crossfade the framework word in the heading ("Wails + Svelte") to the name
-  // the user entered ("Wails + <name>"): the old word fades out while the new one
-  // fades in over the same spot.
-  function swapTitleName(name: string): void {
-    const current = titleNameEl.querySelector('.title-name-text:not(.is-outgoing)');
-    if (!current || current.textContent === name) {
-      return;
-    }
-    const incoming = document.createElement('span');
-    incoming.className = 'title-name-text is-entering';
-    incoming.textContent = name;
-    current.classList.add('is-outgoing');
-    titleNameEl.appendChild(incoming);
-    // Force a reflow so the transitions run from the starting state.
-    void incoming.offsetWidth;
-    incoming.classList.remove('is-entering');
-    current.classList.add('is-leaving');
-    current.addEventListener('transitionend', () => current.remove(), {once: true});
-  }
-
-  // Pop the toast with the message Go returned, then auto-dismiss it.
-  function showToast(message: string): void {
-    resultEl.innerText = message;
-    toastEl.classList.add('is-visible');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.classList.remove('is-visible'), 4000);
-  }
-
-  const doGreet = (): void => {
-    let n = name || 'anonymous';
-    swapTitleName(n);
-    GreetService.Greet(n).then(showToast).catch(console.error);
-  }
+  const entryLabel: Record<string, string> = {
+    gui: 'Window',
+    cli: 'Command line',
+    contextmenu: 'Explorer context menu',
+  };
 </script>
 
-<main class="container">
-  <header class="brand">
-    <span class="brand-mark" data-wml-openURL="https://v3.wails.io">
-      <img src="/wails.png" class="brand-logo" alt="Wails logo"/>
-    </span>
-    <span class="brand-badge" data-wml-openURL="https://svelte.dev">
-      <img src="/svelte.svg" alt="Svelte logo"/>
-    </span>
+<main class="app">
+  <header class="topbar">
+    <h1>jxleet</h1>
+    <span class="tagline">JPEG-XL-Expert-Encoding-Tool</span>
   </header>
 
-  <h1 class="title"><span class="title-accent">Wails +</span> <span class="title-name" bind:this={titleNameEl}><span class="title-name-text">Svelte</span></span></h1>
-  <p class="subtitle">Build beautiful cross-platform apps with Go and Svelte.</p>
-
-  <div class="greet">
-    <div class="input-box">
-      <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      <input aria-label="input" class="input" bind:value={name} type="text" placeholder="Your name" autocomplete="off"/>
-      <button aria-label="greet-btn" class="btn" onclick={doGreet}>Greet
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-      </button>
-    </div>
-  </div>
+  {#if !loaded}
+    <p class="muted">Loading…</p>
+  {:else if ready}
+    <section class="card">
+      <p>Ready. Drop files or folders to begin.</p>
+    </section>
+  {:else}
+    <section class="card warn">
+      <h2>Setup needed</h2>
+      <p>Each entry point needs a preset before jxleet will run:</p>
+      <ul>
+        {#each unbound as ep}
+          <li>{entryLabel[ep] ?? ep}</li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
 </main>
 
-<hr class="footer-divider"/>
-<footer class="footer">
-  <span class="footer-version">{wailsVersion}</span>
-  <span class="footer-time">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    <span>{time}</span>
-  </span>
-  <a class="footer-docs" data-wml-openURL="https://v3.wails.io" aria-label="Wails documentation">Docs
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
-  </a>
-</footer>
-
-<div class="toast" bind:this={toastEl} role="status" aria-live="polite">
-  <span class="toast-label">From Go</span>
-  <span aria-label="result" class="toast-msg" bind:this={resultEl}></span>
-</div>
-
 <style>
-  /* Put your standard CSS here */
+  :global(body) {
+    margin: 0;
+    background: #06070f;
+    color: #e5e7eb;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  .app {
+    padding: 24px;
+    min-width: 420px;
+    box-sizing: border-box;
+  }
+  .topbar {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .topbar h1 {
+    margin: 0;
+    font-size: 22px;
+  }
+  .tagline {
+    color: #9ca3af;
+    font-size: 13px;
+  }
+  .card {
+    background: #10131f;
+    border: 1px solid #1f2433;
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .card.warn {
+    border-color: #f97316;
+  }
+  .card h2 {
+    margin: 0 0 8px;
+    font-size: 16px;
+  }
+  .muted {
+    color: #9ca3af;
+  }
+  ul {
+    margin: 8px 0 0;
+    padding-left: 18px;
+  }
 </style>

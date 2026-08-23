@@ -13,10 +13,6 @@ vars:
 includes:
   common: ./build/Taskfile.yml
   windows: ./build/windows/Taskfile.yml
-  darwin: ./build/darwin/Taskfile.yml
-  linux: ./build/linux/Taskfile.yml
-  ios: ./build/ios/Taskfile.yml
-  android: ./build/android/Taskfile.yml
 
 tasks:
   build:
@@ -38,6 +34,13 @@ tasks:
     summary: Runs the application in development mode
     cmds:
       - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  check:
+    summary: Build, vet and test — the CI gate
+    cmds:
+      - task: build
+      - go vet ./...
+      - go test ./...
 
   setup:docker:
     summary: Builds Docker image for cross-compilation (~800MB download)
