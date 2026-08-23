@@ -25,8 +25,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// TODO(config): load config.yaml from paths.ConfigFile. Defaults for now.
-	cfg := config.Default()
+	// Load persisted config (entry-point bindings). Missing file -> defaults.
+	cfg, err := config.Load(paths.ConfigFile)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	svc := app.New(paths, cfg)
 

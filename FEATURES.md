@@ -15,12 +15,12 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Use `go:generate` to keep the available flags in sync with cjxl, trough call of `cjxl --help -v -v -v -v` and parsing the output
 
 ## Presets
-- [ ] Create, duplicate, rename, delete named presets 
+- [x] Create, duplicate, rename, delete named presets 
 - [ ] Separate binding per entry point 
-- [ ] Export to a file 
-- [ ] Import from a file, without adopting the output policy 
-- [ ] Format version with a migration path 
-- [ ] Collision handling on import 
+- [x] Export to a file 
+- [x] Import from a file, without adopting the output policy 
+- [x] Format version with a migration path 
+- [x] Collision handling on import 
 
 ## Output
 - [ ] Alongside 

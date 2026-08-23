@@ -2,7 +2,10 @@ module github.com/dhcgn/jxleet
 
 go 1.27
 
-require github.com/wailsapp/wails/v3 v3.0.0-beta.11
+require (
+	github.com/wailsapp/wails/v3 v3.0.0-beta.11
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	github.com/adrg/xdg v0.5.3 // indirect

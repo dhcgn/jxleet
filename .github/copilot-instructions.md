@@ -8,15 +8,17 @@ libjxl's `cjxl`. **jxleet does not encode anything itself** — it decides which
 files to hand to `cjxl`, assembles arguments, runs the process, and reports
 results. Never add encoding logic; only orchestrate the libjxl tools.
 
-## Project status: scaffolding + cjxl core complete
-- Phases 0–2 are **done**: CI + scaffold (module `github.com/dhcgn/jxleet`,
-  Windows-only build), and the cjxl core in `internal/cjxl`:
-  distance↔quality conversion, effort model, command builder, process runner
-  (with real-cjxl integration tests), and a `go:generate` flag scraper
-  (`internal/cjxl/flags`) that parses `cjxl --help -v -v -v -v` into a
-  validated, diffable flag set. `task check` is green.
-- Still open in this area: the effort-ladder tool matrix (authored data, GUI
-  phase) and wiring the core into a real end-to-end conversion (Phases 3–5).
+## Project status: scaffolding + cjxl core + presets complete
+- Phases 0–3 are **done**: CI + scaffold, the cjxl core (`internal/cjxl`,
+  `internal/cjxl/flags`), and presets (`internal/preset`): order-preserving YAML
+  schema, first-match-wins rule/route resolution, validation against the cjxl
+  flag set, version + migration, and a store with CRUD / import-export
+  (import resets the output policy) / collision handling. Config load/save with
+  the three entry-point bindings is wired in `internal/config`. `task check` is
+  green.
+- Still open nearby: consuming the entry-point bindings (Phases 8–9) and the
+  effort-ladder tool matrix (GUI). Next per the plan: **Phase 4 — Output**
+  (policies + recycle-bin replace with verification).
 - Authoritative documents (read these first):
   - `README.md` — product specification.
   - `FEATURES.md` — scope checklist (**living**, see rules below).
