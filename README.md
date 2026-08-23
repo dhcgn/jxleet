@@ -131,6 +131,11 @@ Any number of paths, files or folders, in any mix. With paths given, jxleet uses
 bound to the command-line entry point and never shows a settings dialog. `--preset`
 overrides that binding for a single call.
 
+`jxleet.exe --help` prints the command-line options and `jxleet.exe --version` prints the
+application version. The per-user Explorer entry can be registered or removed with
+`--register-context-menu` and `--unregister-context-menu`; registration uses the preset bound
+to the context-menu entry point.
+
 An unknown preset name aborts with a non-zero exit code rather than falling back to
 something plausible. A typo in an automated pipeline should not quietly convert a hundred
 images with the wrong settings.

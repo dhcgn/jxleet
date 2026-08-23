@@ -32,11 +32,11 @@ Complete inventory as a checklist. The bracket names the spec area.
 
 ## Entry points
 - [x] Graphical interface
-- [ ] File-path invocation without prompting 
-- [ ] Context menu for files, folders, folder background 
+- [x] File-path invocation without prompting
+- [x] Context menu for files, folders, folder background
 - [x] Folders recursively
-- [ ] Preset name overridable by flag 
-- [ ] Preset name visible in the menu text 
+- [x] Preset name overridable by flag
+- [x] Preset name visible in the menu text
 
 ## Concurrency
 - [x] Single instance 

@@ -16,6 +16,7 @@ declare module "@wailsio/runtime" {
             "conversion-error": string;
             "conversion-file": app$0.FileUpdate;
             "files": string[] | null;
+            "preset": string;
             "progress": app$0.ProgressUpdate;
         }
     }

@@ -21,6 +21,7 @@ import (
 	"github.com/dhcgn/jxleet/internal/output"
 	"github.com/dhcgn/jxleet/internal/preset"
 	"github.com/dhcgn/jxleet/internal/routes"
+	"github.com/dhcgn/jxleet/internal/shellext"
 	"github.com/dhcgn/jxleet/internal/toolchain"
 )
 
@@ -38,9 +39,11 @@ type Service struct {
 	tools *toolchain.Manager
 	cb    Callbacks
 
-	mu      sync.Mutex
-	pending []string
-	engine  *convert.Engine
+	mu            sync.Mutex
+	pending       []string
+	pendingPreset string
+	engine        *convert.Engine
+	activePreset  string
 }
 
 // New constructs the root service with resolved paths, loaded config, and
@@ -91,6 +94,26 @@ func (s *Service) AddPaths(paths []string) {
 	s.emit("files", paths)
 }
 
+// ReceivePaths accepts an external invocation, retaining its explicit preset
+// override until the frontend starts the run.
+func (s *Service) ReceivePaths(paths []string, presetName string) {
+	s.mu.Lock()
+	engine := s.engine
+	activePreset := s.activePreset
+	if engine == nil && presetName != "" {
+		s.pendingPreset = presetName
+	}
+	s.mu.Unlock()
+	if engine != nil && presetName != "" && activePreset != "" && presetName != activePreset {
+		s.emit("conversion-error", fmt.Sprintf("an invocation selected preset %q while %q is already running", presetName, activePreset))
+		return
+	}
+	s.AddPaths(paths)
+	if presetName != "" {
+		s.emit("preset", presetName)
+	}
+}
+
 // TakePending returns and clears paths received before the frontend subscribed.
 func (s *Service) TakePending() []string {
 	s.mu.Lock()
@@ -98,6 +121,23 @@ func (s *Service) TakePending() []string {
 	p := s.pending
 	s.pending = nil
 	return p
+}
+
+// TakePendingPreset returns an external preset override received before the
+// frontend subscribed.
+func (s *Service) TakePendingPreset() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	presetName := s.pendingPreset
+	s.pendingPreset = ""
+	return presetName
+}
+
+// GetActivePreset reports the preset currently used by an asynchronous run.
+func (s *Service) GetActivePreset() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.activePreset
 }
 
 // OpenFiles opens the native multi-file/folder picker.
@@ -210,6 +250,30 @@ func (s *Service) DuplicatePreset(name, newName string) error {
 // RenamePreset renames a named preset.
 func (s *Service) RenamePreset(name, newName string) error {
 	return preset.NewStore(s.paths.PresetsDir).Rename(name, newName)
+}
+
+// RegisterContextMenu installs the per-user Explorer entries using the current
+// context-menu preset binding.
+func (s *Service) RegisterContextMenu() error {
+	binding := s.GetBindings().ContextMenu
+	if binding == "" {
+		return errors.New("bind a context-menu preset first")
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolve jxleet executable: %w", err)
+	}
+	return shellext.Register(executable, binding)
+}
+
+// UnregisterContextMenu removes the per-user Explorer entries.
+func (s *Service) UnregisterContextMenu() error {
+	return shellext.Unregister()
+}
+
+// ContextMenuRegistered reports whether the primary Explorer entry exists.
+func (s *Service) ContextMenuRegistered() (bool, error) {
+	return shellext.Registered()
 }
 
 // ConversionOptions are the temporary GUI settings applied to a preset for one
@@ -364,6 +428,7 @@ func (s *Service) StartConversion(paths []string, options ConversionOptions) err
 		s.emit("conversion-file", fileUpdate(result))
 	}
 	s.engine = engine
+	s.activePreset = p.Name
 	s.mu.Unlock()
 
 	go func() {
@@ -377,6 +442,7 @@ func (s *Service) StartConversion(paths []string, options ConversionOptions) err
 		s.mu.Lock()
 		if s.engine == engine {
 			s.engine = nil
+			s.activePreset = ""
 		}
 		s.mu.Unlock()
 		s.emit("conversion-done", ConversionSummary{

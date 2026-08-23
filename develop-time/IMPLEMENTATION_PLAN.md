@@ -204,6 +204,11 @@ separate confirmation for irreversible routes (names the file count).
    (“To JXL — <preset>”); register/unregister from within the app. Windows 11:
    entry under “Show more options”.
 
+Phase 9 implementation uses the stdlib-only parser in `internal/cli` for strict
+path/flag handling. A first invocation with paths starts the same asynchronous
+engine without a settings prompt; later invocations hand over paths and an
+explicit preset through `internal/ipc`.
+
 ---
 
 ## 9. Frontend (Svelte) — views ↔ mockup states
@@ -305,7 +310,7 @@ Distinct from the §5 *toolchain* manager (which updates libjxl, not jxleet).
 6. **IPC** — single instance, handover, coalescing, takeover. *(Concurrency)*
 7. **Toolchain** — versions, download+verify, atomic update, diff/lock. *(Toolchain)*
 8. **GUI** — the 8 views. *(Interface — implemented)*
-9. **CLI + context menu** — path invocation, registry integration. *(Entry points)*
+9. **CLI + context menu** — path invocation, registry integration. *(Entry points — implemented)*
 8b. **GUI port** — convert `jxlconv-mockups.html` into Svelte state views +
     shared theme, wired to bindings (see §9.1). *(Interface — implemented)*
 10. **Polish** — logs view, size balance, jxlinfo figures.

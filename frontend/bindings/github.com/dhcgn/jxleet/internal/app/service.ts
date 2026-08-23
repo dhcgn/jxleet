@@ -31,6 +31,13 @@ export function CancelConversion(): $CancellablePromise<void> {
 }
 
 /**
+ * ContextMenuRegistered reports whether the primary Explorer entry exists.
+ */
+export function ContextMenuRegistered(): $CancellablePromise<boolean> {
+    return $Call.ByID(1144342962);
+}
+
+/**
  * CreatePreset creates a usable basic preset.
  */
 export function CreatePreset(name: string, description: string): $CancellablePromise<void> {
@@ -49,6 +56,13 @@ export function DeletePreset(name: string): $CancellablePromise<void> {
  */
 export function DuplicatePreset(name: string, newName: string): $CancellablePromise<void> {
     return $Call.ByID(2391082988, name, newName);
+}
+
+/**
+ * GetActivePreset reports the preset currently used by an asynchronous run.
+ */
+export function GetActivePreset(): $CancellablePromise<string> {
+    return $Call.ByID(2506442175);
 }
 
 /**
@@ -118,6 +132,22 @@ export function PreviewPaths(paths: string[] | null, options: $models.Conversion
 }
 
 /**
+ * ReceivePaths accepts an external invocation, retaining its explicit preset
+ * override until the frontend starts the run.
+ */
+export function ReceivePaths(paths: string[] | null, presetName: string): $CancellablePromise<void> {
+    return $Call.ByID(4082249969, paths, presetName);
+}
+
+/**
+ * RegisterContextMenu installs the per-user Explorer entries using the current
+ * context-menu preset binding.
+ */
+export function RegisterContextMenu(): $CancellablePromise<void> {
+    return $Call.ByID(286962749);
+}
+
+/**
  * RenamePreset renames a named preset.
  */
 export function RenamePreset(name: string, newName: string): $CancellablePromise<void> {
@@ -151,4 +181,19 @@ export function StartConversion(paths: string[] | null, options: $models.Convers
  */
 export function TakePending(): $CancellablePromise<string[] | null> {
     return $Call.ByID(1800653784);
+}
+
+/**
+ * TakePendingPreset returns an external preset override received before the
+ * frontend subscribed.
+ */
+export function TakePendingPreset(): $CancellablePromise<string> {
+    return $Call.ByID(3054070023);
+}
+
+/**
+ * UnregisterContextMenu removes the per-user Explorer entries.
+ */
+export function UnregisterContextMenu(): $CancellablePromise<void> {
+    return $Call.ByID(3976869576);
 }

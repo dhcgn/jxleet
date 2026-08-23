@@ -28,9 +28,10 @@ results. Never add encoding logic; only orchestrate the libjxl tools.
   a `files` Wails event. The engine was validated on the real committed
   `test-data/` sample (JPEG→transcode with byte-identical reconstruction,
   JXL→reencode, 8/16-bit PNG→encode). `task check` is green.
-- Still open nearby: the CLI/context-menu entry points, jxlinfo metadata
-  parsing, persistent logs, and the effort-ladder source data. Next per the
-  plan: **Phase 9 — CLI + context menu**.
+- Still open nearby: jxlinfo metadata parsing, persistent logs, and the
+  effort-ladder source data. Phase 9 CLI/context-menu work is implemented:
+  strict path invocation, `--preset` overrides, per-user Explorer registration,
+  and registry cleanup. Next per the plan: **Phase 10 — polish**.
 - Authoritative documents (read these first):
   - `README.md` — product specification.
   - `FEATURES.md` — scope checklist (**living**, see rules below).

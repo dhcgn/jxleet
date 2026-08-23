@@ -76,6 +76,7 @@
   let appStatus = $state<Status | null>(null);
   let toolchain = $state<ToolchainStatus | null>(null);
   let toolchainError = $state('');
+  let contextMenuRegistered = $state(false);
   let errorMessage = $state('');
   let loaded = $state(false);
   let busy = $state(false);
@@ -108,8 +109,16 @@
     const offFiles = Events.On('files', (event: any) => {
       const incoming = Array.isArray(event?.data) ? event.data : [];
       if (incoming.length === 0) return;
+      const wasRunning = view === 'running' || view === 'automatic';
       acceptPaths(incoming);
-      if (view === 'running') view = 'automatic';
+      if (wasRunning) view = 'automatic';
+    });
+    const offPreset = Events.On('preset', (event: any) => {
+      const selected = String(event?.data ?? '');
+      if (selected) {
+        presetName = selected;
+        void refreshPreview();
+      }
     });
     const offProgress = Events.On('progress', (event: any) => {
       if (event?.data) {
@@ -135,6 +144,7 @@
     void load();
     return () => {
       offFiles();
+      offPreset();
       offProgress();
       offFile();
       offDone();
@@ -153,10 +163,25 @@
       } catch (error) {
         toolchainError = errorText(error);
       }
+      try {
+        contextMenuRegistered = await Service.ContextMenuRegistered();
+      } catch (error) {
+        errorMessage = errorText(error);
+      }
       const pending = (await Service.TakePending()) ?? [];
+      const pendingPreset = await Service.TakePendingPreset();
+      const activePreset = await Service.GetActivePreset();
+      if (pendingPreset) presetName = pendingPreset;
+      if (activePreset) presetName = activePreset;
       if (pending.length > 0) {
         acceptPaths(pending);
         await refreshPreview();
+      }
+      const runningProgress = await Service.GetProgress();
+      if (runningProgress.total > 0) {
+        progress = runningProgress;
+        view = runningProgress.coalesced > 1 ? 'automatic' : 'running';
+        busy = true;
       }
     } catch (error) {
       errorMessage = errorText(error);
@@ -359,6 +384,27 @@
         await refreshPreview();
       }
       appStatus = await Service.GetStatus();
+      if (entryPoint === 'contextmenu') {
+        contextMenuRegistered = await Service.ContextMenuRegistered();
+      }
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  async function registerContextMenu(): Promise<void> {
+    try {
+      await Service.RegisterContextMenu();
+      contextMenuRegistered = await Service.ContextMenuRegistered();
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  async function unregisterContextMenu(): Promise<void> {
+    try {
+      await Service.UnregisterContextMenu();
+      contextMenuRegistered = false;
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -834,6 +880,18 @@
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="card">
+            <h3>Explorer context menu</h3>
+            <div class="in">
+              <div class="row"><span class="k">Status</span><span class:success={contextMenuRegistered} class:muted={!contextMenuRegistered} class="v">{contextMenuRegistered ? 'registered' : 'not registered'}</span></div>
+              <div class="row"><span class="k">Preset</span><span class="v">{bindings.contextMenu || 'not bound'}</span></div>
+              <div class="mini" style="margin-top:8px">Per-user registration; Windows 11 shows it under Show more options.</div>
+              <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+                <button class="btn" onclick={() => void registerContextMenu()} disabled={!bindings.contextMenu}>Register</button>
+                <button class="btn danger" onclick={() => void unregisterContextMenu()} disabled={!contextMenuRegistered}>Remove entry</button>
+              </div>
+            </div>
+          </div>
           <div class="card">
             <h3>Flag changes</h3>
             <div class="in kv">
