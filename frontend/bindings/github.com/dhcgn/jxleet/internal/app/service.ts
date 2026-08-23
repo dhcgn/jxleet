@@ -176,6 +176,13 @@ export function ResumeConversion(): $CancellablePromise<void> {
 }
 
 /**
+ * SavePresetOutputPolicy persists a policy change for a writable preset.
+ */
+export function SavePresetOutputPolicy(name: string, policy: string): $CancellablePromise<void> {
+    return $Call.ByID(4076282471, name, policy);
+}
+
+/**
  * SetBinding validates and persists one entry-point binding.
  */
 export function SetBinding(entryPoint: string, presetName: string): $CancellablePromise<void> {

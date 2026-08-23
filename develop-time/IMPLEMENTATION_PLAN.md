@@ -254,8 +254,11 @@ will not be dropped in as-is. Porting plan:
   columns with compact path display and native full-path tooltips; the effort
   matrix uses compact accessible capability icons; the Presets table displays
   core distance/quality, effort, and JPEG mode summaries with `Mixed` for
-  differing rules. Split into child components only when the view logic
-  materially grows.
+  differing rules. The selected preset exposes all file rules and a
+  read-only-aware output-policy editor with explicit Save. Expert Lossless
+  fixes distance at zero; lossy Distance/Quality controls mark the visually
+  lossless point and recommended ranges. Split into child components only when
+  the view logic materially grows.
 
 ---
 

@@ -212,13 +212,22 @@ func (s *Service) SetBinding(entryPoint, presetName string) error {
 
 // PresetSummary is the compact data shown by the Presets view.
 type PresetSummary struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Policy      string `json:"policy"`
-	ReadOnly    bool   `json:"readOnly"`
-	CoreValue   string `json:"coreValue"`
-	Effort      string `json:"effort"`
-	JPEGMode    string `json:"jpegMode"`
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	Policy      string              `json:"policy"`
+	ReadOnly    bool                `json:"readOnly"`
+	CoreValue   string              `json:"coreValue"`
+	Effort      string              `json:"effort"`
+	JPEGMode    string              `json:"jpegMode"`
+	Rules       []PresetRuleSummary `json:"rules"`
+}
+
+// PresetRuleSummary is one file-filter rule shown in the selected-preset details.
+type PresetRuleSummary struct {
+	Matches   []string `json:"matches"`
+	CoreValue string   `json:"coreValue"`
+	Effort    string   `json:"effort"`
+	JPEGMode  string   `json:"jpegMode"`
 }
 
 // ListPresets returns valid stored presets.
@@ -237,9 +246,32 @@ func (s *Service) ListPresets() ([]PresetSummary, error) {
 			CoreValue:   summarizeCoreValue(p),
 			Effort:      summarizeEffort(p),
 			JPEGMode:    summarizeJPEGMode(p),
+			Rules:       summarizeRules(p),
 		})
 	}
 	return result, nil
+}
+
+// SavePresetOutputPolicy persists a policy change for a writable preset.
+func (s *Service) SavePresetOutputPolicy(name, policy string) error {
+	p, err := preset.NewStore(s.paths.PresetsDir).Load(name)
+	if err != nil {
+		return err
+	}
+	if p.ReadOnly {
+		return fmt.Errorf("preset %q is read-only", name)
+	}
+	selected := preset.Policy(policy)
+	switch selected {
+	case preset.PolicyAlongside, preset.PolicySubfolder, preset.PolicyReplace:
+	default:
+		return fmt.Errorf("unknown output policy %q", policy)
+	}
+	p.Output.Policy = selected
+	if selected == preset.PolicySubfolder && p.Output.Subfolder == "" {
+		p.Output.Subfolder = "jxl"
+	}
+	return preset.NewStore(s.paths.PresetsDir).Save(p)
 }
 
 // CreatePreset creates a usable basic preset.
@@ -730,6 +762,50 @@ func summarizeJPEGMode(p preset.Preset) string {
 		}
 	}
 	return summarizeValues(values, "default")
+}
+
+func summarizeRules(p preset.Preset) []PresetRuleSummary {
+	result := make([]PresetRuleSummary, 0, len(p.Rules))
+	for _, rule := range p.Rules {
+		jpegMode := "n/a"
+		if ruleMatchesJPEG(rule) {
+			if preset.EffectiveLosslessJPEG(rule.Args) {
+				jpegMode = "lossless"
+			} else {
+				jpegMode = "lossy"
+			}
+		}
+		coreValue := "default"
+		if onlyJPEGTranscode(rule) {
+			coreValue = "n/a"
+		} else {
+			for _, arg := range rule.Args {
+				switch arg.Key {
+				case "-d", "--distance":
+					coreValue = "d " + arg.Value
+				case "-q", "--quality":
+					coreValue = "q " + arg.Value
+				default:
+					continue
+				}
+				break
+			}
+		}
+		effortValue := "default"
+		for _, arg := range rule.Args {
+			if arg.Key == "-e" || arg.Key == "--effort" {
+				effortValue = arg.Value
+				break
+			}
+		}
+		result = append(result, PresetRuleSummary{
+			Matches:   append([]string(nil), rule.Match...),
+			CoreValue: coreValue,
+			Effort:    effortValue,
+			JPEGMode:  jpegMode,
+		})
+	}
+	return result
 }
 
 func onlyJPEGTranscode(rule preset.Rule) bool {

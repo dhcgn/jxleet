@@ -16,8 +16,9 @@ results. Never add encoding logic; only orchestrate the libjxl tools.
   UI uses Wails-native file drops, separate Open File/Open Folder actions,
   one-level folder enumeration, a full-bleed shell, scrollable content with
   pinned conversion actions, hidden child processes, fixed-width result tables,
-  compact capability icons, and backend-derived preset summaries. The visual
-  port lives in `frontend/src/App.svelte` + `frontend/public/style.css`.
+  compact capability icons, backend-derived preset summaries, selected-preset
+  rule details, and Expert quality guidance. The visual port lives in
+  `frontend/src/App.svelte` + `frontend/public/style.css`.
 - Toolchain: `internal/toolchain` — official libjxl
   GitHub release lookup, per-asset sha256 verification, Deflate64-compatible
   Windows extraction, immutable versioned install + atomic current pointer,

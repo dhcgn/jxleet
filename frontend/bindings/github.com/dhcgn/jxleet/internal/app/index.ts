@@ -12,6 +12,7 @@ export type {
     ConversionSummary,
     FilePreview,
     FileUpdate,
+    PresetRuleSummary,
     PresetSummary,
     ProgressUpdate,
     Status,

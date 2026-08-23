@@ -69,6 +69,16 @@ export interface FileUpdate {
 }
 
 /**
+ * PresetRuleSummary is one file-filter rule shown in the selected-preset details.
+ */
+export interface PresetRuleSummary {
+    "matches": string[] | null;
+    "coreValue": string;
+    "effort": string;
+    "jpegMode": string;
+}
+
+/**
  * PresetSummary is the compact data shown by the Presets view.
  */
 export interface PresetSummary {
@@ -79,6 +89,7 @@ export interface PresetSummary {
     "coreValue": string;
     "effort": string;
     "jpegMode": string;
+    "rules": PresetRuleSummary[] | null;
 }
 
 /**

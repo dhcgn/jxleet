@@ -284,13 +284,14 @@ sizes or effort change mid-run.
 jxleet is an expert tool and does not hide these. All three are `cjxl` concepts; what
 follows is a summary, and `cjxl -v -v -v -v --help` remains the authority.
 
-**Distance** (`-d`) is JPEG XL's quality measure in JND units. `0` is mathematically
-lossless. Useful lossy values sit between `0.5` and `3.0`, with `1.0` visually
-indistinguishable for most photographic material.
+**Distance** (`-d`) is JPEG XL's quality measure in JND units, from `0.0` to `25.0`.
+`0` is mathematically lossless. Useful lossy values sit between `0.5` and `3.0`, with
+`1.0` visually indistinguishable for most photographic material.
 
 **Quality** (`-q`) on a 0–100 scale is the same quantity in different clothing. In the
 interface a toggle switches the display between the two; it never changes the stored value,
-so you cannot end up with two settings that disagree.
+so you cannot end up with two settings that disagree. `90` is visually lossless; the
+recommended range is `68` to `96`.
 
 **Effort** (`-e`) trades encoding time for file size, from `1` (lightning) to `10`
 (glacier), default `7` (squirrel). The number alone tells you nothing useful, so the expert

@@ -212,3 +212,50 @@ func TestPresetSummaryValues(t *testing.T) {
 		t.Errorf("default effort = %q", got)
 	}
 }
+
+func TestPresetRuleSummaries(t *testing.T) {
+	p := preset.Preset{
+		Rules: []preset.Rule{
+			{Match: []string{"JPEG"}, Args: []cjxl.Arg{{Key: "--lossless_jpeg", Value: "1"}}},
+			{Match: []string{"PNG"}, Args: []cjxl.Arg{{Key: "-d", Value: "0"}, {Key: "-e", Value: "9"}}},
+			{Match: []string{"*"}, Args: []cjxl.Arg{{Key: "-q", Value: "90"}, {Key: "-e", Value: "7"}, {Key: "-j", Value: "0"}}},
+		},
+	}
+	rules := summarizeRules(p)
+	if len(rules) != 3 {
+		t.Fatalf("got %d rule summaries", len(rules))
+	}
+	if rules[0].CoreValue != "n/a" || rules[0].JPEGMode != "lossless" {
+		t.Errorf("JPEG rule summary = %+v", rules[0])
+	}
+	if rules[1].CoreValue != "d 0" || rules[1].Effort != "9" || rules[1].JPEGMode != "n/a" {
+		t.Errorf("PNG rule summary = %+v", rules[1])
+	}
+	if rules[2].CoreValue != "q 90" || rules[2].Effort != "7" || rules[2].JPEGMode != "lossy" {
+		t.Errorf("fallback rule summary = %+v", rules[2])
+	}
+}
+
+func TestSavePresetOutputPolicy(t *testing.T) {
+	service := testService(t)
+	saveTestPreset(t, service)
+	if err := service.SavePresetOutputPolicy("test", string(preset.PolicyReplace)); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := preset.NewStore(service.paths.PresetsDir).Load("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Output.Policy != preset.PolicyReplace {
+		t.Fatalf("policy = %q", updated.Output.Policy)
+	}
+
+	defaultStore := preset.NewStore(filepath.Join(t.TempDir(), "presets"))
+	if _, err := preset.EnsureDefaults(defaultStore); err != nil {
+		t.Fatal(err)
+	}
+	service.paths.PresetsDir = defaultStore.Dir
+	if err := service.SavePresetOutputPolicy("default-gui", string(preset.PolicyReplace)); err == nil {
+		t.Error("read-only default policy change should fail")
+	}
+}

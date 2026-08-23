@@ -87,6 +87,8 @@
   let outputPolicy = $state('alongside');
   let processes = $state(2);
   let threads = $state(8);
+  let presetPolicyDraft = $state('');
+  let lossyDistance = $state(1.0);
 
   let routeCounts = $derived.by(() => ({
     Transcode: files.filter((file) => file.route === 'Transcode').length,
@@ -95,7 +97,10 @@
     Skip: files.filter((file) => file.skip).length,
   }));
   let totalSize = $derived(files.reduce((total, file) => total + file.size, 0));
+  let selectedPresetData = $derived(presets.find((preset) => preset.name === selectedPreset) ?? null);
+  let selectedPresetRules = $derived(selectedPresetData?.rules ?? []);
   let selectedPresetReadOnly = $derived(presets.find((preset) => preset.name === selectedPreset)?.readOnly ?? false);
+  let presetPolicyDirty = $derived(Boolean(selectedPresetData) && presetPolicyDraft !== selectedPresetData?.policy);
   let dominantRoute = $derived(
     routeCounts.Reencode >= routeCounts.Encode && routeCounts.Reencode >= routeCounts.Transcode
       ? 'Reencode'
@@ -104,6 +109,10 @@
         : 'Transcode',
   );
   let quality = $derived(Math.round(qualityFromDistance(distance)));
+  let outOfRange = $derived(
+    routeMode !== 'lossless' &&
+      (qualityUnit === 'distance' ? distance < 0.5 || distance > 3 : quality < 68 || quality > 96),
+  );
   let hasFiles = $derived(files.length > 0);
 
   onMount(() => {
@@ -351,7 +360,7 @@
     try {
       await Service.DuplicatePreset(selectedPreset, name);
       await refreshPresets();
-      selectedPreset = name.trim();
+      selectPreset(name.trim());
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -365,7 +374,7 @@
       await Service.RenamePreset(selectedPreset, name);
       if (presetName === selectedPreset) presetName = name.trim();
       await refreshPresets();
-      selectedPreset = name.trim();
+      selectPreset(name.trim());
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -377,6 +386,7 @@
       await Service.DeletePreset(selectedPreset);
       if (presetName === selectedPreset) presetName = '';
       selectedPreset = '';
+      presetPolicyDraft = '';
       await refreshPresets();
     } catch (error) {
       errorMessage = errorText(error);
@@ -385,6 +395,22 @@
 
   async function refreshPresets(): Promise<void> {
     presets = (await Service.ListPresets()) ?? [];
+  }
+
+  function selectPreset(name: string): void {
+    selectedPreset = name;
+    presetPolicyDraft = presets.find((preset) => preset.name === name)?.policy ?? '';
+  }
+
+  async function savePresetPolicy(): Promise<void> {
+    if (!selectedPreset || selectedPresetReadOnly || !presetPolicyDirty) return;
+    try {
+      await Service.SavePresetOutputPolicy(selectedPreset, presetPolicyDraft);
+      await refreshPresets();
+      selectPreset(selectedPreset);
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
   }
 
   async function setBinding(entryPoint: string, value: string): Promise<void> {
@@ -497,11 +523,30 @@
   }
 
   function setDistance(event: Event): void {
-    distance = Number((event.currentTarget as HTMLInputElement).value) / 10;
+    distance = Number((event.currentTarget as HTMLInputElement).value);
+    if (routeMode === 'lossy') lossyDistance = distance;
+  }
+
+  function setQuality(event: Event): void {
+    const position = Number((event.currentTarget as HTMLInputElement).value);
+    const value = 100 - position; // slider is inverted so best quality (100) sits on the left, matching distance 0
+    distance = value >= 100 ? 0 : 0.1 + (100 - value) * 0.09;
+    if (routeMode === 'lossy') lossyDistance = distance;
   }
 
   function setEffort(event: Event): void {
     effort = Number((event.currentTarget as HTMLInputElement).value);
+  }
+
+  function setRouteMode(next: RouteMode): void {
+    if (next === routeMode) return;
+    if (next === 'lossless') {
+      lossyDistance = distance > 0 ? distance : lossyDistance;
+      distance = 0;
+    } else {
+      distance = lossyDistance > 0 ? lossyDistance : 1.0;
+    }
+    routeMode = next;
   }
 
   function commandPreview(): string {
@@ -663,14 +708,20 @@
                 <button aria-pressed={qualityUnit === 'quality'} style="flex:1" onclick={() => qualityUnit = 'quality'}>Quality</button>
               </div>
               <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
-                <span style="font:600 22px/1 var(--mono)">{qualityUnit === 'distance' ? distance.toFixed(1) : quality}</span>
+                <span class="qnum" class:out-of-range={outOfRange}>{qualityUnit === 'distance' ? distance.toFixed(1) : quality}</span>
                 <span class="mini">{qualityUnit === 'distance' ? `Quality ${quality}` : `Distance ${distance.toFixed(1)}`}</span>
-                <span class="mini" style="margin-left:auto">0 = lossless</span>
+                <span class="mini" style="margin-left:auto">{qualityUnit === 'distance' ? '0 = lossless' : '100 = lossless'}</span>
               </div>
               {#if qualityUnit === 'distance'}
-                <input type="range" min="0" max="150" value={distance * 10} oninput={setDistance} aria-label="Distance" />
+                <div class="quality-range" class:out-of-range={outOfRange} style="--zone-a:2%;--zone-b:12%">
+                  <input type="range" min="0" max="25" step="0.1" value={distance} oninput={setDistance} aria-label="Distance" />
+                </div>
+                <div class="quality-guidance"><span>Recommended: 0.5 .. 3.0</span><span>1.0 = visually lossless</span></div>
               {:else}
-                <input type="range" min="0" max="100" value={quality} oninput={(event) => distance = Number((event.currentTarget as HTMLInputElement).value) === 100 ? 0 : 0.1 + (100 - Number((event.currentTarget as HTMLInputElement).value)) * 0.09} aria-label="Quality" />
+                <div class="quality-range" class:out-of-range={outOfRange} style="--zone-a:4%;--zone-b:32%">
+                  <input type="range" min="0" max="100" step="1" value={100 - quality} oninput={(event) => setQuality(event)} aria-label="Quality" />
+                </div>
+                <div class="quality-guidance"><span>Recommended: 68 .. 96</span><span>90 = visually lossless</span></div>
               {/if}
               <div class="row" style="border-top:1px solid var(--line-soft);margin-top:6px">
                 <span class="k">Effort</span><span class="v">{effort} - {effortNames[effort - 1]}</span>
@@ -726,12 +777,12 @@
       <div class="toolbar" style="margin:-12px -12px 12px">
         <div class="field"><span class="field-label">Route</span>
           <div class="seg">
-            <button aria-pressed={routeMode === 'lossy'} onclick={() => routeMode = 'lossy'}>Lossy</button>
-            <button aria-pressed={routeMode === 'lossless'} onclick={() => routeMode = 'lossless'}>Lossless</button>
+            <button aria-pressed={routeMode === 'lossy'} onclick={() => setRouteMode('lossy')}>Lossy</button>
+            <button aria-pressed={routeMode === 'lossless'} onclick={() => setRouteMode('lossless')}>Lossless</button>
           </div>
         </div>
         <span class="spacer"></span>
-        <button class="btn ghost" onclick={() => { distance = 1; effort = 7; jpegLossless = true; }}>Reset to preset</button>
+        <button class="btn ghost" onclick={() => { setRouteMode('lossy'); distance = 1; effort = 7; jpegLossless = true; }}>Reset to preset</button>
       </div>
       <div class="cols wide-right">
         <div class="card">
@@ -786,12 +837,26 @@
                 <button aria-pressed={qualityUnit === 'quality'} style="flex:1" data-testid="unit-quality" onclick={() => qualityUnit = 'quality'}>Quality</button>
               </div>
               <div style="display:flex;align-items:baseline;gap:8px">
-                <span style="font:600 22px/1 var(--mono)">{qualityUnit === 'distance' ? distance.toFixed(1) : quality}</span>
+                <span class="qnum" class:out-of-range={outOfRange}>{qualityUnit === 'distance' ? distance.toFixed(1) : quality}</span>
                 <span class="mini">same stored quantity</span>
               </div>
-              <input type="range" min="0" max="150" value={distance * 10} oninput={setDistance} aria-label="Distance" />
-              <div class="mini" style="display:flex;justify-content:space-between"><span>0 lossless</span><span>3.0 visible</span></div>
-              <div class="banner info" style="margin:10px 0 0"><span class="ic">i</span><span>Distance and quality change only the display, never the stored setting.</span></div>
+              {#if routeMode === 'lossless'}
+                <div class="quality-range locked">
+                  <input type="range" min="0" max="25" step="0.1" value="0" disabled aria-label="Distance fixed at zero in lossless mode" />
+                </div>
+                <div class="quality-guidance"><span>Lossless: distance is fixed at 0</span></div>
+              {:else if qualityUnit === 'distance'}
+                <div class="quality-range" class:out-of-range={outOfRange} style="--zone-a:2%;--zone-b:12%">
+                  <input type="range" min="0" max="25" step="0.1" value={distance} oninput={setDistance} aria-label="Distance" />
+                </div>
+                <div class="quality-guidance"><span>Recommended: 0.5 .. 3.0</span><span>1.0 = visually lossless</span></div>
+              {:else}
+                <div class="quality-range" class:out-of-range={outOfRange} style="--zone-a:4%;--zone-b:32%">
+                  <input type="range" min="0" max="100" step="1" value={100 - quality} oninput={setQuality} aria-label="Quality" />
+                </div>
+                <div class="quality-guidance"><span>Recommended: 68 .. 96</span><span>90 = visually lossless</span></div>
+              {/if}
+              <div class="banner info" style="margin:10px 0 0"><span class="ic">i</span><span>Distance and quality control the same quantity. The marker shows the visually-lossless reference point.</span></div>
             </div>
           </div>
           <div class="card">
@@ -966,7 +1031,7 @@
     <div class="body">
       <div class="cols wide-right">
         <div class="card">
-          <h3>Preset library <span class="r">{presets.length} stored</span></h3>
+          <h3>Preset library <span class="r">{presets.length} stored <button class="icon-btn" aria-label="Open preset storage folder" title="Open in Explorer" onclick={() => void openStorage('presets')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></span></h3>
           {#if presets.length === 0}
             <div class="empty">No presets yet. Create one or copy a YAML preset into %APPDATA%\\jxleet\\presets\\.</div>
           {:else}
@@ -981,7 +1046,7 @@
               <thead><tr><th>Preset</th><th>Core</th><th>Effort</th><th>JPEG</th><th>Output</th></tr></thead>
               <tbody>
                 {#each presets as preset}
-                  <tr aria-selected={selectedPreset === preset.name} onclick={() => selectedPreset = preset.name}>
+                  <tr class:selected={selectedPreset === preset.name} aria-selected={selectedPreset === preset.name} onclick={() => selectPreset(preset.name)}>
                     <td class="fn" title={preset.description}>{preset.name}{preset.readOnly ? ' (read-only)' : ''}</td>
                     <td class="num">{preset.coreValue}</td>
                     <td class="num">{preset.effort}</td>
@@ -998,6 +1063,47 @@
             <button class="btn ghost" onclick={() => void renamePreset()} disabled={!selectedPreset || selectedPresetReadOnly}>Rename</button>
             <button class="btn danger" style="margin-left:auto" onclick={() => void deletePreset()} disabled={!selectedPreset || selectedPresetReadOnly}>Delete</button>
           </div>
+          {#if selectedPresetData}
+            <div class="preset-details" data-testid="preset-details">
+              <h3>{selectedPresetData.name} <span class="r">{selectedPresetReadOnly ? 'read-only' : 'details'}</span></h3>
+              <div class="in">
+                <div class="preset-policy-editor">
+                  <label for="preset-output-policy">Output policy</label>
+                  <div class="preset-policy-controls">
+                    <select id="preset-output-policy" bind:value={presetPolicyDraft} disabled={selectedPresetReadOnly}>
+                      <option value="alongside">Alongside</option>
+                      <option value="subfolder">Into subfolder</option>
+                      <option value="replace">Replace via recycle bin</option>
+                    </select>
+                    <button class="btn" onclick={() => void savePresetPolicy()} disabled={selectedPresetReadOnly || !presetPolicyDirty}>Save</button>
+                  </div>
+                  {#if selectedPresetReadOnly}
+                    <div class="mini">This built-in preset is read-only. Duplicate it to change the policy.</div>
+                  {/if}
+                </div>
+                <div class="rule-details">
+                  <div class="eyebrow">File rules</div>
+                  {#if selectedPresetRules.length === 0}
+                    <div class="empty">No rules.</div>
+                  {:else}
+                    <table class="rule-table">
+                      <thead><tr><th>File</th><th>Core</th><th>Effort</th><th>JPEG</th></tr></thead>
+                      <tbody>
+                        {#each selectedPresetRules as rule}
+                          <tr>
+                            <td class="rule-matches">{rule.matches?.join(', ') ?? ''}</td>
+                            <td>{rule.coreValue}</td>
+                            <td>{rule.effort}</td>
+                            <td>{rule.jpegMode}</td>
+                          </tr>
+                        {/each}
+                      </tbody>
+                    </table>
+                  {/if}
+                </div>
+              </div>
+            </div>
+          {/if}
         </div>
         <div style="display:flex;flex-direction:column;gap:12px">
           <div class="card">
