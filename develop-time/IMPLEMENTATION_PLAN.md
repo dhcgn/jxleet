@@ -33,8 +33,8 @@ kept in sync throughout implementation:
 - Latest release resolvable via `GET /repos/libjxl/libjxl/releases/latest`.
 - Windows x64 static asset present and self-contained.
 - Each asset carries `digest: "sha256:<hex>"` → our integrity source of truth.
-- **To verify during implementation:** exact internal folder layout of the zip
-  (path of `cjxl.exe`, `djxl.exe`, `jxlinfo.exe`).
+- **Zip layout confirmed (v0.12.0):** binaries live at
+  `x64-windows-static/bin/{cjxl,djxl,jxlinfo}.exe` inside the zip.
 
 ---
 

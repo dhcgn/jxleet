@@ -8,11 +8,15 @@ libjxl's `cjxl`. **jxleet does not encode anything itself** — it decides which
 files to hand to `cjxl`, assembles arguments, runs the process, and reports
 results. Never add encoding logic; only orchestrate the libjxl tools.
 
-## Project status: scaffolding complete, feature work next
-- Phase 0 (CI) and Phase 1 (scaffold) are **done**: module renamed to
-  `github.com/dhcgn/jxleet`, demo code removed, Windows-only build, initial
-  `internal/{config,routes,app}` packages, GitHub Actions CI, and a green
-  `task check`. Remaining phases (2–11) are feature work — see the plan.
+## Project status: scaffolding + cjxl core complete
+- Phases 0–2 are **done**: CI + scaffold (module `github.com/dhcgn/jxleet`,
+  Windows-only build), and the cjxl core in `internal/cjxl`:
+  distance↔quality conversion, effort model, command builder, process runner
+  (with real-cjxl integration tests), and a `go:generate` flag scraper
+  (`internal/cjxl/flags`) that parses `cjxl --help -v -v -v -v` into a
+  validated, diffable flag set. `task check` is green.
+- Still open in this area: the effort-ladder tool matrix (authored data, GUI
+  phase) and wiring the core into a real end-to-end conversion (Phases 3–5).
 - Authoritative documents (read these first):
   - `README.md` — product specification.
   - `FEATURES.md` — scope checklist (**living**, see rules below).

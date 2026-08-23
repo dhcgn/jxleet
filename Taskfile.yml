@@ -38,6 +38,8 @@ tasks:
   check:
     summary: Build, vet and test — the CI gate
     cmds:
+      - cmd: powershell -NoProfile -ExecutionPolicy Bypass -File build/gofmt-check.ps1
+        platforms: [windows]
       - task: build
       - go vet ./...
       - go test ./...

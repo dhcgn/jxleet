@@ -9,17 +9,17 @@ package routes
 type Format string
 
 const (
-	FormatJPEG   Format = "JPEG"
-	FormatPNG    Format = "PNG"
-	FormatAPNG   Format = "APNG"
-	FormatGIF    Format = "GIF"
-	FormatEXR    Format = "EXR"
-	FormatPPM    Format = "PPM"
-	FormatPGM    Format = "PGM"
-	FormatPAM    Format = "PAM"
-	FormatPFM    Format = "PFM"
-	FormatPGX    Format = "PGX"
-	FormatJXL    Format = "JXL"
+	FormatJPEG    Format = "JPEG"
+	FormatPNG     Format = "PNG"
+	FormatAPNG    Format = "APNG"
+	FormatGIF     Format = "GIF"
+	FormatEXR     Format = "EXR"
+	FormatPPM     Format = "PPM"
+	FormatPGM     Format = "PGM"
+	FormatPAM     Format = "PAM"
+	FormatPFM     Format = "PFM"
+	FormatPGX     Format = "PGX"
+	FormatJXL     Format = "JXL"
 	FormatUnknown Format = ""
 )
 

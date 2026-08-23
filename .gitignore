@@ -11,3 +11,6 @@ build/android/overlay.json
 build/android/gen/
 *.exe
 build/android/
+
+# Downloaded libjxl toolchain for local dev/integration (not committed)
+develop-time/cjxl/

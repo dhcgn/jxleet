@@ -12,7 +12,7 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [ ] Effort 1–10 
 - [ ] Skip unsupported files instead of aborting 
 - [ ] GUI Expert Mode with all flags of cjxl
-- [ ] Use `go:generate` to keep the available flags in sync with cjxl, trough call of `cjxl --help -v -v -v -v` and parsing the output
+- [x] Use `go:generate` to keep the available flags in sync with cjxl, trough call of `cjxl --help -v -v -v -v` and parsing the output
 
 ## Presets
 - [ ] Create, duplicate, rename, delete named presets 
