@@ -1,0 +1,37 @@
+JPEG XL encoder v0.12.0 4128790 [_AVX2_,SSE4,SSE2] {Clang 22.1.3}
+Usage: D:\jpegxl-expert-encoding-tool\test-bins\cjxl.exe INPUT OUTPUT [OPTIONS...]
+ INPUT
+    the input can be JXL, PPM, PNM, PFM, PAM, PGX, PNG, APNG, GIF, JPEG
+ OUTPUT
+    the compressed JXL output file
+
+Basic options:
+ -d DISTANCE, --distance=DISTANCE
+    Target visual distance in JND units, range: 0.0 .. 25.0.
+    0.0 = mathematically lossless, default for JPEG/GIF input.
+    1.0 = visually lossless, default for other input.
+    Recommended range: 0.5 .. 3.0. Higher values allow more distortion.
+Mutually exclusive with --quality.
+ -q QUALITY, --quality=QUALITY
+    Internally mapped to --distance, range: 0 .. 100.
+    100 = mathematically lossless. 90 = visually lossless.
+    Quality values roughly match libjpeg quality.
+    Recommended range: 68 .. 96. Mutually exclusive with --distance.
+ -e EFFORT, --effort=EFFORT
+    Encoder effort, range: 1 .. 10, default = 7.
+    Higher values allow more computation, generally achieving smaller output at same quality.
+    For lossy encoding, higher effort should achieve more accurate quality.
+ -V, --version
+    Print encoder library version number and exit.
+ --quiet
+    Minimal printing.
+ -v, --verbose
+    Verbose printing; can be repeated and also applies to help (!).
+ --buffering=-1..3
+    Controls how much input buffering libjxl uses, affecting memory usage and compression quality.
+    -1 = encoder chooses (default). 0 = buffer entire image (most memory, best compression).
+    1 = stream input for large images. 2 = stream input with a lower threshold.
+    3 = deprecated; use --output_mode to control output streaming.
+
+ -h, --help
+    Prints this help message. Add -v (up to a total of 4 times) to see more options.
