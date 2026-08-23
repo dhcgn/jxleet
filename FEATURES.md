@@ -23,12 +23,12 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Collision handling on import 
 
 ## Output
-- [ ] Alongside 
-- [ ] Into a subfolder 
-- [ ] Replace via recycle bin, after verification 
-- [ ] Deletion rule selectable per route 
+- [x] Alongside 
+- [x] Into a subfolder 
+- [x] Replace via recycle bin, after verification 
+- [x] Deletion rule selectable per route 
 - [ ] Separate confirmation for irreversible routes 
-- [ ] Handle name collisions 
+- [x] Handle name collisions 
 
 ## Entry points
 - [ ] Graphical interface 

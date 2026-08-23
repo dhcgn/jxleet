@@ -8,17 +8,20 @@ libjxl's `cjxl`. **jxleet does not encode anything itself** — it decides which
 files to hand to `cjxl`, assembles arguments, runs the process, and reports
 results. Never add encoding logic; only orchestrate the libjxl tools.
 
-## Project status: scaffolding + cjxl core + presets complete
-- Phases 0–3 are **done**: CI + scaffold, the cjxl core (`internal/cjxl`,
-  `internal/cjxl/flags`), and presets (`internal/preset`): order-preserving YAML
-  schema, first-match-wins rule/route resolution, validation against the cjxl
-  flag set, version + migration, and a store with CRUD / import-export
-  (import resets the output policy) / collision handling. Config load/save with
-  the three entry-point bindings is wired in `internal/config`. `task check` is
-  green.
-- Still open nearby: consuming the entry-point bindings (Phases 8–9) and the
-  effort-ladder tool matrix (GUI). Next per the plan: **Phase 4 — Output**
-  (policies + recycle-bin replace with verification).
+## Project status: core pipeline through output complete
+- Phases 0–4 are **done**: CI + scaffold; the cjxl core (`internal/cjxl`,
+  `internal/cjxl/flags`); presets (`internal/preset`); and output
+  (`internal/output` + `internal/djxl`): alongside/subfolder/replace path
+  computation with skip/number/overwrite collisions, the recycle-bin replace
+  flow (verify → move → recycle, with a safe in-place path for jxl→jxl), the
+  Windows recycle bin via `SHFileOperationW` (refuses on volumes without one),
+  per-route deletion rules, and irreversible-replace detection. djxl verifies
+  readability and **byte-identical JPEG reconstruction** (confirmed against real
+  cjxl/djxl). `task check` is green.
+- Still open nearby: the interactive irreversible-replace confirmation (GUI/CLI,
+  Phase 8–9), consuming entry-point bindings, and the effort-ladder tool matrix.
+  Next per the plan: **Phase 5 — Engine** (queue, worker pool, pause/cancel,
+  throughput/ETA) tying routes + preset + cjxl + output together.
 - Authoritative documents (read these first):
   - `README.md` — product specification.
   - `FEATURES.md` — scope checklist (**living**, see rules below).
