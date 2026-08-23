@@ -10,3 +10,4 @@ build/ios/xcode/gen/
 build/android/overlay.json
 build/android/gen/
 *.exe
+build/android/
