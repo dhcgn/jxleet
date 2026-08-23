@@ -25,12 +25,18 @@ type Config struct {
 	RouteColors map[string]string `yaml:"route_colors,omitempty"`
 }
 
-// Default returns a Config with no bindings set. Until the user binds all three
-// entry points, jxleet will say so rather than run.
+const DefaultPresetName = "Default"
+
+// Default returns a Config with the read-only Default preset bound to every
+// entry point. Users can replace these bindings with their own presets later.
 func Default() Config {
 	return Config{
-		Version:  1,
-		Bindings: map[EntryPoint]string{},
+		Version: 1,
+		Bindings: map[EntryPoint]string{
+			EntryGUI:         DefaultPresetName,
+			EntryCLI:         DefaultPresetName,
+			EntryContextMenu: DefaultPresetName,
+		},
 	}
 }
 

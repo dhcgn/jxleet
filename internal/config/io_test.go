@@ -10,8 +10,11 @@ func TestLoadMissingReturnsDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.UnboundEntryPoints()) != 3 {
-		t.Errorf("fresh config should have 3 unbound entry points, got %v", c.UnboundEntryPoints())
+	if len(c.UnboundEntryPoints()) != 0 {
+		t.Errorf("fresh config should bind the default preset, unbound = %v", c.UnboundEntryPoints())
+	}
+	if name, ok := c.Binding(EntryGUI); !ok || name != DefaultPresetName {
+		t.Errorf("fresh GUI binding = %q ok=%v", name, ok)
 	}
 }
 

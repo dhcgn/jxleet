@@ -107,6 +107,9 @@ func (s *Store) Save(p Preset) error {
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return err
 	}
+	if existing, err := s.Load(p.Name); err == nil && existing.ReadOnly {
+		return fmt.Errorf("preset %q is read-only", p.Name)
+	}
 	path := s.pathFor(p.Name)
 	data, err := Marshal(p)
 	if err != nil {
@@ -135,6 +138,9 @@ func (s *Store) Delete(name string) error {
 	}
 	for _, e := range entries {
 		if e.preset.Name == name {
+			if e.preset.ReadOnly {
+				return fmt.Errorf("preset %q is read-only", name)
+			}
 			return os.Remove(e.path)
 		}
 	}
@@ -153,6 +159,9 @@ func (s *Store) Rename(oldName, newName string) error {
 	if err != nil {
 		return err
 	}
+	if p.ReadOnly {
+		return fmt.Errorf("preset %q is read-only", oldName)
+	}
 	if err := s.Delete(oldName); err != nil {
 		return err
 	}
@@ -169,6 +178,7 @@ func (s *Store) Duplicate(name, newName string) error {
 	if err != nil {
 		return err
 	}
+	p.ReadOnly = false
 	p.Name = newName
 	return s.Save(p)
 }
@@ -203,6 +213,7 @@ func (s *Store) Import(srcPath string, onCollision Collision) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	p.ReadOnly = false
 	p.Output = DefaultOutput()
 	if err := p.Validate(); err != nil {
 		return "", err

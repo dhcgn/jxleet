@@ -24,6 +24,7 @@
 html,
 body,
 #app {
+  height: 100%;
   min-height: 100%;
   margin: 0;
 }
@@ -52,7 +53,10 @@ button:disabled {
 }
 
 .app {
+  display: flex;
+  flex-direction: column;
   width: min(1080px, 100%);
+  height: 100%;
   min-width: 420px;
   margin: 0 auto;
   overflow: hidden;
@@ -66,43 +70,8 @@ button:disabled {
   max-width: 420px;
 }
 
-.titlebar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 30px;
-  padding: 0 4px 0 10px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-}
-
-.titlebar .name {
-  color: var(--ink2);
-  font: 500 11.5px/1 var(--mono);
-  letter-spacing: 0.08em;
-}
-
 .spacer {
   flex: 1;
-}
-
-.wctl {
-  display: grid;
-  width: 30px;
-  height: 29px;
-  place-items: center;
-  color: var(--ink3);
-  font-size: 11px;
-}
-
-.wctl:hover {
-  background: var(--panel3);
-  color: var(--ink);
-}
-
-.wctl.close:hover {
-  background: #8c2f2a;
-  color: #fff;
 }
 
 .toolbar {
@@ -222,6 +191,7 @@ input[type="range"] {
 }
 
 .body {
+  flex: 1;
   padding: 12px;
 }
 
@@ -449,6 +419,7 @@ input[type="range"] {
 
 .drop {
   display: grid;
+  height: 100%;
   min-height: 250px;
   place-content: center;
   gap: 8px;
@@ -588,10 +559,30 @@ input[type="range"] {
   font-size: 11px;
 }
 
+.effort-slider {
+  position: relative;
+  padding: 0 7px 20px;
+}
+
+.effort-slider input[type="range"] {
+  display: block;
+  width: 100%;
+  margin: 2px 0 4px;
+}
+
+.effort-value {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  color: var(--ink);
+  font: 600 12px/1 var(--mono);
+}
+
 .ticks {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
   margin-bottom: 10px;
+  padding: 0 7px;
   color: var(--ink3);
   font: 400 9.5px/1 var(--mono);
 }
@@ -802,6 +793,41 @@ tr.na .dot.on {
   overflow-wrap: anywhere;
   color: var(--ink2);
   font-family: var(--mono);
+}
+
+.kv div span:last-of-type {
+  overflow-wrap: anywhere;
+  color: var(--ink2);
+  font-family: var(--mono);
+}
+
+.icon-btn {
+  display: grid;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 3px;
+  background: transparent;
+  color: var(--ink3);
+  border: 1px solid transparent;
+  border-radius: 2px;
+}
+
+.icon-btn:hover {
+  background: var(--panel3);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.icon-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
 }
 
 .empty {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -63,6 +64,15 @@ func main() {
 	cfg, err := config.Load(paths.ConfigFile)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if _, err := preset.EnsureDefault(preset.NewStore(paths.PresetsDir)); err != nil {
+		log.Fatal(err)
+	}
+	_, configFileErr := os.Stat(paths.ConfigFile)
+	if ensureDefaultBindings(&cfg) || errors.Is(configFileErr, os.ErrNotExist) {
+		if err := config.Save(paths.ConfigFile, cfg); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	if arguments.RegisterContextMenu || arguments.UnregisterContextMenu {
@@ -163,4 +173,18 @@ func main() {
 	if err := wailsApp.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func ensureDefaultBindings(cfg *config.Config) bool {
+	changed := false
+	if cfg.Bindings == nil {
+		cfg.Bindings = map[config.EntryPoint]string{}
+	}
+	for _, entryPoint := range []config.EntryPoint{config.EntryGUI, config.EntryCLI, config.EntryContextMenu} {
+		if cfg.Bindings[entryPoint] == "" {
+			cfg.Bindings[entryPoint] = config.DefaultPresetName
+			changed = true
+		}
+	}
+	return changed
 }

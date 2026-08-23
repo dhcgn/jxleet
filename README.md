@@ -166,6 +166,10 @@ A preset is a YAML file. It pairs **file filters** with **`cjxl` arguments** —
 arguments are passed through verbatim. jxleet does not invent a settings vocabulary that
 wraps the encoder; the preset *is* the argument list.
 
+On first start jxleet creates a read-only `Default` preset and binds it to the graphical
+interface, command line, and Explorer context menu entry points. Duplicate it to create a
+writable preset; the built-in default cannot be renamed, deleted, or overwritten.
+
 ```yaml
 # %APPDATA%\jxleet\presets\archive-lossless.yaml
 name: archive-lossless

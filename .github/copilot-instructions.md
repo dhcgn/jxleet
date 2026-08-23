@@ -66,8 +66,9 @@ results. Never add encoding logic; only orchestrate the libjxl tools.
   no recycle bin exists.
 - **Distance is the single stored quality value**; quality (`-q`) is a display
   transform only.
-- Each entry point (GUI / CLI / context menu) needs an explicit **preset binding**;
-  refuse to run until all three are set. Never guess a default.
+- Each entry point (GUI / CLI / context menu) needs an explicit **preset binding**.
+  First start creates and binds the read-only `Default` preset to all three;
+  never silently replace an existing user binding.
 
 ## Working agreements
 - **`FEATURES.md` is the source of truth for scope.** When you implement a listed

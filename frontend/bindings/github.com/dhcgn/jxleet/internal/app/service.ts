@@ -118,6 +118,13 @@ export function OpenFiles(): $CancellablePromise<string[] | null> {
 }
 
 /**
+ * OpenStorageLocation opens one of jxleet's storage directories in Explorer.
+ */
+export function OpenStorageLocation(location: string): $CancellablePromise<void> {
+    return $Call.ByID(2196472704, location);
+}
+
+/**
  * PauseConversion pauses dispatching new files.
  */
 export function PauseConversion(): $CancellablePromise<void> {

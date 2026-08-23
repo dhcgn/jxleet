@@ -112,8 +112,9 @@ which are struck through for the current mode.
 - CRUD: create, duplicate, rename, delete, export, import.
 
 **Entry-point bindings** live in `config.yaml` — one preset name each for
-`gui`, `cli`, `contextmenu`. Until all three are set, the app says so and refuses
-to run (no guessed defaults).
+`gui`, `cli`, `contextmenu`. On first start all three are bound to the read-only
+`Default` preset. Existing user bindings are preserved; the app refuses to run
+only when a binding is missing or points to an unavailable preset.
 
 ---
 
@@ -244,8 +245,10 @@ will not be dropped in as-is. Porting plan:
   `frontend/src/App.svelte`, with the shared visual system in
   `frontend/public/style.css`; they are wired to native dialog intake, Wails
   bindings/events, real preset previews, asynchronous engine progress, and
-  toolchain status/install. Split into child components only when the view logic
-  materially grows.
+  toolchain status/install. The shell fills the Wails client area and leaves
+  minimize/maximize/close controls to the native Wails host. Storage rows open
+  their corresponding directories in Windows Explorer. Split into child
+  components only when the view logic materially grows.
 
 ---
 

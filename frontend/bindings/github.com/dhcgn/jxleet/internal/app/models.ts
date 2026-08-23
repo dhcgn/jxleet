@@ -75,6 +75,7 @@ export interface PresetSummary {
     "name": string;
     "description": string;
     "policy": string;
+    "readOnly": boolean;
 }
 
 /**

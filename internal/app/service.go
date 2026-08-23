@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -200,6 +201,7 @@ type PresetSummary struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Policy      string `json:"policy"`
+	ReadOnly    bool   `json:"readOnly"`
 }
 
 // ListPresets returns valid stored presets.
@@ -214,6 +216,7 @@ func (s *Service) ListPresets() ([]PresetSummary, error) {
 			Name:        p.Name,
 			Description: p.Description,
 			Policy:      string(p.Output.Policy),
+			ReadOnly:    p.ReadOnly,
 		})
 	}
 	return result, nil
@@ -274,6 +277,34 @@ func (s *Service) UnregisterContextMenu() error {
 // ContextMenuRegistered reports whether the primary Explorer entry exists.
 func (s *Service) ContextMenuRegistered() (bool, error) {
 	return shellext.Registered()
+}
+
+// OpenStorageLocation opens one of jxleet's storage directories in Explorer.
+func (s *Service) OpenStorageLocation(location string) error {
+	var path string
+	switch location {
+	case "config":
+		path = s.paths.ConfigDir
+	case "presets":
+		path = s.paths.PresetsDir
+	case "bin":
+		path = s.paths.BinDir
+	case "logs":
+		path = s.paths.LogsDir
+	default:
+		return fmt.Errorf("unknown storage location %q", location)
+	}
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		return fmt.Errorf("create storage location: %w", err)
+	}
+	cmd := exec.Command("explorer.exe", path)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("open storage location: %w", err)
+	}
+	if err := cmd.Process.Release(); err != nil {
+		return fmt.Errorf("release Explorer process: %w", err)
+	}
+	return nil
 }
 
 // ConversionOptions are the temporary GUI settings applied to a preset for one

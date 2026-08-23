@@ -9,6 +9,9 @@ import "github.com/dhcgn/jxleet/internal/cjxl"
 // CurrentVersion is the preset schema version written by this build.
 const CurrentVersion = 1
 
+// DefaultName is the read-only preset created on first start.
+const DefaultName = "Default"
+
 // Policy selects where a converted file is written.
 type Policy string
 
@@ -47,6 +50,7 @@ type Preset struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description,omitempty"`
 	Version     int    `yaml:"version"`
+	ReadOnly    bool   `yaml:"read_only,omitempty"`
 	Output      Output `yaml:"output"`
 	Rules       []Rule `yaml:"rules"`
 }

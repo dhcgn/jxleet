@@ -95,6 +95,7 @@
     Skip: files.filter((file) => file.skip).length,
   }));
   let totalSize = $derived(files.reduce((total, file) => total + file.size, 0));
+  let selectedPresetReadOnly = $derived(presets.find((preset) => preset.name === selectedPreset)?.readOnly ?? false);
   let dominantRoute = $derived(
     routeCounts.Reencode >= routeCounts.Encode && routeCounts.Reencode >= routeCounts.Transcode
       ? 'Reencode'
@@ -359,7 +360,7 @@
   }
 
   async function deletePreset(): Promise<void> {
-    if (!selectedPreset || !window.confirm(`Delete "${selectedPreset}"?`)) return;
+    if (!selectedPreset || selectedPresetReadOnly || !window.confirm(`Delete "${selectedPreset}"?`)) return;
     try {
       await Service.DeletePreset(selectedPreset);
       if (presetName === selectedPreset) presetName = '';
@@ -405,6 +406,14 @@
     try {
       await Service.UnregisterContextMenu();
       contextMenuRegistered = false;
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  async function openStorage(location: string): Promise<void> {
+    try {
+      await Service.OpenStorageLocation(location);
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -503,14 +512,6 @@
 }} />
 
 <main class:running={view === 'running' || view === 'automatic'} class:narrow={view === 'automatic'} class="app">
-  <div class="titlebar">
-    <span class="name">JXLEET{view === 'drop' ? '' : ` - ${view.toUpperCase()}`}</span>
-    <span class="spacer"></span>
-    <span class="wctl" aria-hidden="true">-</span>
-    <span class="wctl" aria-hidden="true">[]</span>
-    <span class="wctl close" aria-hidden="true">x</span>
-  </div>
-
   <div class="toolbar">
     <div class="seg" aria-label="Editor mode">
       <button aria-pressed={mode === 'basic'} onclick={() => { mode = 'basic'; if (view === 'expert') view = 'basic'; }}>Basic</button>
@@ -705,11 +706,13 @@
           <h3>Effort <span class="r">what this level adds</span></h3>
           <div class="in">
             <div class="ladder-head">
-              <span class="lvl">{effort}</span>
               <span class="nm">{effortNames[effort - 1]}</span>
               <span class="hint">{effort === 7 ? 'cjxl default' : effort >= 9 ? 'noticeably slower' : effort <= 3 ? 'very fast, larger file' : ''}</span>
             </div>
-            <input type="range" min="1" max="10" value={effort} oninput={setEffort} data-testid="effort-range" aria-label="Effort" />
+            <div class="effort-slider">
+              <input type="range" min="1" max="10" value={effort} oninput={setEffort} data-testid="effort-range" aria-label="Effort" />
+              <output class="effort-value" style={`left:${((effort - 1) / 9) * 100}%`}>{effort}</output>
+            </div>
             <div class="ticks">
               {#each effortNames as name, index}
                 <span class:on={index + 1 === effort}>{index + 1}</span>
@@ -904,10 +907,10 @@
           <div class="card">
             <h3>Storage locations</h3>
             <div class="in kv">
-              <div><span>Settings</span><span>%APPDATA%\\jxleet\\config.yaml</span></div>
-              <div><span>Presets</span><span>%APPDATA%\\jxleet\\presets\\</span></div>
-              <div><span>Binaries</span><span>%LOCALAPPDATA%\\jxleet\\bin\\</span></div>
-              <div><span>Logs</span><span>%LOCALAPPDATA%\\jxleet\\logs\\</span></div>
+              <div><span>Settings</span><span>%APPDATA%\\jxleet\\config.yaml</span><button class="icon-btn" aria-label="Open settings folder" title="Open in Explorer" onclick={() => void openStorage('config')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></div>
+              <div><span>Presets</span><span>%APPDATA%\\jxleet\\presets\\</span><button class="icon-btn" aria-label="Open presets folder" title="Open in Explorer" onclick={() => void openStorage('presets')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></div>
+              <div><span>Binaries</span><span>%LOCALAPPDATA%\\jxleet\\bin\\</span><button class="icon-btn" aria-label="Open binaries folder" title="Open in Explorer" onclick={() => void openStorage('bin')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></div>
+              <div><span>Logs</span><span>%LOCALAPPDATA%\\jxleet\\logs\\</span><button class="icon-btn" aria-label="Open logs folder" title="Open in Explorer" onclick={() => void openStorage('logs')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></div>
             </div>
           </div>
         </div>
@@ -926,7 +929,7 @@
               <tbody>
                 {#each presets as preset}
                   <tr aria-selected={selectedPreset === preset.name} onclick={() => selectedPreset = preset.name}>
-                    <td class="fn">{preset.name}</td><td>{preset.description || '-'}</td><td class="num">{preset.policy}</td>
+                    <td class="fn">{preset.name}{preset.readOnly ? ' (read-only)' : ''}</td><td>{preset.description || '-'}</td><td class="num">{preset.policy}</td>
                   </tr>
                 {/each}
               </tbody>
@@ -935,8 +938,8 @@
           <div class="in" style="display:flex;gap:8px;border-top:1px solid var(--line-soft);flex-wrap:wrap">
             <button class="btn" data-testid="preset-new" onclick={() => void createPreset()}>New preset</button>
             <button class="btn ghost" onclick={() => void duplicatePreset()} disabled={!selectedPreset}>Duplicate</button>
-            <button class="btn ghost" onclick={() => void renamePreset()} disabled={!selectedPreset}>Rename</button>
-            <button class="btn danger" style="margin-left:auto" onclick={() => void deletePreset()} disabled={!selectedPreset}>Delete</button>
+            <button class="btn ghost" onclick={() => void renamePreset()} disabled={!selectedPreset || selectedPresetReadOnly}>Rename</button>
+            <button class="btn danger" style="margin-left:auto" onclick={() => void deletePreset()} disabled={!selectedPreset || selectedPresetReadOnly}>Delete</button>
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:12px">

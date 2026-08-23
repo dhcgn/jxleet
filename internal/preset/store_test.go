@@ -160,3 +160,40 @@ func TestStoreWritesReadableYAML(t *testing.T) {
 		t.Error("written preset is empty")
 	}
 }
+
+func TestDefaultPresetIsReadOnly(t *testing.T) {
+	store := NewStore(t.TempDir())
+	created, err := EnsureDefault(store)
+	if err != nil || !created {
+		t.Fatalf("EnsureDefault created=%v err=%v", created, err)
+	}
+	p, err := store.Load(DefaultName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.ReadOnly {
+		t.Error("default preset must be read-only")
+	}
+	if err := store.Save(p); err == nil {
+		t.Error("saving the default preset should fail")
+	}
+	if err := store.Delete(DefaultName); err == nil {
+		t.Error("deleting the default preset should fail")
+	}
+	if err := store.Rename(DefaultName, "custom"); err == nil {
+		t.Error("renaming the default preset should fail")
+	}
+	if err := store.Duplicate(DefaultName, "custom"); err != nil {
+		t.Fatalf("duplicating the default preset: %v", err)
+	}
+	custom, err := store.Load("custom")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if custom.ReadOnly {
+		t.Error("duplicating a read-only preset should create a writable copy")
+	}
+	if created, err := EnsureDefault(store); err != nil || created {
+		t.Errorf("EnsureDefault on existing default created=%v err=%v", created, err)
+	}
+}
