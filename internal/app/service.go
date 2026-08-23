@@ -2,12 +2,19 @@
 // exported service types become the strongly-typed JS/TS binding surface.
 package app
 
-import "github.com/dhcgn/jxleet/internal/config"
+import (
+	"sync"
+
+	"github.com/dhcgn/jxleet/internal/config"
+)
 
 // Service is the root object bound to the frontend.
 type Service struct {
 	paths config.Paths
 	cfg   config.Config
+
+	mu      sync.Mutex
+	pending []string
 }
 
 // New constructs the root service with resolved paths and loaded config.
@@ -35,4 +42,25 @@ func (s *Service) GetStatus() Status {
 		UnboundEntryPoints: names,
 		Ready:              len(names) == 0,
 	}
+}
+
+// AddPaths queues paths handed over from this or another process invocation.
+// The frontend also receives a "files" event for live updates; TakePending lets
+// it drain anything queued before it started listening.
+func (s *Service) AddPaths(paths []string) {
+	if len(paths) == 0 {
+		return
+	}
+	s.mu.Lock()
+	s.pending = append(s.pending, paths...)
+	s.mu.Unlock()
+}
+
+// TakePending returns and clears the queued paths.
+func (s *Service) TakePending() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p := s.pending
+	s.pending = nil
+	return p
 }

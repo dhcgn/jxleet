@@ -3,9 +3,13 @@ package main
 import (
 	"embed"
 	"log"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/dhcgn/jxleet/internal/app"
 	"github.com/dhcgn/jxleet/internal/config"
+	"github.com/dhcgn/jxleet/internal/ipc"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -15,6 +19,12 @@ import (
 //
 //go:embed all:frontend/dist
 var assets embed.FS
+
+func init() {
+	// Files handed over from secondary invocations are delivered to the frontend
+	// as this event; registering it gives the binding generator a typed API.
+	application.RegisterEvent[[]string]("files")
+}
 
 func main() {
 	paths, err := config.ResolvePaths()
@@ -31,7 +41,21 @@ func main() {
 		log.Fatal(err)
 	}
 
+	inputs, presetOverride := parseArgs(os.Args[1:])
+
+	// Single-instance: become the owner, or hand our paths to the running
+	// instance and exit immediately (so callers like Lightroom are not blocked).
+	server, handedOver, err := ipc.Acquire(ipc.Message{Paths: inputs, Preset: presetOverride}, 500*time.Millisecond)
+	if err != nil {
+		// Could neither own nor reach an owner; continue standalone without IPC.
+		log.Printf("ipc: %v (continuing without single-instance handover)", err)
+	}
+	if handedOver {
+		return
+	}
+
 	svc := app.New(paths, cfg)
+	svc.AddPaths(inputs)
 
 	wailsApp := application.New(application.Options{
 		Name:        "jxleet",
@@ -54,7 +78,37 @@ func main() {
 		URL:              "/",
 	})
 
+	// Coalesce handovers from later invocations into this running instance.
+	if server != nil {
+		go server.Serve(func(m ipc.Message) {
+			svc.AddPaths(m.Paths)
+			wailsApp.Event.Emit("files", m.Paths)
+		})
+		defer server.Close()
+	}
+
 	if err := wailsApp.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// parseArgs performs the minimal argument parsing needed at startup: everything
+// that is not a flag is treated as an input path, and --preset[=name] is
+// captured as an override. Full CLI handling lives in a later phase.
+func parseArgs(args []string) (paths []string, presetOverride string) {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--preset" && i+1 < len(args):
+			presetOverride = args[i+1]
+			i++
+		case strings.HasPrefix(a, "--preset="):
+			presetOverride = strings.TrimPrefix(a, "--preset=")
+		case strings.HasPrefix(a, "-"):
+			// Ignore unrecognised flags for now (handled in the CLI phase).
+		default:
+			paths = append(paths, a)
+		}
+	}
+	return paths, presetOverride
 }

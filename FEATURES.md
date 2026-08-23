@@ -39,10 +39,10 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [ ] Preset name visible in the menu text 
 
 ## Concurrency
-- [ ] Single instance 
-- [ ] Handover to the running instance, second process returns immediately 
+- [x] Single instance 
+- [x] Handover to the running instance, second process returns immediately 
 - [ ] Coalesce invocations into one run 
-- [ ] Takeover when the instance is unreachable 
+- [x] Takeover when the instance is unreachable 
 - [x] Pause and cancel 
 - [x] Processes and threads configurable separately 
 - [x] Progress with remaining time from measured throughput 

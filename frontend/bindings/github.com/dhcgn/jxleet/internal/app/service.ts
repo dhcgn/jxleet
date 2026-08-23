@@ -15,8 +15,24 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * AddPaths queues paths handed over from this or another process invocation.
+ * The frontend also receives a "files" event for live updates; TakePending lets
+ * it drain anything queued before it started listening.
+ */
+export function AddPaths(paths: string[] | null): $CancellablePromise<void> {
+    return $Call.ByID(2953239195, paths);
+}
+
+/**
  * GetStatus reports whether the app is ready to run conversions.
  */
 export function GetStatus(): $CancellablePromise<$models.Status> {
     return $Call.ByID(2946764936);
+}
+
+/**
+ * TakePending returns and clears the queued paths.
+ */
+export function TakePending(): $CancellablePromise<string[] | null> {
+    return $Call.ByID(1800653784);
 }

@@ -8,18 +8,19 @@ libjxl's `cjxl`. **jxleet does not encode anything itself** — it decides which
 files to hand to `cjxl`, assembles arguments, runs the process, and reports
 results. Never add encoding logic; only orchestrate the libjxl tools.
 
-## Project status: full conversion pipeline complete (engine)
-- Phases 0–5 are **done**. The engine (`internal/convert`) ties everything
-  together: per-file pipeline (detect → route → prepare → encode → verify →
-  finalize) behind an `Encoder` interface, a cond-based worker pool with
-  **separate Processes and Threads**, **pause/cancel**, **coalescing** of late
-  arrivals (Start/Add/CloseInput/Wait), and a sliding-window **throughput ETA**.
-  Verified end-to-end against real cjxl/djxl (parallel batch, outputs decode).
-  `task check` is green.
-- Still open nearby: the interactive irreversible-replace confirmation, entry
-  points consuming bindings, effort-ladder matrix. Next per the plan:
-  **Phase 6 — IPC** (single instance, named-pipe handover, coalescing across
-  process invocations, takeover) which drives the engine's Add during a run.
+## Project status: core complete through IPC single-instance
+- Phases 0–6 are **done**. Latest: `internal/ipc` — Windows named-pipe
+  single-instance (per-user SID pipe), handover (secondary invocations send
+  their paths + `--preset` and exit within ms), takeover when no owner is
+  reachable, and coalescing of multiple invocations. `main.go` now does
+  single-instance startup and feeds handed-over paths into the app service +
+  a `files` Wails event. The engine was validated on the real committed
+  `test-data/` sample (JPEG→transcode with byte-identical reconstruction,
+  JXL→reencode, 8/16-bit PNG→encode). `task check` is green.
+- Still open nearby: joining coalesced handovers into one **running** engine
+  run (needs the GUI), the irreversible-replace confirmation, entry points
+  consuming bindings, effort-ladder matrix. Next per the plan: **Phase 7 —
+  Toolchain** (versions, download+verify, atomic update, flag diff/lock).
 - Authoritative documents (read these first):
   - `README.md` — product specification.
   - `FEATURES.md` — scope checklist (**living**, see rules below).
