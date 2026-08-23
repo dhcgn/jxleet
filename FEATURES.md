@@ -43,9 +43,9 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [ ] Handover to the running instance, second process returns immediately 
 - [ ] Coalesce invocations into one run 
 - [ ] Takeover when the instance is unreachable 
-- [ ] Pause and cancel 
-- [ ] Processes and threads configurable separately 
-- [ ] Progress with remaining time from measured throughput 
+- [x] Pause and cancel 
+- [x] Processes and threads configurable separately 
+- [x] Progress with remaining time from measured throughput 
 
 ## Toolchain management
 - [ ] Show versions of cjxl, djxl, jxlinfo 

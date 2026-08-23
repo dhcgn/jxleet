@@ -8,20 +8,18 @@ libjxl's `cjxl`. **jxleet does not encode anything itself** — it decides which
 files to hand to `cjxl`, assembles arguments, runs the process, and reports
 results. Never add encoding logic; only orchestrate the libjxl tools.
 
-## Project status: core pipeline through output complete
-- Phases 0–4 are **done**: CI + scaffold; the cjxl core (`internal/cjxl`,
-  `internal/cjxl/flags`); presets (`internal/preset`); and output
-  (`internal/output` + `internal/djxl`): alongside/subfolder/replace path
-  computation with skip/number/overwrite collisions, the recycle-bin replace
-  flow (verify → move → recycle, with a safe in-place path for jxl→jxl), the
-  Windows recycle bin via `SHFileOperationW` (refuses on volumes without one),
-  per-route deletion rules, and irreversible-replace detection. djxl verifies
-  readability and **byte-identical JPEG reconstruction** (confirmed against real
-  cjxl/djxl). `task check` is green.
-- Still open nearby: the interactive irreversible-replace confirmation (GUI/CLI,
-  Phase 8–9), consuming entry-point bindings, and the effort-ladder tool matrix.
-  Next per the plan: **Phase 5 — Engine** (queue, worker pool, pause/cancel,
-  throughput/ETA) tying routes + preset + cjxl + output together.
+## Project status: full conversion pipeline complete (engine)
+- Phases 0–5 are **done**. The engine (`internal/convert`) ties everything
+  together: per-file pipeline (detect → route → prepare → encode → verify →
+  finalize) behind an `Encoder` interface, a cond-based worker pool with
+  **separate Processes and Threads**, **pause/cancel**, **coalescing** of late
+  arrivals (Start/Add/CloseInput/Wait), and a sliding-window **throughput ETA**.
+  Verified end-to-end against real cjxl/djxl (parallel batch, outputs decode).
+  `task check` is green.
+- Still open nearby: the interactive irreversible-replace confirmation, entry
+  points consuming bindings, effort-ladder matrix. Next per the plan:
+  **Phase 6 — IPC** (single instance, named-pipe handover, coalescing across
+  process invocations, takeover) which drives the engine's Add during a run.
 - Authoritative documents (read these first):
   - `README.md` — product specification.
   - `FEATURES.md` — scope checklist (**living**, see rules below).
