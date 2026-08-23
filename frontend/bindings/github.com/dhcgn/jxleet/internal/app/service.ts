@@ -31,6 +31,23 @@ export function GetStatus(): $CancellablePromise<$models.Status> {
 }
 
 /**
+ * GetToolchainStatus reports installed versions, the latest release, and the
+ * Expert flag lock/diff. Network or local toolchain errors are returned to the
+ * caller for display; they are not hidden as an empty status.
+ */
+export function GetToolchainStatus(): $CancellablePromise<$models.ToolchainStatus> {
+    return $Call.ByID(3508019419);
+}
+
+/**
+ * InstallLatestToolchain performs the user-requested libjxl download and
+ * atomic installation. It is deliberately not called by GetToolchainStatus.
+ */
+export function InstallLatestToolchain(): $CancellablePromise<string> {
+    return $Call.ByID(1078493661);
+}
+
+/**
  * TakePending returns and clears the queued paths.
  */
 export function TakePending(): $CancellablePromise<string[] | null> {

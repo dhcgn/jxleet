@@ -7,5 +7,6 @@ export {
 };
 
 export type {
-    Status
+    Status,
+    ToolchainStatus
 } from "./models.js";

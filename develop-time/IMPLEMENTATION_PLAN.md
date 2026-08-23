@@ -140,18 +140,28 @@ separate confirmation for irreversible routes (names the file count).
 
 ## 5. Toolchain manager (`internal/toolchain`)
 
-- Show installed versions of `cjxl/djxl/jxlinfo` (`--version`) on every start.
+- Show installed versions of `cjxl/djxl` (`--version`) and the bundled
+  `jxlinfo` release version on every start (`jxlinfo` itself has no version-only
+  flag in libjxl v0.12.0).
 - Query latest via GitHub API; compare.
-- Download `jxl-x64-windows-static.zip`, verify sha256 against asset `digest`,
-  extract to a temp dir, then **atomic install** (extract to
-  `bin\<version>.tmp` → verify exes run → rename to `bin\<version>` → flip a
-  `current` pointer). Binaries live under `%LOCALAPPDATA%\jxleet\bin\`.
+- Download `jxl-x64-windows-static.zip`, verify sha256 against the GitHub API
+  per-asset `digest`, extract to a temp dir, then **atomic install** (extract to
+  a unique staging directory → verify exes run → move the three exes into the
+  immutable `versions\<version>\bin` directory → atomically replace
+  `current.txt`). Binaries live under `%LOCALAPPDATA%\jxleet\bin\`.
+- The v0.12.0 official ZIP uses **Deflate64**, which Go's `archive/zip` cannot
+  decompress. Go performs archive preflight (contained paths, no symlinks, size
+  limits), then uses the Windows 10/11 built-in `Shell.Application` extractor;
+  no third-party extractor is required.
 - First-run: detect missing tools, offer install (README first-run fetch).
 - **Updates are notify-only** — never automatic/background. When a newer libjxl
   release exists the app shows a notice; the user explicitly triggers the
   download (which then verifies sha256 + atomically installs). Same policy as the
   app itself (§10b).
 - On version mismatch: **lock expert flags** and show a **flag diff** (see §6).
+- `internal/app` exposes `GetToolchainStatus` and
+  `InstallLatestToolchain`; status only notifies, while installation is
+  explicitly user-triggered. The first-run offer belongs to the Tools GUI view.
 
 ---
 

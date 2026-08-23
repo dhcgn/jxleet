@@ -8,8 +8,14 @@ libjxl's `cjxl`. **jxleet does not encode anything itself** — it decides which
 files to hand to `cjxl`, assembles arguments, runs the process, and reports
 results. Never add encoding logic; only orchestrate the libjxl tools.
 
-## Project status: core complete through IPC single-instance
-- Phases 0–6 are **done**. Latest: `internal/ipc` — Windows named-pipe
+## Project status: core complete through toolchain
+- Phases 0–7 are **done**. Latest: `internal/toolchain` — official libjxl
+  GitHub release lookup, per-asset sha256 verification, Deflate64-compatible
+  Windows extraction, immutable versioned install + atomic current pointer,
+  cjxl/djxl/jxlinfo status, notify-only update detection, and Expert flag
+  lock/diff. `internal/app` exposes status and an explicitly user-triggered
+  install method.
+- Earlier IPC: `internal/ipc` — Windows named-pipe
   single-instance (per-user SID pipe), handover (secondary invocations send
   their paths + `--preset` and exit within ms), takeover when no owner is
   reachable, and coalescing of multiple invocations. `main.go` now does
@@ -17,10 +23,11 @@ results. Never add encoding logic; only orchestrate the libjxl tools.
   a `files` Wails event. The engine was validated on the real committed
   `test-data/` sample (JPEG→transcode with byte-identical reconstruction,
   JXL→reencode, 8/16-bit PNG→encode). `task check` is green.
-- Still open nearby: joining coalesced handovers into one **running** engine
-  run (needs the GUI), the irreversible-replace confirmation, entry points
-  consuming bindings, effort-ladder matrix. Next per the plan: **Phase 7 —
-  Toolchain** (versions, download+verify, atomic update, flag diff/lock).
+- Still open nearby: the Tools GUI's first-run installation offer, joining
+  coalesced handovers into one **running** engine run, the
+  irreversible-replace confirmation, entry points consuming bindings, and the
+  effort-ladder matrix. Next per the plan: **Phase 8 — GUI** (port the mockup
+  into Svelte views and wire the backend).
 - Authoritative documents (read these first):
   - `README.md` — product specification.
   - `FEATURES.md` — scope checklist (**living**, see rules below).

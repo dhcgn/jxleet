@@ -48,13 +48,13 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Progress with remaining time from measured throughput 
 
 ## Toolchain management
-- [ ] Show versions of cjxl, djxl, jxlinfo 
-- [ ] Compare with the latest release 
-- [ ] Download with checksum verification 
-- [ ] Atomic update 
-- [ ] Lock expert flags on version mismatch 
+- [x] Show versions of cjxl, djxl, jxlinfo
+- [x] Compare with the latest release
+- [x] Download with checksum verification
+- [x] Atomic update
+- [x] Lock expert flags on version mismatch
 - [ ] Offer first-time installation of the toolchain 
-- [ ] Diff the flag list on version bump 
+- [x] Diff the flag list on version bump
 
 ## Interface
 

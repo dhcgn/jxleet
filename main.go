@@ -10,6 +10,7 @@ import (
 	"github.com/dhcgn/jxleet/internal/app"
 	"github.com/dhcgn/jxleet/internal/config"
 	"github.com/dhcgn/jxleet/internal/ipc"
+	"github.com/dhcgn/jxleet/internal/toolchain"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -54,7 +55,7 @@ func main() {
 		return
 	}
 
-	svc := app.New(paths, cfg)
+	svc := app.New(paths, cfg, toolchain.NewManager(paths.BinDir))
 	svc.AddPaths(inputs)
 
 	wailsApp := application.New(application.Options{

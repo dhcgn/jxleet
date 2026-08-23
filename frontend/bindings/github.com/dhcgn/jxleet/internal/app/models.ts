@@ -16,3 +16,22 @@ export interface Status {
      */
     "ready": boolean;
 }
+
+/**
+ * ToolchainStatus is the compact toolchain state rendered by the Tools view.
+ * Updates are notify-only: querying status never downloads or installs anything.
+ */
+export interface ToolchainStatus {
+    "installedVersion": string;
+    "cjxlVersion": string;
+    "djxlVersion": string;
+    "jxlinfoVersion": string;
+    "latestVersion": string;
+    "updateAvailable": boolean;
+    "needsInstall": boolean;
+    "flagsLocked": boolean;
+    "flagBaseVersion": string;
+    "flagToolVersion": string;
+    "addedFlags": string[] | null;
+    "removedFlags": string[] | null;
+}
