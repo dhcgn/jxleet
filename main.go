@@ -16,6 +16,7 @@ import (
 	"github.com/dhcgn/jxleet/internal/shellext"
 	"github.com/dhcgn/jxleet/internal/toolchain"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 // Wails uses Go's `embed` package to embed the frontend files into the binary.
@@ -65,11 +66,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if _, err := preset.EnsureDefault(preset.NewStore(paths.PresetsDir)); err != nil {
+	presetStore := preset.NewStore(paths.PresetsDir)
+	if _, err := preset.EnsureDefaults(presetStore); err != nil {
 		log.Fatal(err)
 	}
 	_, configFileErr := os.Stat(paths.ConfigFile)
-	if ensureDefaultBindings(&cfg) || errors.Is(configFileErr, os.ErrNotExist) {
+	legacyDefault := false
+	if legacy, err := presetStore.Load(config.LegacyDefaultPresetName); err == nil {
+		legacyDefault = legacy.ReadOnly
+	}
+	if ensureDefaultBindings(&cfg, legacyDefault) || errors.Is(configFileErr, os.ErrNotExist) {
 		if err := config.Save(paths.ConfigFile, cfg); err != nil {
 			log.Fatal(err)
 		}
@@ -124,9 +130,20 @@ func main() {
 			return wailsApp.Dialog.OpenFileWithOptions(&application.OpenFileDialogOptions{
 				Title:                   "Select images or folders",
 				CanChooseFiles:          true,
-				CanChooseDirectories:    true,
+				CanChooseDirectories:    false,
 				AllowsMultipleSelection: true,
 				AllowsOtherFileTypes:    true,
+			}).PromptForMultipleSelection()
+		},
+		OpenFolders: func() ([]string, error) {
+			if wailsApp == nil {
+				return nil, fmt.Errorf("application is not initialized")
+			}
+			return wailsApp.Dialog.OpenFileWithOptions(&application.OpenFileDialogOptions{
+				Title:                   "Select folders",
+				CanChooseFiles:          false,
+				CanChooseDirectories:    true,
+				AllowsMultipleSelection: true,
 			}).PromptForMultipleSelection()
 		},
 	})
@@ -142,14 +159,25 @@ func main() {
 		},
 	})
 
-	wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
+	window := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "jxleet",
 		// Window sized to the golden ratio (1000 / 618 ≈ 1.618).
 		Width:            1000,
 		Height:           618,
 		MinWidth:         420,
+		Hidden:           true,
+		EnableFileDrop:   true,
 		BackgroundColour: application.NewRGB(6, 7, 15),
 		URL:              "/",
+	})
+
+	window.OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
+		if event.Context() != nil {
+			svc.AddPaths(event.Context().DroppedFiles())
+		}
+	})
+	window.OnWindowEvent(events.Windows.WebViewNavigationCompleted, func(_ *application.WindowEvent) {
+		window.Show()
 	})
 
 	// Coalesce handovers from later invocations into this running instance.
@@ -175,14 +203,14 @@ func main() {
 	}
 }
 
-func ensureDefaultBindings(cfg *config.Config) bool {
+func ensureDefaultBindings(cfg *config.Config, migrateLegacy bool) bool {
 	changed := false
 	if cfg.Bindings == nil {
 		cfg.Bindings = map[config.EntryPoint]string{}
 	}
 	for _, entryPoint := range []config.EntryPoint{config.EntryGUI, config.EntryCLI, config.EntryContextMenu} {
-		if cfg.Bindings[entryPoint] == "" {
-			cfg.Bindings[entryPoint] = config.DefaultPresetName
+		if cfg.Bindings[entryPoint] == "" || (migrateLegacy && cfg.Bindings[entryPoint] == config.LegacyDefaultPresetName) {
+			cfg.Bindings[entryPoint] = config.DefaultPresetFor(entryPoint)
 			changed = true
 		}
 	}

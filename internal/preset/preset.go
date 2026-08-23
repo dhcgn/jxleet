@@ -9,9 +9,6 @@ import "github.com/dhcgn/jxleet/internal/cjxl"
 // CurrentVersion is the preset schema version written by this build.
 const CurrentVersion = 1
 
-// DefaultName is the read-only preset created on first start.
-const DefaultName = "Default"
-
 // Policy selects where a converted file is written.
 type Policy string
 

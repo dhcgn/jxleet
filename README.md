@@ -107,14 +107,19 @@ the application.
 
 **Each of the three requires a preset.** Not a default that jxleet picks for you — one you
 choose, once, per entry point. A tool that can replace files should never guess at your
-intent, and until all three bindings are set, jxleet will say so rather than run.
+intent. On first start the read-only `default-gui`, `default-cli`, and
+`default-explorer-context` presets are bound to their respective entry points;
+jxleet refuses to run only when a binding is missing or invalid.
 
 *TODO: Screenshot of the preset bindings panel with the three entry points*
 
 ### 1. The window
 
-Drag files or folders in. Folders are traversed recursively and anything unsupported is
-skipped rather than aborting the batch. Settings split into **Basic** — the essentials — and
+Drag files or folders in. The window provides separate **Open File** and **Open Folder**
+actions, and native Windows drag-and-drop accepts files or folders. A selected folder
+contributes only regular files directly inside it;
+subfolders are not traversed, and anything unsupported is skipped rather than aborting the
+batch. Settings split into **Basic** — the essentials — and
 **Expert**, which exposes the full flag surface plus a live preview of the exact `cjxl`
 command line that will run.
 
@@ -166,9 +171,10 @@ A preset is a YAML file. It pairs **file filters** with **`cjxl` arguments** —
 arguments are passed through verbatim. jxleet does not invent a settings vocabulary that
 wraps the encoder; the preset *is* the argument list.
 
-On first start jxleet creates a read-only `Default` preset and binds it to the graphical
-interface, command line, and Explorer context menu entry points. Duplicate it to create a
-writable preset; the built-in default cannot be renamed, deleted, or overwritten.
+On first start jxleet creates three read-only presets — `default-gui`,
+`default-cli`, and `default-explorer-context` — and binds each to its corresponding entry
+point. Duplicate one to create a writable preset; the built-in defaults cannot be renamed,
+deleted, or overwritten.
 
 ```yaml
 # %APPDATA%\jxleet\presets\archive-lossless.yaml

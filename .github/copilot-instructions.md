@@ -12,7 +12,11 @@ results. Never add encoding logic; only orchestrate the libjxl tools.
 - Phases 0–8 are **done**. Latest: the Svelte/Wails GUI port — all eight mockup
   states, native file dialog/drop intake, preset/binding controls, route
   preview, asynchronous conversion events, pause/resume/cancel,
-  toolchain install/status, and irreversible-replace confirmation. The visual
+  toolchain install/status, and irreversible-replace confirmation. The current
+  UI uses Wails-native file drops, separate Open File/Open Folder actions,
+  one-level folder enumeration, a full-bleed shell, scrollable content with
+  pinned conversion actions, hidden child processes, fixed-width result tables,
+  compact capability icons, and backend-derived preset summaries. The visual
   port lives in `frontend/src/App.svelte` + `frontend/public/style.css`.
 - Toolchain: `internal/toolchain` — official libjxl
   GitHub release lookup, per-asset sha256 verification, Deflate64-compatible
@@ -67,8 +71,9 @@ results. Never add encoding logic; only orchestrate the libjxl tools.
 - **Distance is the single stored quality value**; quality (`-q`) is a display
   transform only.
 - Each entry point (GUI / CLI / context menu) needs an explicit **preset binding**.
-  First start creates and binds the read-only `Default` preset to all three;
-  never silently replace an existing user binding.
+  First start creates `default-gui`, `default-cli`, and
+  `default-explorer-context` as read-only presets and binds them to their
+  respective entry points; never silently replace an existing user binding.
 
 ## Working agreements
 - **`FEATURES.md` is the source of truth for scope.** When you implement a listed

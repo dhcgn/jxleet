@@ -13,8 +13,14 @@ func TestLoadMissingReturnsDefault(t *testing.T) {
 	if len(c.UnboundEntryPoints()) != 0 {
 		t.Errorf("fresh config should bind the default preset, unbound = %v", c.UnboundEntryPoints())
 	}
-	if name, ok := c.Binding(EntryGUI); !ok || name != DefaultPresetName {
+	if name, ok := c.Binding(EntryGUI); !ok || name != DefaultGUIPresetName {
 		t.Errorf("fresh GUI binding = %q ok=%v", name, ok)
+	}
+	if name, ok := c.Binding(EntryCLI); !ok || name != DefaultCLIPresetName {
+		t.Errorf("fresh CLI binding = %q ok=%v", name, ok)
+	}
+	if name, ok := c.Binding(EntryContextMenu); !ok || name != DefaultExplorerContextPresetName {
+		t.Errorf("fresh context-menu binding = %q ok=%v", name, ok)
 	}
 }
 

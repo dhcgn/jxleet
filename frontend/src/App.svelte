@@ -137,6 +137,9 @@
       progress = { ...progress, paused: false, percent: 100 };
       view = 'done';
       busy = false;
+      if (summary?.cancelled) {
+        errorMessage = '! cancelled by user';
+      }
     });
     const offError = Events.On('conversion-error', (event: any) => {
       errorMessage = String(event?.data ?? 'Conversion error');
@@ -226,9 +229,18 @@
     void refreshPreview();
   }
 
-  async function browse(): Promise<void> {
+  async function openFile(): Promise<void> {
     try {
       const paths = (await Service.OpenFiles()) ?? [];
+      acceptPaths(paths);
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  async function openFolder(): Promise<void> {
+    try {
+      const paths = (await Service.OpenFolders()) ?? [];
       acceptPaths(paths);
     } catch (error) {
       errorMessage = errorText(error);
@@ -242,7 +254,7 @@
       .map((file) => (file as File & { path?: string }).path ?? '')
       .filter(Boolean);
     if (paths.length === 0) {
-      errorMessage = 'The WebView did not expose local paths. Use Browse to select files or folders.';
+      errorMessage = 'The WebView did not expose local paths. Use Open File or Open Folder.';
       return;
     }
     acceptPaths(paths);
@@ -250,7 +262,7 @@
 
   async function startConversion(): Promise<void> {
     if (inputPaths.length === 0) {
-      errorMessage = 'Drop or browse for at least one file or folder first.';
+      errorMessage = 'Drop files or use Open File/Open Folder first.';
       return;
     }
     if (presetName === '') {
@@ -448,6 +460,10 @@
     return 'Skipped';
   }
 
+  function compactFileName(name: string): string {
+    return name.length > 9 ? `${name.slice(0, 3)}...${name.slice(-6)}` : name;
+  }
+
   function formatBytes(value: number): string {
     if (value < 1024) return `${value} B`;
     const units = ['KB', 'MB', 'GB', 'TB'];
@@ -498,6 +514,10 @@
   function errorText(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
   }
+
+  function dismissMessage(): void {
+    errorMessage = '';
+  }
 </script>
 
 <svelte:head>
@@ -507,7 +527,7 @@
 <svelte:window onkeydown={(event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') {
     event.preventDefault();
-    void browse();
+    void openFile();
   }
 }} />
 
@@ -537,7 +557,10 @@
   </div>
 
   {#if errorMessage}
-    <div class="banner warn" role="alert"><span class="ic">!</span><span>{errorMessage}</span></div>
+    <div class="banner warn" role="alert">
+      <span class="ic">!</span><span>{errorMessage}</span>
+      <button class="alert-close" aria-label="Dismiss message" title="Dismiss" onclick={dismissMessage}>x</button>
+    </div>
   {/if}
 
   {#if !loaded}
@@ -561,14 +584,15 @@
       <div
         class:dragging
         class="drop"
+        data-file-drop-target="dropzone"
         role="button"
         tabindex="0"
         aria-label="Drop files or folders"
         ondragover={(event) => { event.preventDefault(); dragging = true; }}
         ondragleave={() => { dragging = false; }}
         ondrop={handleDrop}
-        onclick={() => void browse()}
-        onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') void browse(); }}
+        onclick={() => void openFile()}
+        onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') void openFile(); }}
       >
         <div class="big">Drop files or folders here</div>
         <div class="sub">jxleet detects the input format and chooses the route. Unsupported files are skipped and reported.</div>
@@ -577,8 +601,11 @@
           <span class="badge b-reencode">JPEG / JXL - reencode</span>
           <span class="badge b-encode">Pixel - encode</span>
         </div>
-        <div class="sub" style="margin-top:10px">or <kbd>Ctrl</kbd> + <kbd>O</kbd> to browse</div>
-        <button class="btn primary" style="margin:4px auto 0;background:var(--p-encode)" onclick={(event) => { event.stopPropagation(); void browse(); }}>Browse</button>
+        <div class="sub" style="margin-top:10px">or use one of the native open actions</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin:4px auto 0;flex-wrap:wrap">
+          <button class="btn primary" style="background:var(--p-encode)" onclick={(event) => { event.stopPropagation(); void openFile(); }}>Open File</button>
+          <button class="btn" onclick={(event) => { event.stopPropagation(); void openFolder(); }}>Open Folder</button>
+        </div>
       </div>
     </div>
   {:else if view === 'basic'}
@@ -608,12 +635,17 @@
             <div class="empty">Choose a preset to classify the selected paths.</div>
           {:else}
             <table class="files" data-testid="file-table">
+              <colgroup>
+                <col class="file-col" />
+                <col class="route-col" />
+                <col class="size-col" />
+              </colgroup>
               <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Size</th></tr></thead>
               <tbody>
                 {#each files as file}
                   <tr>
-                    <td class="fn" title={file.path}>{file.name}</td>
-                    <td><span class={`badge ${routeClass(file.route)}`}>{file.skip ? 'skip' : file.route}</span></td>
+                    <td class="fn" title={file.path}>{compactFileName(file.name)}</td>
+                    <td class="route-cell"><span class={`badge ${routeClass(file.route)}`}>{file.skip ? 'skip' : file.route}</span></td>
                     <td class="num">{formatBytes(file.size)}</td>
                   </tr>
                 {/each}
@@ -683,7 +715,7 @@
             </div>
           </div>
 
-          <button class="btn primary" style={`background:var(--p-${dominantRoute === 'Transcode' ? 'transcode' : dominantRoute === 'Encode' ? 'encode' : 'reencode'});padding:11px`} data-testid="start-convert" onclick={() => void startConversion()} disabled={!hasFiles || busy}>
+          <button class="btn primary convert-action" style={`background:var(--p-${dominantRoute === 'Transcode' ? 'transcode' : dominantRoute === 'Encode' ? 'encode' : 'reencode'});padding:11px`} data-testid="start-convert" onclick={() => void startConversion()} disabled={!hasFiles || busy}>
             Convert {files.length} files
           </button>
         </div>
@@ -711,7 +743,6 @@
             </div>
             <div class="effort-slider">
               <input type="range" min="1" max="10" value={effort} oninput={setEffort} data-testid="effort-range" aria-label="Effort" />
-              <output class="effort-value" style={`left:${((effort - 1) / 9) * 100}%`}>{effort}</output>
             </div>
             <div class="ticks">
               {#each effortNames as name, index}
@@ -728,8 +759,16 @@
                     {#each effortNames as _, index}
                       <td class:colhi={index + 1 === effort} class="cell"><span class:on={applicable && index + 1 >= tool.from} class:cur={applicable && index + 1 === effort} class="dot"></span></td>
                     {/each}
-                    <td class="mode">{tool.lossy ? 'yes' : '-'}</td>
-                    <td class="mode">{tool.lossless ? 'yes' : '-'}</td>
+                    <td class="mode">
+                      <span class="capability-icon" class:capability-yes={tool.lossy} role="img" aria-label={tool.lossy ? 'Lossy mode supported' : 'Lossy mode not supported'} title={tool.lossy ? 'Lossy mode supported' : 'Lossy mode not supported'}>
+                        {#if tool.lossy}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8 3 3 7-7"></path></svg>{:else}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4 4 12"></path></svg>{/if}
+                      </span>
+                    </td>
+                    <td class="mode">
+                      <span class="capability-icon" class:capability-yes={tool.lossless} role="img" aria-label={tool.lossless ? 'Lossless mode supported' : 'Lossless mode not supported'} title={tool.lossless ? 'Lossless mode supported' : 'Lossless mode not supported'}>
+                        {#if tool.lossless}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8 3 3 7-7"></path></svg>{:else}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4 4 12"></path></svg>{/if}
+                      </span>
+                    </td>
                   </tr>
                 {/each}
               </tbody>
@@ -766,7 +805,7 @@
               <div class="row"><span class="k">Parallel processes</span><span class="v">{processes}</span></div>
             </div>
           </div>
-          <button class="btn primary" style="background:var(--p-encode);padding:11px" onclick={() => void startConversion()} disabled={!hasFiles || busy}>Convert {files.length} files</button>
+          <button class="btn primary convert-action" style="background:var(--p-encode);padding:11px" onclick={() => void startConversion()} disabled={!hasFiles || busy}>Convert {files.length} files</button>
         </div>
       </div>
     </div>
@@ -831,15 +870,22 @@
             <div class="empty">No file results were reported.</div>
           {:else}
             <table class="files" data-testid="result-table">
+              <colgroup>
+                <col class="result-file-col" />
+                <col class="result-route-col" />
+                <col class="result-size-col" />
+                <col class="result-size-col" />
+                <col class="result-status-col" />
+              </colgroup>
               <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Before</th><th style="text-align:right">After</th><th>Status</th></tr></thead>
               <tbody>
                 {#each results as result}
                   <tr>
-                    <td class="fn" title={result.input}>{result.input.split(/[\\/]/).pop()}</td>
-                    <td><span class={`badge ${routeClass(result.route)}`}>{result.route || 'Skip'}</span></td>
+                    <td class="fn" title={result.input}>{compactFileName(result.input.split(/[\\/]/).pop() ?? result.input)}</td>
+                    <td class="route-cell"><span class={`badge ${routeClass(result.route)}`}>{result.route || 'Skip'}</span></td>
                     <td class="num">{formatBytes(result.inputSize)}</td>
                     <td class="num">{formatBytes(result.outputSize)}</td>
-                    <td class:error={Boolean(result.error)} class:success={!result.error && !result.skipped}>{result.error || result.skipReason || (result.cancelled ? 'cancelled' : 'done')}</td>
+                    <td class="status-cell" title={result.error || result.skipReason || (result.cancelled ? 'cancelled' : 'done')} class:error={Boolean(result.error)} class:success={!result.error && !result.skipped}>{result.error || result.skipReason || (result.cancelled ? 'cancelled' : 'done')}</td>
                   </tr>
                 {/each}
               </tbody>
@@ -925,11 +971,22 @@
             <div class="empty">No presets yet. Create one or copy a YAML preset into %APPDATA%\\jxleet\\presets\\.</div>
           {:else}
             <table class="files" data-testid="preset-table">
-              <thead><tr><th>Name</th><th>Description</th><th>Output</th></tr></thead>
+              <colgroup>
+                <col class="preset-name-col" />
+                <col class="preset-core-col" />
+                <col class="preset-effort-col" />
+                <col class="preset-jpeg-col" />
+                <col class="preset-output-col" />
+              </colgroup>
+              <thead><tr><th>Preset</th><th>Core</th><th>Effort</th><th>JPEG</th><th>Output</th></tr></thead>
               <tbody>
                 {#each presets as preset}
                   <tr aria-selected={selectedPreset === preset.name} onclick={() => selectedPreset = preset.name}>
-                    <td class="fn">{preset.name}{preset.readOnly ? ' (read-only)' : ''}</td><td>{preset.description || '-'}</td><td class="num">{preset.policy}</td>
+                    <td class="fn" title={preset.description}>{preset.name}{preset.readOnly ? ' (read-only)' : ''}</td>
+                    <td class="num">{preset.coreValue}</td>
+                    <td class="num">{preset.effort}</td>
+                    <td class="num">{preset.jpegMode}</td>
+                    <td class="num">{preset.policy}</td>
                   </tr>
                 {/each}
               </tbody>

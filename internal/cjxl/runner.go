@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"regexp"
 	"time"
+
+	"github.com/dhcgn/jxleet/internal/process"
 )
 
 // Runner executes a specific cjxl binary.
@@ -46,7 +48,7 @@ func (r *Runner) Run(ctx context.Context, args []Arg, input, output string) Resu
 // exec runs the binary with raw arguments and captures its streams.
 func (r *Runner) exec(ctx context.Context, argv []string) Result {
 	start := time.Now()
-	cmd := exec.CommandContext(ctx, r.Binary, argv...)
+	cmd := process.CommandContext(ctx, r.Binary, argv...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -75,7 +77,7 @@ var versionRe = regexp.MustCompile(`v(\d+\.\d+\.\d+)`)
 // Version runs `cjxl --version` and returns the parsed semantic version, e.g.
 // "0.12.0". It returns an error if the binary cannot be run.
 func (r *Runner) Version(ctx context.Context) (string, error) {
-	cmd := exec.CommandContext(ctx, r.Binary, "--version")
+	cmd := process.CommandContext(ctx, r.Binary, "--version")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err

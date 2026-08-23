@@ -1,6 +1,6 @@
 // Package cli parses jxleet's small command-line surface. Path arguments are
 // intentionally accepted in any mix of files and folders; the GUI/engine owns
-// recursive expansion and conversion.
+// one-level folder expansion and conversion.
 package cli
 
 import (

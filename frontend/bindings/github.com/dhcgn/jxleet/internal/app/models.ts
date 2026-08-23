@@ -76,6 +76,9 @@ export interface PresetSummary {
     "description": string;
     "policy": string;
     "readOnly": boolean;
+    "coreValue": string;
+    "effort": string;
+    "jpegMode": string;
 }
 
 /**

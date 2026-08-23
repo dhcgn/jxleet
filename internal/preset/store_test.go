@@ -163,27 +163,33 @@ func TestStoreWritesReadableYAML(t *testing.T) {
 
 func TestDefaultPresetIsReadOnly(t *testing.T) {
 	store := NewStore(t.TempDir())
-	created, err := EnsureDefault(store)
+	created, err := EnsureDefaults(store)
 	if err != nil || !created {
-		t.Fatalf("EnsureDefault created=%v err=%v", created, err)
+		t.Fatalf("EnsureDefaults created=%v err=%v", created, err)
 	}
-	p, err := store.Load(DefaultName)
+	for _, name := range []string{"default-gui", "default-cli", "default-explorer-context"} {
+		p, err := store.Load(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !p.ReadOnly {
+			t.Errorf("%s must be read-only", name)
+		}
+	}
+	p, err := store.Load("default-gui")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if !p.ReadOnly {
-		t.Error("default preset must be read-only")
 	}
 	if err := store.Save(p); err == nil {
 		t.Error("saving the default preset should fail")
 	}
-	if err := store.Delete(DefaultName); err == nil {
+	if err := store.Delete("default-gui"); err == nil {
 		t.Error("deleting the default preset should fail")
 	}
-	if err := store.Rename(DefaultName, "custom"); err == nil {
+	if err := store.Rename("default-gui", "custom"); err == nil {
 		t.Error("renaming the default preset should fail")
 	}
-	if err := store.Duplicate(DefaultName, "custom"); err != nil {
+	if err := store.Duplicate("default-gui", "custom"); err != nil {
 		t.Fatalf("duplicating the default preset: %v", err)
 	}
 	custom, err := store.Load("custom")
@@ -193,7 +199,56 @@ func TestDefaultPresetIsReadOnly(t *testing.T) {
 	if custom.ReadOnly {
 		t.Error("duplicating a read-only preset should create a writable copy")
 	}
-	if created, err := EnsureDefault(store); err != nil || created {
-		t.Errorf("EnsureDefault on existing default created=%v err=%v", created, err)
+	if created, err := EnsureDefaults(store); err != nil || created {
+		t.Errorf("EnsureDefaults on existing defaults created=%v err=%v", created, err)
+	}
+}
+
+func TestDefaultPresetRules(t *testing.T) {
+	store := NewStore(t.TempDir())
+	if _, err := EnsureDefaults(store); err != nil {
+		t.Fatal(err)
+	}
+	gui, err := store.Load("default-gui")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gui.Output.Policy != PolicyAlongside || len(gui.Rules) != 4 {
+		t.Fatalf("GUI defaults = %+v", gui)
+	}
+	if got := gui.Rules[0].Args[0]; got.Key != "-d" || got.Value != "0.3" {
+		t.Errorf("JXL rule = %+v", got)
+	}
+	if got := gui.Rules[0].Args[1]; got.Key != "-e" || got.Value != "8" {
+		t.Errorf("JXL effort = %+v", got)
+	}
+	if got := gui.Rules[1].Args[0]; got.Key != "--lossless_jpeg" || got.Value != "1" {
+		t.Errorf("JPEG rule = %+v", got)
+	}
+	if got := gui.Rules[2].Args[0]; got.Key != "-d" || got.Value != "0" {
+		t.Errorf("PNG distance = %+v", got)
+	}
+	if got := gui.Rules[2].Args[1]; got.Key != "-e" || got.Value != "9" {
+		t.Errorf("PNG effort = %+v", got)
+	}
+	if got := gui.Rules[3].Args[0]; got.Key != "-d" || got.Value != "0.5" {
+		t.Errorf("fallback distance = %+v", got)
+	}
+	if got := gui.Rules[3].Args[1]; got.Key != "-e" || got.Value != "7" {
+		t.Errorf("fallback effort = %+v", got)
+	}
+
+	cliPreset, err := store.Load("default-cli")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cliPreset.Output.Policy != PolicyReplace || len(cliPreset.Rules) != 1 {
+		t.Fatalf("CLI defaults = %+v", cliPreset)
+	}
+	args := cliPreset.Rules[0].Args
+	if len(args) != 3 || args[0].Key != "--lossless_jpeg" || args[0].Value != "0" ||
+		args[1].Key != "-d" || args[1].Value != "0.3" ||
+		args[2].Key != "-e" || args[2].Value != "8" {
+		t.Errorf("CLI rule = %+v", args)
 	}
 }

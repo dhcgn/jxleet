@@ -113,7 +113,7 @@ which are struck through for the current mode.
 
 **Entry-point bindings** live in `config.yaml` — one preset name each for
 `gui`, `cli`, `contextmenu`. On first start all three are bound to the read-only
-`Default` preset. Existing user bindings are preserved; the app refuses to run
+entry-point default presets. Existing user bindings are preserved; the app refuses to run
 only when a binding is missing or points to an unavailable preset.
 
 ---
@@ -195,7 +195,7 @@ separate confirmation for irreversible routes (names the file count).
 
 ## 8. Entry points
 
-1. **GUI** (`internal/app` + Svelte): drag/drop + file dialog, recursive folders,
+1. **GUI** (`internal/app` + Svelte): drag/drop + file dialog, direct folder files only,
    Basic/Expert split, live command preview, results with jxlinfo figures.
 2. **CLI** (`internal/cli`): any mix of file/folder paths → uses `cli` binding,
    no dialog; `--preset <name>` overrides for one call; unknown preset → non-zero
@@ -246,9 +246,16 @@ will not be dropped in as-is. Porting plan:
   `frontend/public/style.css`; they are wired to native dialog intake, Wails
   bindings/events, real preset previews, asynchronous engine progress, and
   toolchain status/install. The shell fills the Wails client area and leaves
-  minimize/maximize/close controls to the native Wails host. Storage rows open
-  their corresponding directories in Windows Explorer. Split into child
-  components only when the view logic materially grows.
+  minimize/maximize/close controls to the native Wails host. Native Wails file
+  drops target the drop zone, Open File/Open Folder are separate multi-select
+  actions, folders enumerate only direct regular files, and conversion actions
+  remain visible while content scrolls. Storage rows open their corresponding
+  directories in Windows Explorer. File/result tables use fixed, non-overlapping
+  columns with compact path display and native full-path tooltips; the effort
+  matrix uses compact accessible capability icons; the Presets table displays
+  core distance/quality, effort, and JPEG mode summaries with `Mixed` for
+  differing rules. Split into child components only when the view logic
+  materially grows.
 
 ---
 

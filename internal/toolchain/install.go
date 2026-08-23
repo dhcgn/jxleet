@@ -11,11 +11,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/dhcgn/jxleet/internal/process"
 	"github.com/spf13/fileflow"
 	"github.com/spf13/pathologize"
 )
@@ -343,7 +343,7 @@ func extractZipWithPowerShell(ctx context.Context, archivePath, destination stri
 		quotePowerShell(destination),
 		quotePowerShell(destination),
 	)
-	cmd := exec.CommandContext(ctx, powershellExecutable(), "-NoProfile", "-NonInteractive", "-STA", "-Command", script)
+	cmd := process.CommandContext(ctx, powershellExecutable(), "-NoProfile", "-NonInteractive", "-STA", "-Command", script)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("toolchain: extract Deflate64 archive with Windows Shell (%s -> %s): %w: %s", archivePath, destination, err, strings.TrimSpace(string(output)))

@@ -111,10 +111,17 @@ export function ListPresets(): $CancellablePromise<$models.PresetSummary[] | nul
 }
 
 /**
- * OpenFiles opens the native multi-file/folder picker.
+ * OpenFiles opens the native multi-file picker.
  */
 export function OpenFiles(): $CancellablePromise<string[] | null> {
     return $Call.ByID(1594681061);
+}
+
+/**
+ * OpenFolders opens the native multi-folder picker.
+ */
+export function OpenFolders(): $CancellablePromise<string[] | null> {
+    return $Call.ByID(2368652971);
 }
 
 /**

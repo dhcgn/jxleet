@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/dhcgn/jxleet/internal/cjxl/flags"
+	"github.com/dhcgn/jxleet/internal/process"
 	"github.com/spf13/pathologize"
 )
 
@@ -360,5 +361,5 @@ func comparePrerelease(a, b string) int {
 // osCommandContext is a variable to keep command execution replaceable in
 // package tests without adding an abstraction to the production path.
 var osCommandContext = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-	return exec.CommandContext(ctx, name, args...)
+	return process.CommandContext(ctx, name, args...)
 }

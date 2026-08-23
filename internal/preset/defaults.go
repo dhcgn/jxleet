@@ -2,37 +2,66 @@ package preset
 
 import "github.com/dhcgn/jxleet/internal/cjxl"
 
-// EnsureDefault creates the built-in read-only preset when it is absent. It
-// returns true when the file was created.
-func EnsureDefault(store *Store) (bool, error) {
-	if store.Exists(DefaultName) {
-		return false, nil
-	}
-	p := Preset{
-		Name:        DefaultName,
-		Description: "Safe defaults: JPEGs remain reconstructable; other inputs use d 1.0.",
+// DefaultPresets are the immutable presets installed for the three entry
+// points on first start.
+var DefaultPresets = []Preset{
+	{
+		Name:        "default-gui",
+		Description: "GUI defaults: JPEG lossless, PNG lossless, moderate JXL compression.",
 		Version:     CurrentVersion,
 		ReadOnly:    true,
 		Output:      DefaultOutput(),
 		Rules: []Rule{
-			{
-				Match: []string{"JPEG"},
-				Args: []cjxl.Arg{
-					{Key: "--lossless_jpeg", Value: "1"},
-					{Key: "-e", Value: "7"},
-				},
-			},
+			{Match: []string{"JXL"}, Args: []cjxl.Arg{{Key: "-d", Value: "0.3"}, {Key: "-e", Value: "8"}}},
+			{Match: []string{"JPEG"}, Args: []cjxl.Arg{{Key: "--lossless_jpeg", Value: "1"}}},
+			{Match: []string{"PNG"}, Args: []cjxl.Arg{{Key: "-d", Value: "0"}, {Key: "-e", Value: "9"}}},
+			{Match: []string{"*"}, Args: []cjxl.Arg{{Key: "-d", Value: "0.5"}, {Key: "-e", Value: "7"}}},
+		},
+	},
+	{
+		Name:        "default-cli",
+		Description: "CLI defaults: lossy d 0.3, effort 8, originals replaced after verification.",
+		Version:     CurrentVersion,
+		ReadOnly:    true,
+		Output:      Output{Policy: PolicyReplace, OnCollision: CollisionSkip},
+		Rules: []Rule{
 			{
 				Match: []string{"*"},
 				Args: []cjxl.Arg{
-					{Key: "-d", Value: "1.0"},
-					{Key: "-e", Value: "7"},
+					{Key: "--lossless_jpeg", Value: "0"},
+					{Key: "-d", Value: "0.3"},
+					{Key: "-e", Value: "8"},
 				},
 			},
 		},
+	},
+	{
+		Name:        "default-explorer-context",
+		Description: "Explorer defaults: JPEG lossless, PNG lossless, moderate JXL compression.",
+		Version:     CurrentVersion,
+		ReadOnly:    true,
+		Output:      DefaultOutput(),
+		Rules: []Rule{
+			{Match: []string{"JXL"}, Args: []cjxl.Arg{{Key: "-d", Value: "0.3"}, {Key: "-e", Value: "8"}}},
+			{Match: []string{"JPEG"}, Args: []cjxl.Arg{{Key: "--lossless_jpeg", Value: "1"}}},
+			{Match: []string{"PNG"}, Args: []cjxl.Arg{{Key: "-d", Value: "0"}, {Key: "-e", Value: "9"}}},
+			{Match: []string{"*"}, Args: []cjxl.Arg{{Key: "-d", Value: "0.5"}, {Key: "-e", Value: "7"}}},
+		},
+	},
+}
+
+// EnsureDefaults creates any missing built-in presets and returns whether it
+// created at least one file. Existing files and user presets are untouched.
+func EnsureDefaults(store *Store) (bool, error) {
+	created := false
+	for _, p := range DefaultPresets {
+		if store.Exists(p.Name) {
+			continue
+		}
+		if err := store.Save(p); err != nil {
+			return created, err
+		}
+		created = true
 	}
-	if err := store.Save(p); err != nil {
-		return false, err
-	}
-	return true, nil
+	return created, nil
 }

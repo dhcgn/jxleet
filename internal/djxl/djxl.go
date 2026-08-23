@@ -13,6 +13,8 @@ import (
 	"os/exec"
 	"regexp"
 	"time"
+
+	"github.com/dhcgn/jxleet/internal/process"
 )
 
 // Runner executes a specific djxl binary.
@@ -43,7 +45,7 @@ func (r Result) Success() bool {
 // output file's extension.
 func (r *Runner) Decode(ctx context.Context, input, output string) Result {
 	start := time.Now()
-	cmd := exec.CommandContext(ctx, r.Binary, input, output)
+	cmd := process.CommandContext(ctx, r.Binary, input, output)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -63,7 +65,7 @@ var versionRe = regexp.MustCompile(`v(\d+\.\d+\.\d+)`)
 
 // Version runs `djxl --version` and returns the parsed semantic version.
 func (r *Runner) Version(ctx context.Context) (string, error) {
-	out, err := exec.CommandContext(ctx, r.Binary, "--version").CombinedOutput()
+	out, err := process.CommandContext(ctx, r.Binary, "--version").CombinedOutput()
 	if err != nil {
 		return "", err
 	}

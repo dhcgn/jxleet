@@ -29,8 +29,9 @@ import (
 // Callbacks connect the Wails adapter to native dialogs and events without
 // importing Wails into the application domain.
 type Callbacks struct {
-	Emit      func(name string, data any)
-	OpenFiles func() ([]string, error)
+	Emit        func(name string, data any)
+	OpenFiles   func() ([]string, error)
+	OpenFolders func() ([]string, error)
 }
 
 // Service is the root object bound to the frontend.
@@ -141,12 +142,25 @@ func (s *Service) GetActivePreset() string {
 	return s.activePreset
 }
 
-// OpenFiles opens the native multi-file/folder picker.
+// OpenFiles opens the native multi-file picker.
 func (s *Service) OpenFiles() ([]string, error) {
 	if s.cb.OpenFiles == nil {
 		return nil, errors.New("file dialog is not configured")
 	}
 	paths, err := s.cb.OpenFiles()
+	if err != nil {
+		return nil, err
+	}
+	s.AddPaths(paths)
+	return paths, nil
+}
+
+// OpenFolders opens the native multi-folder picker.
+func (s *Service) OpenFolders() ([]string, error) {
+	if s.cb.OpenFolders == nil {
+		return nil, errors.New("folder dialog is not configured")
+	}
+	paths, err := s.cb.OpenFolders()
 	if err != nil {
 		return nil, err
 	}
@@ -202,6 +216,9 @@ type PresetSummary struct {
 	Description string `json:"description"`
 	Policy      string `json:"policy"`
 	ReadOnly    bool   `json:"readOnly"`
+	CoreValue   string `json:"coreValue"`
+	Effort      string `json:"effort"`
+	JPEGMode    string `json:"jpegMode"`
 }
 
 // ListPresets returns valid stored presets.
@@ -217,6 +234,9 @@ func (s *Service) ListPresets() ([]PresetSummary, error) {
 			Description: p.Description,
 			Policy:      string(p.Output.Policy),
 			ReadOnly:    p.ReadOnly,
+			CoreValue:   summarizeCoreValue(p),
+			Effort:      summarizeEffort(p),
+			JPEGMode:    summarizeJPEGMode(p),
 		})
 	}
 	return result, nil
@@ -659,6 +679,85 @@ func (s *Service) effectivePreset(options ConversionOptions) (preset.Preset, err
 	return p, nil
 }
 
+func summarizeCoreValue(p preset.Preset) string {
+	var values []string
+	for _, rule := range p.Rules {
+		if onlyJPEGTranscode(rule) {
+			continue
+		}
+		value := "default"
+		for _, arg := range rule.Args {
+			switch arg.Key {
+			case "-d", "--distance":
+				value = "d " + arg.Value
+			case "-q", "--quality":
+				value = "q " + arg.Value
+			default:
+				continue
+			}
+			break
+		}
+		values = append(values, value)
+	}
+	return summarizeValues(values, "default")
+}
+
+func summarizeEffort(p preset.Preset) string {
+	values := make([]string, 0, len(p.Rules))
+	for _, rule := range p.Rules {
+		value := "default"
+		for _, arg := range rule.Args {
+			if arg.Key == "-e" || arg.Key == "--effort" {
+				value = arg.Value
+				break
+			}
+		}
+		values = append(values, value)
+	}
+	return summarizeValues(values, "default")
+}
+
+func summarizeJPEGMode(p preset.Preset) string {
+	var values []string
+	for _, rule := range p.Rules {
+		if !ruleMatchesJPEG(rule) {
+			continue
+		}
+		if preset.EffectiveLosslessJPEG(rule.Args) {
+			values = append(values, "lossless")
+		} else {
+			values = append(values, "lossy")
+		}
+	}
+	return summarizeValues(values, "default")
+}
+
+func onlyJPEGTranscode(rule preset.Rule) bool {
+	if len(rule.Match) == 0 || !preset.EffectiveLosslessJPEG(rule.Args) {
+		return false
+	}
+	for _, match := range rule.Match {
+		if !strings.EqualFold(match, "JPEG") {
+			return false
+		}
+	}
+	return true
+}
+
+func summarizeValues(values []string, fallback string) string {
+	if len(values) == 0 {
+		return fallback
+	}
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		seen[value] = struct{}{}
+	}
+	if len(seen) == 1 {
+		return values[0]
+	}
+	return "Mixed"
+}
+
 func ruleMatchesJPEG(rule preset.Rule) bool {
 	for _, match := range rule.Match {
 		if match == "*" || strings.EqualFold(match, "JPEG") {
@@ -740,19 +839,15 @@ func expandPaths(inputs []string) ([]string, error) {
 			addPath(absolute, seen, &result)
 			continue
 		}
-		if err := filepath.WalkDir(absolute, func(path string, entry os.DirEntry, walkErr error) error {
-			if walkErr != nil {
-				return walkErr
+		entries, err := os.ReadDir(absolute)
+		if err != nil {
+			return nil, fmt.Errorf("read directory %q: %w", input, err)
+		}
+		for _, entry := range entries {
+			if !entry.Type().IsRegular() {
+				continue
 			}
-			if entry.IsDir() {
-				return nil
-			}
-			if entry.Type().IsRegular() {
-				addPath(path, seen, &result)
-			}
-			return nil
-		}); err != nil {
-			return nil, fmt.Errorf("walk %q: %w", input, err)
+			addPath(filepath.Join(absolute, entry.Name()), seen, &result)
 		}
 	}
 	return result, nil

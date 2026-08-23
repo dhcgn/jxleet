@@ -25,18 +25,37 @@ type Config struct {
 	RouteColors map[string]string `yaml:"route_colors,omitempty"`
 }
 
-const DefaultPresetName = "Default"
+const (
+	DefaultGUIPresetName             = "default-gui"
+	DefaultCLIPresetName             = "default-cli"
+	DefaultExplorerContextPresetName = "default-explorer-context"
+	LegacyDefaultPresetName          = "Default"
+)
 
-// Default returns a Config with the read-only Default preset bound to every
-// entry point. Users can replace these bindings with their own presets later.
+// Default returns a Config with a read-only preset bound to each entry point.
+// Users can replace these bindings with their own presets later.
 func Default() Config {
 	return Config{
 		Version: 1,
 		Bindings: map[EntryPoint]string{
-			EntryGUI:         DefaultPresetName,
-			EntryCLI:         DefaultPresetName,
-			EntryContextMenu: DefaultPresetName,
+			EntryGUI:         DefaultGUIPresetName,
+			EntryCLI:         DefaultCLIPresetName,
+			EntryContextMenu: DefaultExplorerContextPresetName,
 		},
+	}
+}
+
+// DefaultPresetFor returns the built-in preset name for an entry point.
+func DefaultPresetFor(entryPoint EntryPoint) string {
+	switch entryPoint {
+	case EntryGUI:
+		return DefaultGUIPresetName
+	case EntryCLI:
+		return DefaultCLIPresetName
+	case EntryContextMenu:
+		return DefaultExplorerContextPresetName
+	default:
+		return ""
 	}
 }
 

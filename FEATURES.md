@@ -21,7 +21,7 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Import from a file, without adopting the output policy 
 - [x] Format version with a migration path 
 - [x] Collision handling on import 
-- [x] Read-only `Default` preset bound on first start
+- [x] Read-only entry-point defaults bound on first start
 
 ## Output
 - [x] Alongside 
@@ -35,7 +35,7 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Graphical interface
 - [x] File-path invocation without prompting
 - [x] Context menu for files, folders, folder background
-- [x] Folders recursively
+- [x] Direct folder files only (no recursion)
 - [x] Preset name overridable by flag
 - [x] Preset name visible in the menu text
 

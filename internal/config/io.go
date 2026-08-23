@@ -10,7 +10,7 @@ import (
 )
 
 // Load reads the config from path. A missing file is not an error: it returns
-// Default so a fresh install starts with no bindings set.
+// Default so a fresh install starts with the built-in entry-point bindings.
 func Load(path string) (Config, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {

@@ -139,7 +139,7 @@ func TestEffectivePresetOmitsDistanceForJPEGTranscode(t *testing.T) {
 	}
 }
 
-func TestExpandPathsRecursesAndDeduplicates(t *testing.T) {
+func TestExpandPathsUsesDirectFilesAndDeduplicates(t *testing.T) {
 	root := t.TempDir()
 	nested := filepath.Join(root, "nested")
 	if err := os.MkdirAll(nested, 0o755); err != nil {
@@ -156,7 +156,59 @@ func TestExpandPathsRecursesAndDeduplicates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(paths) != 2 {
+	if len(paths) != 1 {
 		t.Fatalf("expanded paths = %v", paths)
+	}
+	if paths[0] != a {
+		t.Fatalf("expanded paths = %v, want only %s", paths, a)
+	}
+}
+
+func TestPresetSummaryValues(t *testing.T) {
+	uniform := preset.Preset{
+		Rules: []preset.Rule{{
+			Match: []string{"*"},
+			Args: []cjxl.Arg{
+				{Key: "--distance", Value: "1.0"},
+				{Key: "--effort", Value: "7"},
+				{Key: "--lossless_jpeg", Value: "1"},
+			},
+		}},
+	}
+	if got := summarizeCoreValue(uniform); got != "d 1.0" {
+		t.Errorf("uniform core value = %q", got)
+	}
+	if got := summarizeEffort(uniform); got != "7" {
+		t.Errorf("uniform effort = %q", got)
+	}
+	if got := summarizeJPEGMode(uniform); got != "lossless" {
+		t.Errorf("uniform JPEG mode = %q", got)
+	}
+
+	mixed := preset.Preset{
+		Rules: []preset.Rule{
+			{Match: []string{"JPEG"}, Args: []cjxl.Arg{{Key: "-e", Value: "7"}, {Key: "-j", Value: "1"}}},
+			{Match: []string{"PNG"}, Args: []cjxl.Arg{{Key: "-q", Value: "90"}, {Key: "-e", Value: "9"}}},
+			{Match: []string{"*"}, Args: []cjxl.Arg{{Key: "-d", Value: "2.0"}, {Key: "-e", Value: "7"}, {Key: "-j", Value: "0"}}},
+		},
+	}
+	if got := summarizeCoreValue(mixed); got != "Mixed" {
+		t.Errorf("mixed core value = %q", got)
+	}
+	if got := summarizeEffort(mixed); got != "Mixed" {
+		t.Errorf("mixed effort = %q", got)
+	}
+	if got := summarizeJPEGMode(mixed); got != "Mixed" {
+		t.Errorf("mixed JPEG mode = %q", got)
+	}
+
+	defaults := preset.Preset{
+		Rules: []preset.Rule{{Match: []string{"JPEG"}, Args: []cjxl.Arg{{Key: "-j", Value: "1"}}}},
+	}
+	if got := summarizeCoreValue(defaults); got != "default" {
+		t.Errorf("default core value = %q", got)
+	}
+	if got := summarizeEffort(defaults); got != "default" {
+		t.Errorf("default effort = %q", got)
 	}
 }
