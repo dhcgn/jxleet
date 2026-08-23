@@ -235,6 +235,12 @@ will not be dropped in as-is. Porting plan:
 - Preserve `data-testid` attributes on interactive elements to enable frontend
   E2E tests.
 - Keep the mockup file in `develop-time/design/` as reference; it is not shipped.
+- **Current implementation:** the eight views are explicit branches in
+  `frontend/src/App.svelte`, with the shared visual system in
+  `frontend/public/style.css`; they are wired to native dialog intake, Wails
+  bindings/events, real preset previews, asynchronous engine progress, and
+  toolchain status/install. Split into child components only when the view logic
+  materially grows.
 
 ---
 
@@ -250,10 +256,10 @@ will not be dropped in as-is. Porting plan:
 
 ## 10a. CI/CD & Release automation (GitHub Actions)
 
-Not yet present — no `.github/` exists, but README badges already reference
-`workflows/build.yml` and Go Report Card. To add:
+Implemented in `.github/`; README badges reference the build workflow and Go
+Report Card:
 
-- **CI (`ci.yml`)** on push/PR: `windows-latest`, set up Go 1.27 + Node, install
+- **CI (`build.yml`)** on push/PR: `windows-latest`, set up Go 1.27 + Node, install
   `wails3` + `task`, run `task check` (build, vet, lint, race tests). Cache Go
   modules and npm. This is what the build badge points at.
 - **Lint:** `golangci-lint` (Go) + `svelte-check`/`tsc` (frontend).
@@ -287,7 +293,7 @@ Distinct from the §5 *toolchain* manager (which updates libjxl, not jxleet).
 
 ## 11. Milestones (mapped to FEATURES.md)
 
-0. **CI first** — add `.github/workflows/ci.yml` (Windows, `task check`) so the
+0. **CI first** — add `.github/workflows/build.yml` (Windows, `task check`) so the
    build badge is real from commit one; Dependabot; lint config. *(infra)*
 1. **Scaffold** — module rename, delete template, package skeleton, config paths,
    Windows-only build. *(no user-facing feature yet)*
@@ -298,10 +304,10 @@ Distinct from the §5 *toolchain* manager (which updates libjxl, not jxleet).
 5. **Engine** — queue, worker pool, pause/cancel, throughput/ETA. *(Concurrency)*
 6. **IPC** — single instance, handover, coalescing, takeover. *(Concurrency)*
 7. **Toolchain** — versions, download+verify, atomic update, diff/lock. *(Toolchain)*
-8. **GUI** — the 8 views. *(Interface)*
+8. **GUI** — the 8 views. *(Interface — implemented)*
 9. **CLI + context menu** — path invocation, registry integration. *(Entry points)*
-8b. **GUI port** — convert `jxlconv-mockups.html` into Svelte components +
-    shared theme, wired to bindings (see §9.1). *(Interface)*
+8b. **GUI port** — convert `jxlconv-mockups.html` into Svelte state views +
+    shared theme, wired to bindings (see §9.1). *(Interface — implemented)*
 10. **Polish** — logs view, size balance, jxlinfo figures.
 11. **Release automation** — `release.yml` on tag: `wails3 package`, zip,
     SHA256SUMS, GitHub Release; app "newer version available" notice (§10a/§10b).
@@ -310,8 +316,6 @@ Distinct from the §5 *toolchain* manager (which updates libjxl, not jxleet).
 
 ## 12. Remaining open questions (non-blocking, resolve as reached)
 
-- Exact d↔q constants: mirror libjxl source vs. approximate table — pin during §2.2.
-- Effort-ladder tool/level matrix: needs authoritative source or hand-authoring.
-- Coalescing window duration and handover message/ack schema — finalize in §7.
-- Preset schema `version` migration mechanics (v1 → future).
-- Confirm zip internal layout (exe paths) before writing the installer.
+- Effort-ladder tool/level matrix remains authored reference data until an
+  authoritative libjxl source mapping is available.
+- Detailed jxlinfo parsing and persistent log-view UX remain Phase 10 polish.

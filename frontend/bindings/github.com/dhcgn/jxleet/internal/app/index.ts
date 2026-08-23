@@ -7,6 +7,13 @@ export {
 };
 
 export type {
+    Bindings,
+    ConversionOptions,
+    ConversionSummary,
+    FilePreview,
+    FileUpdate,
+    PresetSummary,
+    ProgressUpdate,
     Status,
     ToolchainStatus
 } from "./models.js";

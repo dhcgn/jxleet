@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -25,6 +26,10 @@ func init() {
 	// Files handed over from secondary invocations are delivered to the frontend
 	// as this event; registering it gives the binding generator a typed API.
 	application.RegisterEvent[[]string]("files")
+	application.RegisterEvent[app.ProgressUpdate]("progress")
+	application.RegisterEvent[app.FileUpdate]("conversion-file")
+	application.RegisterEvent[app.ConversionSummary]("conversion-done")
+	application.RegisterEvent[string]("conversion-error")
 }
 
 func main() {
@@ -55,10 +60,29 @@ func main() {
 		return
 	}
 
-	svc := app.New(paths, cfg, toolchain.NewManager(paths.BinDir))
+	var wailsApp *application.App
+	svc := app.New(paths, cfg, toolchain.NewManager(paths.BinDir), app.Callbacks{
+		Emit: func(name string, data any) {
+			if wailsApp != nil {
+				wailsApp.Event.Emit(name, data)
+			}
+		},
+		OpenFiles: func() ([]string, error) {
+			if wailsApp == nil {
+				return nil, fmt.Errorf("application is not initialized")
+			}
+			return wailsApp.Dialog.OpenFileWithOptions(&application.OpenFileDialogOptions{
+				Title:                   "Select images or folders",
+				CanChooseFiles:          true,
+				CanChooseDirectories:    true,
+				AllowsMultipleSelection: true,
+				AllowsOtherFileTypes:    true,
+			}).PromptForMultipleSelection()
+		},
+	})
 	svc.AddPaths(inputs)
 
-	wailsApp := application.New(application.Options{
+	wailsApp = application.New(application.Options{
 		Name:        "jxleet",
 		Description: "JPEG-XL-Expert-Encoding-Tool — a comfortable way to use cjxl on Windows.",
 		Services: []application.Service{
@@ -83,7 +107,6 @@ func main() {
 	if server != nil {
 		go server.Serve(func(m ipc.Message) {
 			svc.AddPaths(m.Paths)
-			wailsApp.Event.Emit("files", m.Paths)
 		})
 		defer server.Close()
 	}

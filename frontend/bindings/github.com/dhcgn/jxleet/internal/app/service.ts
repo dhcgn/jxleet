@@ -16,11 +16,54 @@ import * as $models from "./models.js";
 
 /**
  * AddPaths queues paths handed over from this or another process invocation.
- * The frontend also receives a "files" event for live updates; TakePending lets
- * it drain anything queued before it started listening.
+ * When a conversion is already running, the paths are added to that engine so
+ * coalesced invocations share one run.
  */
 export function AddPaths(paths: string[] | null): $CancellablePromise<void> {
     return $Call.ByID(2953239195, paths);
+}
+
+/**
+ * CancelConversion cancels in-flight processes and queued work.
+ */
+export function CancelConversion(): $CancellablePromise<void> {
+    return $Call.ByID(2964716064);
+}
+
+/**
+ * CreatePreset creates a usable basic preset.
+ */
+export function CreatePreset(name: string, description: string): $CancellablePromise<void> {
+    return $Call.ByID(2808243405, name, description);
+}
+
+/**
+ * DeletePreset deletes a named preset.
+ */
+export function DeletePreset(name: string): $CancellablePromise<void> {
+    return $Call.ByID(4177113838, name);
+}
+
+/**
+ * DuplicatePreset duplicates a named preset.
+ */
+export function DuplicatePreset(name: string, newName: string): $CancellablePromise<void> {
+    return $Call.ByID(2391082988, name, newName);
+}
+
+/**
+ * GetBindings returns the configured preset for each entry point.
+ */
+export function GetBindings(): $CancellablePromise<$models.Bindings> {
+    return $Call.ByID(822407320);
+}
+
+/**
+ * GetProgress returns the current progress snapshot, or an empty snapshot when
+ * no conversion is running.
+ */
+export function GetProgress(): $CancellablePromise<$models.ProgressUpdate> {
+    return $Call.ByID(1806053993);
 }
 
 /**
@@ -32,8 +75,7 @@ export function GetStatus(): $CancellablePromise<$models.Status> {
 
 /**
  * GetToolchainStatus reports installed versions, the latest release, and the
- * Expert flag lock/diff. Network or local toolchain errors are returned to the
- * caller for display; they are not hidden as an empty status.
+ * Expert flag lock/diff. Errors are returned for display, never hidden.
  */
 export function GetToolchainStatus(): $CancellablePromise<$models.ToolchainStatus> {
     return $Call.ByID(3508019419);
@@ -41,14 +83,71 @@ export function GetToolchainStatus(): $CancellablePromise<$models.ToolchainStatu
 
 /**
  * InstallLatestToolchain performs the user-requested libjxl download and
- * atomic installation. It is deliberately not called by GetToolchainStatus.
+ * atomic installation. It is deliberately not called by status queries.
  */
 export function InstallLatestToolchain(): $CancellablePromise<string> {
     return $Call.ByID(1078493661);
 }
 
 /**
- * TakePending returns and clears the queued paths.
+ * ListPresets returns valid stored presets.
+ */
+export function ListPresets(): $CancellablePromise<$models.PresetSummary[] | null> {
+    return $Call.ByID(2651436498);
+}
+
+/**
+ * OpenFiles opens the native multi-file/folder picker.
+ */
+export function OpenFiles(): $CancellablePromise<string[] | null> {
+    return $Call.ByID(1594681061);
+}
+
+/**
+ * PauseConversion pauses dispatching new files.
+ */
+export function PauseConversion(): $CancellablePromise<void> {
+    return $Call.ByID(3136368964);
+}
+
+/**
+ * PreviewPaths classifies files using the same preset/options as StartConversion.
+ */
+export function PreviewPaths(paths: string[] | null, options: $models.ConversionOptions): $CancellablePromise<$models.FilePreview[] | null> {
+    return $Call.ByID(2233973306, paths, options);
+}
+
+/**
+ * RenamePreset renames a named preset.
+ */
+export function RenamePreset(name: string, newName: string): $CancellablePromise<void> {
+    return $Call.ByID(869370011, name, newName);
+}
+
+/**
+ * ResumeConversion resumes a paused conversion.
+ */
+export function ResumeConversion(): $CancellablePromise<void> {
+    return $Call.ByID(98548325);
+}
+
+/**
+ * SetBinding validates and persists one entry-point binding.
+ */
+export function SetBinding(entryPoint: string, presetName: string): $CancellablePromise<void> {
+    return $Call.ByID(2914141111, entryPoint, presetName);
+}
+
+/**
+ * StartConversion starts an asynchronous conversion; progress arrives through
+ * Wails events so the UI remains responsive.
+ */
+export function StartConversion(paths: string[] | null, options: $models.ConversionOptions): $CancellablePromise<void> {
+    return $Call.ByID(448384482, paths, options);
+}
+
+/**
+ * TakePending returns and clears paths received before the frontend subscribed.
  */
 export function TakePending(): $CancellablePromise<string[] | null> {
     return $Call.ByID(1800653784);

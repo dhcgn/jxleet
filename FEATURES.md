@@ -27,21 +27,21 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Into a subfolder 
 - [x] Replace via recycle bin, after verification 
 - [x] Deletion rule selectable per route 
-- [ ] Separate confirmation for irreversible routes 
+- [x] Separate confirmation for irreversible routes
 - [x] Handle name collisions 
 
 ## Entry points
-- [ ] Graphical interface 
+- [x] Graphical interface
 - [ ] File-path invocation without prompting 
 - [ ] Context menu for files, folders, folder background 
-- [ ] Folders recursively 
+- [x] Folders recursively
 - [ ] Preset name overridable by flag 
 - [ ] Preset name visible in the menu text 
 
 ## Concurrency
 - [x] Single instance 
 - [x] Handover to the running instance, second process returns immediately 
-- [ ] Coalesce invocations into one run 
+- [x] Coalesce invocations into one run
 - [x] Takeover when the instance is unreachable 
 - [x] Pause and cancel 
 - [x] Processes and threads configurable separately 
@@ -53,23 +53,23 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Download with checksum verification
 - [x] Atomic update
 - [x] Lock expert flags on version mismatch
-- [ ] Offer first-time installation of the toolchain 
+- [x] Offer first-time installation of the toolchain
 - [x] Diff the flag list on version bump
 
 ## Interface
 
 > Take a look at [develop-time\design\jxlconv-mockups.html](develop-time\design\jxlconv-mockups.html) for the mockups that guided the design of the GUI.
 
-- [ ] Dark by default, operable from 420 pixels 
-- [ ] Basic and expert separated 
-- [ ] Drop and file dialog 
-- [ ] Colour marking of routes, follows the setting 
-- [ ] Distance/quality toggle 
-- [ ] Effort slider with effort ladder 
-- [ ] Display of the command line to be executed 
-- [ ] Progress, remaining time, throughput, failures 
-- [ ] Note about coalesced invocations 
-- [ ] Size balance per file and in total 
-- [ ] jxlinfo key figures including reconstruction data 
-- [ ] Compact window for the automatic invocation 
+- [x] Dark by default, operable from 420 pixels
+- [x] Basic and expert separated
+- [x] Drop and file dialog
+- [x] Colour marking of routes, follows the setting
+- [x] Distance/quality toggle
+- [x] Effort slider with effort ladder
+- [x] Display of the command line to be executed
+- [x] Progress, remaining time, throughput, failures
+- [x] Note about coalesced invocations
+- [x] Size balance per file and in total
+- [ ] jxlinfo key figures including reconstruction data
+- [x] Compact window for the automatic invocation
 - [ ] Log view with tool messages 

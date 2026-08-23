@@ -21,6 +21,12 @@ func detectFormat(path string) routes.Format {
 	return routes.DetectFormat(header[:n], path)
 }
 
+// DetectFormat identifies one input path using the same content-first logic as
+// the conversion engine. It is used by the GUI preview before a run starts.
+func DetectFormat(path string) routes.Format {
+	return detectFormat(path)
+}
+
 // encodeError turns a failed cjxl result into an error carrying its stderr.
 func encodeError(res cjxl.Result) error {
 	msg := res.Stderr

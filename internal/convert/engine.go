@@ -102,6 +102,7 @@ type Engine struct {
 	skipped    int
 	bytesTotal int64
 	bytesDone  int64
+	bytesOut   int64
 	coalesced  int
 
 	paused      bool
@@ -219,7 +220,7 @@ func (e *Engine) Wait() Summary {
 		Skipped:   e.skipped,
 		Cancelled: e.cancelled,
 		BytesIn:   e.bytesDone,
-		BytesOut:  0, // filled per-file via callbacks; totals kept minimal here
+		BytesOut:  e.bytesOut,
 		Duration:  time.Since(e.startTime),
 	}
 }
@@ -281,6 +282,7 @@ func (e *Engine) finish(res FileResult) {
 		e.completed++
 	}
 	e.bytesDone += res.InputSize
+	e.bytesOut += res.OutputSize
 	e.tp.record(e.bytesDone)
 	e.cond.Broadcast()
 	e.mu.Unlock()

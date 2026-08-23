@@ -5,10 +5,18 @@
 // @ts-ignore: Unused imports
 import type { Events } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import type * as app$0 from "../../../../dhcgn/jxleet/internal/app/models.js";
+
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "conversion-done": app$0.ConversionSummary;
+            "conversion-error": string;
+            "conversion-file": app$0.FileUpdate;
             "files": string[] | null;
+            "progress": app$0.ProgressUpdate;
         }
     }
 }

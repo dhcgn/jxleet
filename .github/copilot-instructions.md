@@ -8,8 +8,13 @@ libjxl's `cjxl`. **jxleet does not encode anything itself** — it decides which
 files to hand to `cjxl`, assembles arguments, runs the process, and reports
 results. Never add encoding logic; only orchestrate the libjxl tools.
 
-## Project status: core complete through toolchain
-- Phases 0–7 are **done**. Latest: `internal/toolchain` — official libjxl
+## Project status: core complete through GUI
+- Phases 0–8 are **done**. Latest: the Svelte/Wails GUI port — all eight mockup
+  states, native file dialog/drop intake, preset/binding controls, route
+  preview, asynchronous conversion events, pause/resume/cancel,
+  toolchain install/status, and irreversible-replace confirmation. The visual
+  port lives in `frontend/src/App.svelte` + `frontend/public/style.css`.
+- Toolchain: `internal/toolchain` — official libjxl
   GitHub release lookup, per-asset sha256 verification, Deflate64-compatible
   Windows extraction, immutable versioned install + atomic current pointer,
   cjxl/djxl/jxlinfo status, notify-only update detection, and Expert flag
@@ -23,11 +28,9 @@ results. Never add encoding logic; only orchestrate the libjxl tools.
   a `files` Wails event. The engine was validated on the real committed
   `test-data/` sample (JPEG→transcode with byte-identical reconstruction,
   JXL→reencode, 8/16-bit PNG→encode). `task check` is green.
-- Still open nearby: the Tools GUI's first-run installation offer, joining
-  coalesced handovers into one **running** engine run, the
-  irreversible-replace confirmation, entry points consuming bindings, and the
-  effort-ladder matrix. Next per the plan: **Phase 8 — GUI** (port the mockup
-  into Svelte views and wire the backend).
+- Still open nearby: the CLI/context-menu entry points, jxlinfo metadata
+  parsing, persistent logs, and the effort-ladder source data. Next per the
+  plan: **Phase 9 — CLI + context menu**.
 - Authoritative documents (read these first):
   - `README.md` — product specification.
   - `FEATURES.md` — scope checklist (**living**, see rules below).
