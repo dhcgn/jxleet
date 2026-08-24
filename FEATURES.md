@@ -22,6 +22,9 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Format version with a migration path 
 - [x] Collision handling on import 
 - [x] Read-only entry-point defaults bound on first start
+- [x] Guaranteed catch-all (`*`) rule in defaults and new presets
+- [x] JSON schema file for editor validation, referenced from every preset
+- [x] Reload preset library from the folder on demand
 - [ ] Synchronize every multi-rule preset value into global GUI controls (deferred design)
 
 ## Output
@@ -68,8 +71,12 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Colour marking of routes, follows the setting
 - [x] Distance/quality toggle
 - [x] Effort slider with effort ladder
+- [x] Effort as a simple slider in the Basic view
+- [x] Per-file resolved settings (distance/quality, effort, flags) in the Basic file list
+- [x] Queue and live per-file status shown in the Basic view during processing
 - [x] Persistent Open File/Open Folder intake and native drops across views
 - [x] Expert flag overrides with cjxl help tooltips and reset to cjxl defaults
+- [x] Explicit libjxl update check in Tools
 - [x] Display of the command line to be executed
 - [x] Progress, remaining time, throughput, failures
 - [x] Note about coalesced invocations

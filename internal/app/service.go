@@ -440,13 +440,15 @@ type CommandPreview struct {
 
 // FilePreview is one item in the Basic view before conversion starts.
 type FilePreview struct {
-	Path   string `json:"path"`
-	Name   string `json:"name"`
-	Format string `json:"format"`
-	Route  string `json:"route"`
-	Size   int64  `json:"size"`
-	Skip   bool   `json:"skip"`
-	Reason string `json:"reason"`
+	Path     string `json:"path"`
+	Name     string `json:"name"`
+	Format   string `json:"format"`
+	Route    string `json:"route"`
+	Size     int64  `json:"size"`
+	Skip     bool   `json:"skip"`
+	Reason   string `json:"reason"`
+	Settings string `json:"settings"`
+	FlagsSet bool   `json:"flagsSet"`
 }
 
 // PreviewPaths classifies files using the same preset/options as StartConversion.
@@ -482,7 +484,7 @@ func (s *Service) PreviewPaths(paths []string, options ConversionOptions) ([]Fil
 			result = append(result, item)
 			continue
 		}
-		route, _, ok := selected.Route(format)
+		route, args, ok := selected.Route(format)
 		if !ok {
 			item.Skip = true
 			item.Reason = "no matching rule"
@@ -490,6 +492,7 @@ func (s *Service) PreviewPaths(paths []string, options ConversionOptions) ([]Fil
 			continue
 		}
 		item.Route = route.String()
+		item.Settings, item.FlagsSet = summarizeFileSettings(route, args)
 		result = append(result, item)
 	}
 	return result, nil
@@ -914,6 +917,39 @@ func addPreviewThreads(args []cjxl.Arg, threads int) []cjxl.Arg {
 		}
 	}
 	return append(args, cjxl.Arg{Key: "--num_threads", Value: strconv.Itoa(threads)})
+}
+
+// summarizeFileSettings renders the resolved per-file parameters shown in the
+// Basic file table (e.g. "D 0.3 · E 7"). The bool reports whether any non-core
+// cjxl flags are also applied to the file.
+func summarizeFileSettings(route routes.Route, args []cjxl.Arg) (string, bool) {
+	if route == routes.RouteTranscode {
+		return "lossless (reversible)", false
+	}
+	core := ""
+	effort := ""
+	flags := false
+	for _, arg := range args {
+		switch arg.Key {
+		case "-d", "--distance":
+			core = "D " + arg.Value
+		case "-q", "--quality":
+			core = "Q " + arg.Value
+		case "-e", "--effort":
+			effort = "E " + arg.Value
+		}
+		if !isCoreFlag(arg.Key) {
+			flags = true
+		}
+	}
+	parts := make([]string, 0, 2)
+	if core != "" {
+		parts = append(parts, core)
+	}
+	if effort != "" {
+		parts = append(parts, effort)
+	}
+	return strings.Join(parts, " · "), flags
 }
 
 func summarizeCoreValue(p preset.Preset) string {

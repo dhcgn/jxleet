@@ -115,7 +115,15 @@ func (s *Store) Save(p Preset) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	// Prepend the schema modeline so editors validate the file against the
+	// committed JSON schema (written by EnsureSchema).
+	data = append([]byte(schemaModeline+"\n"), data...)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return err
+	}
+	// Best-effort: keep the schema file available next to the presets.
+	_ = s.EnsureSchema()
+	return nil
 }
 
 // pathFor returns the existing file for name, or a derived path when none exists.

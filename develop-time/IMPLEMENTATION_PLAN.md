@@ -260,9 +260,15 @@ will not be dropped in as-is. Porting plan:
   and yellow recommendation bands and a neutral out-of-range state. The Expert
   view exposes every generated cjxl flag with help tooltips, temporary global
   overrides, an exact command preview, and a reset-to-cjxl-defaults action.
-  Selecting a result invokes verbose `jxlinfo` and renders its metadata. Full
-  multi-rule preset-to-global-control synchronization remains deferred. Split
-  into child components only when the view logic materially grows.
+  Selecting a result invokes verbose `jxlinfo` and renders its metadata. The
+  Basic view shows each file's resolved settings (distance/quality, effort, and a
+  flags indicator) and, during a GUI run, an inline progress strip with live
+  per-file status and pause/cancel; Effort is also a simple Basic-view slider.
+  New and saved presets carry a `# yaml-language-server` modeline pointing at a
+  committed `preset.schema.json`, the Preset library can reload from the folder,
+  and Tools exposes an explicit libjxl update check. Full multi-rule
+  preset-to-global-control synchronization remains deferred. Split into child
+  components only when the view logic materially grows.
 
 ---
 

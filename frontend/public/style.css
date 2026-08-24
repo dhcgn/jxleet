@@ -534,6 +534,83 @@ input[type="range"] {
   white-space: nowrap;
 }
 
+.basic-files {
+  table-layout: auto;
+}
+
+.basic-files .bf-file-col {
+  width: auto;
+}
+
+.basic-files .bf-route-col,
+.basic-files .bf-settings-col,
+.basic-files .bf-size-col,
+.basic-files .bf-status-col {
+  width: 1%;
+}
+
+.basic-files td {
+  max-width: none;
+}
+
+.basic-files .fn {
+  max-width: 0;
+  min-width: 0;
+  width: auto;
+}
+
+.basic-files .settings-cell {
+  white-space: nowrap;
+  color: var(--ink2);
+}
+
+.basic-files .status-cell {
+  white-space: nowrap;
+  overflow: visible;
+  color: var(--ink3);
+  text-transform: capitalize;
+}
+
+.mono-mini {
+  color: var(--ink2);
+  font: 400 11.5px/1.3 var(--mono);
+}
+
+.flag-chip {
+  margin-left: 6px;
+  padding: 1px 5px;
+  background: #2a2f38;
+  color: var(--p-reencode);
+  border-radius: 2px;
+  font: 500 9.5px/1.4 var(--mono);
+}
+
+.run-strip {
+  margin-bottom: 12px;
+  padding: 9px 11px;
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: 2px;
+}
+
+.run-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.run-count {
+  color: var(--ink);
+  font: 600 13px/1 var(--mono);
+}
+
+.effort-basic input[type="range"] {
+  width: 100%;
+  margin: 4px 0 2px;
+  accent-color: var(--p-encode);
+}
+
 .drop {
   display: grid;
   height: 100%;

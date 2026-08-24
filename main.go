@@ -70,6 +70,9 @@ func main() {
 	if _, err := preset.EnsureDefaults(presetStore); err != nil {
 		log.Fatal(err)
 	}
+	if err := presetStore.EnsureSchema(); err != nil {
+		log.Printf("preset: could not write schema: %v", err)
+	}
 	_, configFileErr := os.Stat(paths.ConfigFile)
 	legacyDefault := false
 	if legacy, err := presetStore.Load(config.LegacyDefaultPresetName); err == nil {

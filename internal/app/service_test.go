@@ -9,6 +9,7 @@ import (
 	"github.com/dhcgn/jxleet/internal/cjxl"
 	"github.com/dhcgn/jxleet/internal/config"
 	"github.com/dhcgn/jxleet/internal/preset"
+	"github.com/dhcgn/jxleet/internal/routes"
 )
 
 func testService(t *testing.T) *Service {
@@ -453,5 +454,27 @@ func TestInspectJXLValidatesPathBeforeToolchain(t *testing.T) {
 	service := testService(t)
 	if _, err := service.InspectJXL(filepath.Join(t.TempDir(), "image.png")); err == nil {
 		t.Error("non-JXL metadata inspection should fail")
+	}
+}
+
+func TestSummarizeFileSettings(t *testing.T) {
+	if got, flags := summarizeFileSettings(routes.RouteTranscode, nil); got != "lossless (reversible)" || flags {
+		t.Errorf("transcode = %q flags=%v", got, flags)
+	}
+	got, flags := summarizeFileSettings(routes.RouteEncode, []cjxl.Arg{
+		{Key: "--distance", Value: "0.3"},
+		{Key: "--effort", Value: "7"},
+		{Key: "--num_threads", Value: "8"},
+	})
+	if got != "D 0.3 · E 7" || flags {
+		t.Errorf("encode core = %q flags=%v", got, flags)
+	}
+	got, flags = summarizeFileSettings(routes.RouteReencode, []cjxl.Arg{
+		{Key: "--quality", Value: "90"},
+		{Key: "--effort", Value: "9"},
+		{Key: "--progressive", Valueless: true},
+	})
+	if got != "Q 90 · E 9" || !flags {
+		t.Errorf("reencode with extra flag = %q flags=%v", got, flags)
 	}
 }

@@ -127,6 +127,13 @@ generated `cjxl` flag surface. Every flag includes its help text as a tooltip. E
 edits are temporary overrides for the next conversion; **Reset Expert flags** clears them so
 cjxl defaults apply. The live preview shows the exact command line that will run.
 
+The Basic view makes the current plan explicit: the file list shows each file's route and the
+resolved settings it will be processed with (e.g. `D 0.3 · E 7`, with a `+flags` chip when
+extra cjxl flags apply), and Effort is a simple slider alongside Distance/Quality. While a
+conversion runs the Basic view stays in place and shows an inline progress strip with
+pause/cancel and a live per-file status column, so the queue is visible without leaving the
+main view.
+
 *TODO: Screenshot of the expert view with the effort ladder*
 
 After a conversion, click a result row to run `jxlinfo -v` for its JXL output and show the
@@ -187,6 +194,13 @@ deleted, or overwritten.
 The selected preset supplies the file rules used for classification. Basic and Expert
 controls are temporary run overrides and do not yet mirror every value in a multi-rule
 preset; the Presets view shows those format-specific rules.
+
+Presets are edited by changing the YAML files directly. The Preset library has an
+**open-folder** button and a **Reload** button so you can edit a file and pull the change back
+in without restarting. Every preset jxleet writes carries a `# yaml-language-server` modeline
+pointing at a committed `preset.schema.json` (kept next to your presets), so a schema-aware
+editor validates and autocompletes your edits. Keep a trailing `"*"` rule as the catch-all;
+the built-in defaults and new presets already include one.
 
 ```yaml
 # %APPDATA%\jxleet\presets\archive-lossless.yaml

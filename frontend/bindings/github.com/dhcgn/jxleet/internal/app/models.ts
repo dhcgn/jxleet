@@ -60,6 +60,8 @@ export interface FilePreview {
     "size": number;
     "skip": boolean;
     "reason": string;
+    "settings": string;
+    "flagsSet": boolean;
 }
 
 /**

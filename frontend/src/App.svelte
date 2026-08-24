@@ -72,6 +72,7 @@
   let metadataLoading = $state(false);
   let metadataRequest = 0;
   let previewRequest = 0;
+  let previewTimer: ReturnType<typeof setTimeout> | undefined;
   let commandPreviews = $state<CommandPreview[]>([]);
   let commandPreviewError = $state('');
   let commandPreviewRequest = 0;
@@ -132,6 +133,30 @@
   );
   let canConvert = $derived(inputPaths.length > 0 && files.length > 0 && presetName !== '' && !busy);
   let selectedResult = $derived(results.find((result) => result.input === selectedResultInput) ?? null);
+  let processing = $derived(busy && (view === 'basic' || view === 'expert'));
+  let resultByInput = $derived.by(() => {
+    const map = new Map<string, FileUpdate>();
+    for (const result of results) map.set(result.input, result);
+    return map;
+  });
+  let fileStatuses = $derived.by(() => {
+    const map = new Map<string, string>();
+    let runningLeft = processing ? progress.inFlight : 0;
+    for (const file of files) {
+      const result = resultByInput.get(file.path);
+      if (result) {
+        map.set(file.path, result.error ? 'failed' : result.skipped ? 'skipped' : result.cancelled ? 'cancelled' : 'done');
+      } else if (processing && runningLeft > 0) {
+        map.set(file.path, 'running');
+        runningLeft -= 1;
+      } else if (processing) {
+        map.set(file.path, 'waiting');
+      } else {
+        map.set(file.path, '');
+      }
+    }
+    return map;
+  });
   let flagSections = $derived.by(() => {
     const sections: { name: string; flags: FlagInfo[] }[] = [];
     for (const flag of flagDefinitions) {
@@ -166,7 +191,15 @@
     const offProgress = Events.On('progress', (event: any) => {
       if (event?.data) {
         progress = event.data as ProgressUpdate;
-        if (view !== 'automatic') view = 'running';
+        busy = true;
+        // GUI runs stay in the Basic/Expert view (queue shown inline). Only the
+        // coalesced auto path uses the compact window, and a cold CLI start with
+        // no UI context falls back to the running screen.
+        if (progress.coalesced > 1) {
+          view = 'automatic';
+        } else if (view === 'drop') {
+          view = 'running';
+        }
       }
     });
     const offFile = Events.On('conversion-file', (event: any) => {
@@ -277,6 +310,11 @@
     }
   }
 
+  function schedulePreviewRefresh(): void {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => void refreshPreview(), 180);
+  }
+
   async function refreshCommandPreview(): Promise<void> {
     const request = ++commandPreviewRequest;
     if (presetName === '') {
@@ -373,7 +411,8 @@
     metadataLoading = false;
     metadataRequest += 1;
     summary = null;
-    view = 'running';
+    progress = { ...progress, total: files.length, completed: 0, failed: 0, skipped: 0, inFlight: 0, percent: 0, paused: false };
+    view = 'basic';
     try {
       await Service.StartConversion(inputPaths, currentOptions());
     } catch (error) {
@@ -594,6 +633,10 @@
     return `${path.slice(0, head)}...${path.slice(-tail)}`;
   }
 
+  function fileStatus(file: FilePreview): string {
+    return fileStatuses.get(file.path) ?? '';
+  }
+
   function formatBytes(value: number): string {
     if (value < 1024) return `${value} B`;
     const units = ['KB', 'MB', 'GB', 'TB'];
@@ -630,6 +673,7 @@
     distance = Number((event.currentTarget as HTMLInputElement).value);
     if (routeMode === 'lossy') lossyDistance = distance;
     void refreshCommandPreview();
+    schedulePreviewRefresh();
   }
 
   function setQuality(event: Event): void {
@@ -638,11 +682,13 @@
     distance = value >= 100 ? 0 : 0.1 + (100 - value) * 0.09;
     if (routeMode === 'lossy') lossyDistance = distance;
     void refreshCommandPreview();
+    schedulePreviewRefresh();
   }
 
   function setEffort(event: Event): void {
     effort = Number((event.currentTarget as HTMLInputElement).value);
     void refreshCommandPreview();
+    schedulePreviewRefresh();
   }
 
   function expertFlagValue(key: string): string {
@@ -851,6 +897,19 @@
     </div>
   {:else if view === 'basic'}
     <div class="body">
+      {#if processing}
+        <div class="run-strip" data-testid="run-strip">
+          <div class="run-head">
+            <span class="badge b-reencode">{progress.paused ? 'Paused' : 'Converting'}</span>
+            <span class="run-count">{progress.completed + progress.failed + progress.skipped} of {progress.total}</span>
+            <span class="mini">{formatEta(progress.etaSeconds)} remaining - {formatRate(progress.throughput)}</span>
+            <span class="spacer"></span>
+            <button class="btn" onclick={() => void togglePause()}>{progress.paused ? 'Resume' : 'Pause'}</button>
+            <button class="btn danger" data-testid="cancel" onclick={() => void cancelConversion()}>Cancel</button>
+          </div>
+          <div class="bar"><i style={`width:${Math.min(100, progress.percent)}%`}></i></div>
+        </div>
+      {/if}
       <div class="paths">
         <div class="path p1" class:off={routeCounts.Transcode === 0}>
           <div class="t">JPEG transcode</div>
@@ -881,19 +940,26 @@
             {#if files.length === 0}
               <div class="empty">The selected paths could not be previewed.</div>
             {:else}
-            <table class="files" data-testid="file-table">
+            <table class="files basic-files" data-testid="file-table">
               <colgroup>
-                <col class="file-col" />
-                <col class="route-col" />
-                <col class="size-col" />
+                <col class="bf-file-col" />
+                <col class="bf-route-col" />
+                <col class="bf-settings-col" />
+                <col class="bf-size-col" />
+                {#if processing || results.length > 0}<col class="bf-status-col" />{/if}
               </colgroup>
-              <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Size</th></tr></thead>
+              <thead><tr><th>File</th><th>Route</th><th>Settings</th><th style="text-align:right">Size</th>{#if processing || results.length > 0}<th>Status</th>{/if}</tr></thead>
               <tbody>
                 {#each files as file}
+                  {@const status = fileStatus(file)}
                   <tr>
                     <td class="fn" title={file.path}>{compactFileName(file.name)}</td>
                     <td class="route-cell"><span class={`badge ${routeClass(file.route)}`}>{file.skip ? 'skip' : file.route || 'pending'}</span></td>
+                    <td class="settings-cell" title={file.flagsSet ? `${file.settings} + extra flags` : file.settings}>
+                      {#if file.skip}<span class="mini">{file.reason || '-'}</span>{:else}<span class="mono-mini">{file.settings || '-'}</span>{#if file.flagsSet}<span class="flag-chip" title="Extra cjxl flags applied">+flags</span>{/if}{/if}
+                    </td>
                     <td class="num">{formatBytes(file.size)}</td>
+                    {#if processing || results.length > 0}<td class="status-cell" class:success={status === 'done'} class:error={status === 'failed'}>{status}</td>{/if}
                   </tr>
                 {/each}
               </tbody>
@@ -925,8 +991,14 @@
                 </div>
                 <div class="quality-guidance"><span>Recommended: 68 .. 96</span><span>90 = visually lossless</span></div>
               {/if}
-              <div class="row" style="border-top:1px solid var(--line-soft);margin-top:6px">
-                <span class="k">Effort</span><span class="v">{effort} - {effortNames[effort - 1]}</span>
+              <div class="effort-basic" style="border-top:1px solid var(--line-soft);margin-top:8px;padding-top:8px">
+                <div style="display:flex;align-items:baseline;gap:8px">
+                  <span class="k">Effort</span>
+                  <span class="v">{effort} - {effortNames[effort - 1]}</span>
+                  <span class="mini" style="margin-left:auto">{effort === 7 ? 'default' : effort >= 9 ? 'slow' : effort <= 3 ? 'fast' : ''}</span>
+                </div>
+                <input type="range" min="1" max="10" step="1" value={effort} oninput={setEffort} data-testid="effort-range-basic" aria-label="Effort" />
+                <div class="quality-guidance"><span>1 = fastest</span><span>10 = smallest</span></div>
               </div>
               <div class="banner info" style="margin:9px 0 0">
                 <span class="ic">i</span>
@@ -1258,8 +1330,14 @@
             <div class="row"><span class="k">jxlinfo</span><span class="v">{toolchain?.jxlinfoVersion || '-'}</span></div>
             <div class="row"><span class="k">Latest version</span><span class:warning={toolchain?.updateAvailable} class="v">{toolchain?.latestVersion || '-'}</span></div>
             <div class="row"><span class="k">Asset</span><span class="v">jxl-x64-windows-static.zip</span></div>
-            {#if toolchain?.updateAvailable || toolchain?.needsInstall}
-              <button class="btn primary" style="margin-top:10px;background:var(--p-encode)" onclick={() => void installToolchain()} disabled={busy}>{toolchain?.needsInstall ? 'Install toolchain' : `Update to ${toolchain.latestVersion}`}</button>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+              <button class="btn" data-testid="check-updates" onclick={() => void refreshToolchain()} disabled={busy}>Check for updates</button>
+              {#if toolchain?.updateAvailable || toolchain?.needsInstall}
+                <button class="btn primary" style="background:var(--p-encode)" onclick={() => void installToolchain()} disabled={busy}>{toolchain?.needsInstall ? 'Install toolchain' : `Update to ${toolchain.latestVersion}`}</button>
+              {/if}
+            </div>
+            {#if toolchain && !toolchain.updateAvailable && !toolchain.needsInstall}
+              <div class="mini" style="margin-top:6px">libjxl is up to date.</div>
             {/if}
           </div>
         </div>
@@ -1301,7 +1379,10 @@
     <div class="body">
       <div class="cols wide-right">
         <div class="card">
-          <h3>Preset library <span class="r">{presets.length} stored <button class="icon-btn" aria-label="Open preset storage folder" title="Open in Explorer" onclick={() => void openStorage('presets')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></span></h3>
+          <h3>Preset library <span class="r">{presets.length} stored
+            <button class="icon-btn" aria-label="Reload presets from folder" title="Reload from folder" data-testid="preset-refresh" onclick={() => void refreshPresets()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-.9 4"></path><path d="M20 4v6h-6"></path></svg></button>
+            <button class="icon-btn" aria-label="Open preset storage folder" title="Open in Explorer" onclick={() => void openStorage('presets')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></span></h3>
+          <div class="banner info" style="margin:10px 10px 0"><span class="ic">i</span><span>Rules are edited by changing the YAML files directly. Open the folder, edit a preset, then Reload. A JSON schema (<code>preset.schema.json</code>) is provided for editor validation.</span></div>
           {#if presets.length === 0}
             <div class="empty">No presets yet. Create one or copy a YAML preset into %APPDATA%\\jxleet\\presets\\.</div>
           {:else}
