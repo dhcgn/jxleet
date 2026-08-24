@@ -66,16 +66,18 @@ Complete inventory as a checklist. The bracket names the spec area.
 > Take a look at [develop-time\design\jxlconv-mockups.html](develop-time\design\jxlconv-mockups.html) for the mockups that guided the design of the GUI.
 
 - [x] Dark by default, operable from 420 pixels
-- [x] Basic and expert separated
-- [x] Drop and file dialog
+- [x] Main and expert views (drop, running and done are inline states of Main)
+- [x] Drop anywhere in the window; file dialog as alternative
 - [x] Colour marking of routes, follows the setting
 - [x] Distance/quality toggle
 - [x] Effort slider with effort ladder
-- [x] Effort as a simple slider in the Basic view
-- [x] Per-file resolved settings (distance/quality, effort, flags) in the Basic file list
-- [x] Queue and live per-file status shown in the Basic view during processing
+- [x] Effort as a simple slider in the Main view
+- [x] Files grouped by detected type with resolved settings (distance/quality, effort, flags) per group
+- [x] Preset strip below the toolbar spelling out every rule of the active preset
+- [x] Preset as single source of truth: controls read and save the active preset (read-only presets auto-duplicate)
+- [x] Queue and live per-file status inline during processing; results (size balance) in place
 - [x] Persistent Open File/Open Folder intake and native drops across views
-- [x] Expert flag overrides with cjxl help tooltips and reset to cjxl defaults
+- [x] Expert flag edits saved into the preset, with cjxl help tooltips and reset to cjxl defaults
 - [x] Explicit libjxl update check in Tools
 - [x] Display of the command line to be executed
 - [x] Progress, remaining time, throughput, failures

@@ -73,6 +73,14 @@ export function GetBindings(): $CancellablePromise<$models.Bindings> {
 }
 
 /**
+ * GetPresetCore reads the editable core of a preset for the GUI controls.
+ * Absent distance/effort report the cjxl defaults (1.0 / 7).
+ */
+export function GetPresetCore(name: string): $CancellablePromise<$models.PresetCore> {
+    return $Call.ByID(3494567662, name);
+}
+
+/**
  * GetProgress returns the current progress snapshot, or an empty snapshot when
  * no conversion is running.
  */
@@ -194,6 +202,16 @@ export function RenamePreset(name: string, newName: string): $CancellablePromise
  */
 export function ResumeConversion(): $CancellablePromise<void> {
     return $Call.ByID(98548325);
+}
+
+/**
+ * SavePresetCore persists the editable core to the fallback rule and the output
+ * policy of the named preset, and applies the JPEG mode to every JPEG-matching
+ * rule. Read-only presets are not modified: they are duplicated as
+ * "<name>-copy" and the GUI binding switches to the copy (PresetSave.Duplicated).
+ */
+export function SavePresetCore(core: $models.PresetCore): $CancellablePromise<$models.PresetSave> {
+    return $Call.ByID(1455864335, core);
 }
 
 /**

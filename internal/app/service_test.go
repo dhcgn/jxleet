@@ -1,6 +1,7 @@
 package app
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -477,4 +478,145 @@ func TestSummarizeFileSettings(t *testing.T) {
 	if got != "Q 90 · E 9" || !flags {
 		t.Errorf("reencode with extra flag = %q flags=%v", got, flags)
 	}
+}
+
+func TestGetPresetCore(t *testing.T) {
+	service := testService(t)
+	if err := preset.NewStore(service.paths.PresetsDir).Save(preset.Preset{
+		Name:    "core",
+		Version: preset.CurrentVersion,
+		Output:  preset.Output{Policy: preset.PolicySubfolder, Subfolder: "jxl"},
+		Rules: []preset.Rule{{
+			Match: []string{"JPEG"},
+			Args:  []cjxl.Arg{{Key: "-j", Value: "0"}},
+		}, {
+			Match: []string{"*"},
+			Args:  []cjxl.Arg{{Key: "-q", Value: "90"}, {Key: "-e", Value: "8"}, {Key: "--progressive", Valueless: true}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	core, err := service.GetPresetCore("core")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if core.Effort != 8 || core.JPEGMode != "reencode" || core.Policy != "subfolder" || !core.UseQuality {
+		t.Errorf("core = %+v", core)
+	}
+	if want := cjxl.DistanceFromQuality(90); core.Distance != want {
+		t.Errorf("distance = %v, want %v (from -q 90)", core.Distance, want)
+	}
+	if len(core.Flags) != 1 || core.Flags[0].Key != "--progressive" {
+		t.Errorf("flags = %+v", core.Flags)
+	}
+}
+
+func TestSavePresetCoreRoundTrip(t *testing.T) {
+	service := testService(t)
+	saveTestPreset(t, service)
+
+	if _, err := service.SavePresetCore(PresetCore{
+		Name: "test", Distance: 2.5, Effort: 9, JPEGMode: "reencode", Policy: "subfolder",
+		Flags: []FlagOverride{{Key: "--progressive", Valueless: true}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	core, err := service.GetPresetCore("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if core.Distance != 2.5 || core.Effort != 9 || core.JPEGMode != "reencode" || core.Policy != "subfolder" {
+		t.Errorf("round trip = %+v", core)
+	}
+	if len(core.Flags) != 1 {
+		t.Errorf("flags = %+v", core.Flags)
+	}
+	// Non-fallback rules keep their own args; only the JPEG mode flag is applied.
+	p, err := preset.NewStore(service.paths.PresetsDir).Load("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	jpeg := p.Rules[0]
+	if !hasArg(jpeg.Args, "-q", "90") || !hasArg(jpeg.Args, "--lossless_jpeg", "0") {
+		t.Errorf("jpeg rule args = %+v", jpeg.Args)
+	}
+}
+
+func TestSavePresetCoreQualityUnit(t *testing.T) {
+	service := testService(t)
+	saveTestPreset(t, service)
+
+	if _, err := service.SavePresetCore(PresetCore{
+		Name: "test", Distance: cjxl.DistanceFromQuality(80), UseQuality: true,
+		Effort: 7, JPEGMode: "transcode", Policy: "alongside",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	p, err := preset.NewStore(service.paths.PresetsDir).Load("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fallback := p.Rules[1] // "*" rule
+	if !hasArg(fallback.Args, "-q", "80") {
+		t.Errorf("fallback should store -q 80: %+v", fallback.Args)
+	}
+	for _, arg := range fallback.Args {
+		if arg.Key == "-d" || arg.Key == "--distance" {
+			t.Errorf("fallback should not keep a distance arg: %+v", arg)
+		}
+	}
+	core, err := service.GetPresetCore("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !core.UseQuality {
+		t.Errorf("core.UseQuality = false, want true: %+v", core)
+	}
+	if math.Abs(core.Distance-cjxl.DistanceFromQuality(80)) > 0.001 {
+		t.Errorf("distance round trip: %v", core.Distance)
+	}
+}
+
+func TestSavePresetCoreAutoDuplicatesReadOnly(t *testing.T) {
+	service := testService(t)
+	if err := preset.NewStore(service.paths.PresetsDir).Save(preset.Preset{
+		Name:     "built-in",
+		Version:  preset.CurrentVersion,
+		ReadOnly: true,
+		Output:   preset.DefaultOutput(),
+		Rules: []preset.Rule{{
+			Match: []string{"*"},
+			Args:  []cjxl.Arg{{Key: "-d", Value: "1.0"}, {Key: "-e", Value: "7"}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.SavePresetCore(PresetCore{
+		Name: "built-in", Distance: 3, Effort: 5, JPEGMode: "transcode", Policy: "alongside",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Duplicated || result.Name != "built-in-copy" {
+		t.Errorf("result = %+v", result)
+	}
+	if got := service.GetBindings().GUI; got != "built-in-copy" {
+		t.Errorf("gui binding = %q", got)
+	}
+	original, err := preset.NewStore(service.paths.PresetsDir).Load("built-in")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if distance, _ := preset.EffectiveDistance(original.Rules[0].Args); distance != 1.0 {
+		t.Errorf("original rule changed: %+v", original.Rules[0].Args)
+	}
+}
+
+func hasArg(args []cjxl.Arg, key, value string) bool {
+	for _, arg := range args {
+		if arg.Key == key && arg.Value == value {
+			return true
+		}
+	}
+	return false
 }

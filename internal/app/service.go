@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -313,6 +314,188 @@ func (s *Service) SavePresetOutputPolicy(name, policy string) error {
 	return preset.NewStore(s.paths.PresetsDir).Save(p)
 }
 
+// PresetCore is the editable core of the active preset: distance, effort, JPEG
+// mode, output policy and the extra cjxl flags of the fallback ("*") rule. The
+// GUI renders its controls from GetPresetCore and persists every change with
+// SavePresetCore, so the preset is the single source of truth shown everywhere.
+type PresetCore struct {
+	Name       string         `json:"name"`
+	ReadOnly   bool           `json:"readOnly"`
+	Distance   float64        `json:"distance"`
+	UseQuality bool           `json:"useQuality"`
+	Effort     int            `json:"effort"`
+	JPEGMode   string         `json:"jpegMode"`
+	Policy     string         `json:"policy"`
+	Flags      []FlagOverride `json:"flags"`
+}
+
+// PresetSave describes the outcome of SavePresetCore. Duplicated is true when
+// the target was read-only and the edit landed on an automatic copy instead.
+type PresetSave struct {
+	Name       string `json:"name"`
+	Duplicated bool   `json:"duplicated"`
+}
+
+// fallbackRuleIndex returns the index of the catch-all rule (matching "*");
+// without one, the last rule acts as the fallback. -1 when there are no rules.
+func fallbackRuleIndex(p preset.Preset) int {
+	for i, rule := range p.Rules {
+		for _, match := range rule.Match {
+			if match == "*" {
+				return i
+			}
+		}
+	}
+	return len(p.Rules) - 1
+}
+
+// GetPresetCore reads the editable core of a preset for the GUI controls.
+// Absent distance/effort report the cjxl defaults (1.0 / 7).
+func (s *Service) GetPresetCore(name string) (PresetCore, error) {
+	p, err := preset.NewStore(s.paths.PresetsDir).Load(strings.TrimSpace(name))
+	if err != nil {
+		return PresetCore{}, err
+	}
+	core := PresetCore{
+		Name: p.Name, ReadOnly: p.ReadOnly,
+		Distance: 1, Effort: 7, JPEGMode: "transcode", Policy: string(p.Output.Policy),
+	}
+	if core.Policy == "" {
+		core.Policy = string(preset.PolicyAlongside)
+	}
+	for _, rule := range p.Rules {
+		if ruleMatchesJPEG(rule) && !preset.EffectiveLosslessJPEG(rule.Args) {
+			core.JPEGMode = "reencode"
+			break
+		}
+	}
+	index := fallbackRuleIndex(p)
+	if index < 0 {
+		return core, nil
+	}
+	rule := p.Rules[index]
+	if distance, specified := preset.EffectiveDistance(rule.Args); specified {
+		core.Distance = distance
+	}
+	core.Flags = []FlagOverride{}
+	for _, arg := range rule.Args {
+		switch arg.Key {
+		case "-e", "--effort":
+			if effort, parseErr := strconv.Atoi(arg.Value); parseErr == nil {
+				core.Effort = effort
+			}
+			continue
+		case "-q", "--quality":
+			core.UseQuality = true
+			continue
+		}
+		if isCoreFlag(arg.Key) {
+			continue
+		}
+		core.Flags = append(core.Flags, FlagOverride{Key: arg.Key, Value: arg.Value, Valueless: arg.Valueless})
+	}
+	return core, nil
+}
+
+// SavePresetCore persists the editable core to the fallback rule and the output
+// policy of the named preset, and applies the JPEG mode to every JPEG-matching
+// rule. Read-only presets are not modified: they are duplicated as
+// "<name>-copy" and the GUI binding switches to the copy (PresetSave.Duplicated).
+func (s *Service) SavePresetCore(core PresetCore) (PresetSave, error) {
+	name := strings.TrimSpace(core.Name)
+	if name == "" {
+		return PresetSave{}, errors.New("preset name is required")
+	}
+	if core.Distance < 0 || core.Distance > 25 {
+		return PresetSave{}, errors.New("distance must be between 0 and 25")
+	}
+	if core.Effort < 1 || core.Effort > 10 {
+		return PresetSave{}, errors.New("effort must be between 1 and 10")
+	}
+	if core.JPEGMode != "transcode" && core.JPEGMode != "reencode" {
+		return PresetSave{}, fmt.Errorf("unknown JPEG mode %q", core.JPEGMode)
+	}
+	policy := preset.Policy(core.Policy)
+	switch policy {
+	case preset.PolicyAlongside, preset.PolicySubfolder, preset.PolicyReplace:
+	default:
+		return PresetSave{}, fmt.Errorf("unknown output policy %q", core.Policy)
+	}
+	if err := validateExpertFlags(core.Flags); err != nil {
+		return PresetSave{}, err
+	}
+
+	store := preset.NewStore(s.paths.PresetsDir)
+	p, err := store.Load(name)
+	if err != nil {
+		return PresetSave{}, err
+	}
+	result := PresetSave{Name: name}
+	if p.ReadOnly {
+		candidate := name + "-copy"
+		for i := 2; store.Exists(candidate); i++ {
+			candidate = fmt.Sprintf("%s-copy-%d", name, i)
+		}
+		if err := store.Duplicate(name, candidate); err != nil {
+			return PresetSave{}, err
+		}
+		if err := s.SetBinding(string(config.EntryGUI), candidate); err != nil {
+			return PresetSave{}, err
+		}
+		result.Name, result.Duplicated = candidate, true
+		if p, err = store.Load(candidate); err != nil {
+			return PresetSave{}, err
+		}
+	}
+
+	index := fallbackRuleIndex(p)
+	if index < 0 {
+		p.Rules = append(p.Rules, preset.Rule{Match: []string{"*"}})
+		index = 0
+	}
+	coreArg := cjxl.Arg{Key: "-d", Value: formatFloat(core.Distance)}
+	if core.UseQuality {
+		coreArg = cjxl.Arg{Key: "-q", Value: formatFloat(round1(cjxl.QualityFromDistance(core.Distance)))}
+	}
+	args := []cjxl.Arg{
+		coreArg,
+		{Key: "-e", Value: strconv.Itoa(core.Effort)},
+	}
+	for _, arg := range p.Rules[index].Args {
+		if arg.Key == "--num_threads" { // runtime knob, keep whatever the YAML set
+			args = append(args, arg)
+		}
+	}
+	for _, override := range core.Flags {
+		args = append(args, cjxl.Arg{Key: strings.TrimSpace(override.Key), Value: override.Value, Valueless: override.Valueless})
+	}
+	p.Rules[index].Args = args
+	for i := range p.Rules {
+		if !ruleMatchesJPEG(p.Rules[i]) {
+			continue
+		}
+		value := "1"
+		if core.JPEGMode == "reencode" {
+			value = "0"
+		}
+		p.Rules[i].Args = setArg(p.Rules[i].Args, []string{"-j", "--lossless_jpeg"}, cjxl.Arg{Key: "--lossless_jpeg", Value: value})
+	}
+	p.Output.Policy = policy
+	if policy == preset.PolicySubfolder && p.Output.Subfolder == "" {
+		p.Output.Subfolder = "jxl"
+	}
+	if err := p.Validate(); err != nil {
+		return PresetSave{}, err
+	}
+	if err := p.ValidateArgs(flags.Default()); err != nil {
+		return PresetSave{}, err
+	}
+	if err := store.Save(p); err != nil {
+		return PresetSave{}, err
+	}
+	return result, nil
+}
+
 // CreatePreset creates a usable basic preset.
 func (s *Service) CreatePreset(name, description string) error {
 	name = strings.TrimSpace(name)
@@ -407,6 +590,7 @@ type ConversionOptions struct {
 	JPEGMode     string         `json:"jpegMode"`
 	Distance     float64        `json:"distance"`
 	UseDistance  bool           `json:"useDistance"`
+	UseQuality   bool           `json:"useQuality"`
 	Effort       int            `json:"effort"`
 	UseEffort    bool           `json:"useEffort"`
 	OutputPolicy string         `json:"outputPolicy"`
@@ -813,8 +997,13 @@ func (s *Service) effectivePreset(options ConversionOptions) (preset.Preset, err
 		if transcodeJPEG {
 			args = removeArgs(args, "-d", "--distance", "-q", "--quality")
 		} else if options.UseDistance {
-			args = removeArgs(args, "-q", "--quality")
-			args = setArg(args, []string{"-d", "--distance"}, cjxl.Arg{Key: "--distance", Value: formatFloat(options.Distance)})
+			if options.UseQuality {
+				args = removeArgs(args, "-d", "--distance")
+				args = setArg(args, []string{"-q", "--quality"}, cjxl.Arg{Key: "-q", Value: formatFloat(round1(cjxl.QualityFromDistance(options.Distance)))})
+			} else {
+				args = removeArgs(args, "-q", "--quality")
+				args = setArg(args, []string{"-d", "--distance"}, cjxl.Arg{Key: "--distance", Value: formatFloat(options.Distance)})
+			}
 		}
 		if options.UseEffort {
 			args = setArg(args, []string{"-e", "--effort"}, cjxl.Arg{Key: "--effort", Value: fmt.Sprintf("%d", options.Effort)})
@@ -1115,6 +1304,12 @@ func removeArgs(args []cjxl.Arg, keys ...string) []cjxl.Arg {
 
 func formatFloat(value float64) string {
 	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
+// round1 keeps derived quality values tidy in the preset ("80" instead of
+// "79.9999") without changing cjxl's behaviour meaningfully.
+func round1(value float64) float64 {
+	return math.Round(value*10) / 10
 }
 
 func cloneBindings(bindings map[config.EntryPoint]string) map[config.EntryPoint]string {

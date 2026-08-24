@@ -624,7 +624,7 @@ input[type="range"] {
   text-align: center;
 }
 
-.drop.dragging,
+/* Wails v3 adds file-drop-target-active to the drop target during dragover. */
 .drop.file-drop-target-active {
   background: #13252a;
   border-color: var(--p-encode);
@@ -1364,4 +1364,128 @@ tr.na .dot.on {
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* Preset strip: always-visible summary of the active preset and its rules. */
+.preset-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--ink2);
+}
+
+.preset-strip strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.preset-strip .strip-label {
+  font: 600 10.5px/1 var(--mono);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+
+.rule-chip {
+  padding: 2px 8px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink2);
+  font: 11px var(--mono);
+  white-space: nowrap;
+}
+
+/* Main view groups: one card per detected input type. */
+.groups-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.group-head:hover {
+  background: var(--panel2);
+}
+
+.group-head .group-title {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.group-head .chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  color: var(--ink3);
+  transition: transform 0.15s;
+}
+
+.group-head[aria-expanded="true"] .chevron {
+  transform: rotate(90deg);
+}
+
+.group .files {
+  border-top: 1px solid var(--line-soft);
+}
+
+.group .files tr.clickable {
+  cursor: pointer;
+}
+
+/* Convert bar pinned under the scrollable body. */
+.convertbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  padding: 9px 12px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+
+.convertbar .convert-action {
+  min-width: 170px;
+}
+
+.delta-chip {
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(79, 178, 134, 0.15);
+  color: var(--p-transcode);
+  font: 600 11px var(--mono);
+  white-space: nowrap;
+}
+
+.delta-chip.neg {
+  background: rgba(224, 90, 80, 0.15);
+  color: var(--danger);
+}
+
+/* Whole-window drop feedback while the OS drag is over the app. */
+.app.file-drop-target-active .body {
+  outline: 2px dashed var(--steel);
+  outline-offset: -8px;
 }

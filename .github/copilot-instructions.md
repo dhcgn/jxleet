@@ -18,9 +18,11 @@ results. Never add encoding logic; only orchestrate the libjxl tools.
   pinned conversion actions, hidden child processes, non-overlapping result tables,
   compact capability icons, backend-derived preset summaries, selected-preset
   rule details, persistent input actions, selectable results with jxlinfo
-  metadata, Expert quality guidance plus all generated cjxl flags, per-file
-  resolved settings and an inline processing queue in the Basic view, a Basic
-  effort slider, a preset JSON schema with a reload action, and an explicit
+  metadata, Expert quality guidance plus all generated cjxl flags, files
+  grouped by detected type with resolved settings and an inline processing
+  queue in the Main view, a Main effort slider, the active preset as single
+  source of truth (controls save into it; read-only presets auto-duplicate),
+  a preset JSON schema with a reload action, and an explicit
   libjxl update check. The
   visual port lives in `frontend/src/App.svelte` + `frontend/public/style.css`.
 - Toolchain: `internal/toolchain` — official libjxl

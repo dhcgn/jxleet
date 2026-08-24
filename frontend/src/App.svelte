@@ -17,7 +17,20 @@
     ToolchainStatus,
   } from '../bindings/github.com/dhcgn/jxleet/internal/app';
 
-  type View = 'drop' | 'basic' | 'expert' | 'running' | 'done' | 'tools' | 'automatic' | 'presets';
+  type View = 'main' | 'expert' | 'presets' | 'tools' | 'automatic';
+  interface FileGroup {
+    key: string;
+    format: string;
+    route: string;
+    skip: boolean;
+    reason: string;
+    settings: string;
+    flagsSet: boolean;
+    files: FilePreview[];
+    sizeIn: number;
+    sizeOut: number;
+    hasResults: boolean;
+  }
   type QualityUnit = 'distance' | 'quality';
   type RouteMode = 'lossy' | 'lossless';
 
@@ -52,8 +65,7 @@
 
   const hiddenExpertFlags = new Set(['--verbose', '--help', '--version', '--quiet']);
 
-  let view = $state<View>('drop');
-  let mode = $state<'basic' | 'expert'>('basic');
+  let view = $state<View>('main');
   let routeMode = $state<RouteMode>('lossy');
   let qualityUnit = $state<QualityUnit>('distance');
   let presetName = $state('');
@@ -61,7 +73,6 @@
   let presets = $state<PresetSummary[]>([]);
   let flagDefinitions = $state<FlagInfo[]>([]);
   let expertOverrides = $state<FlagOverride[]>([]);
-  let expertFlagsReset = $state(false);
   let bindings = $state<Bindings>({ gui: '', cli: '', contextMenu: '' });
   let inputPaths = $state<string[]>([]);
   let files = $state<FilePreview[]>([]);
@@ -72,7 +83,7 @@
   let metadataLoading = $state(false);
   let metadataRequest = 0;
   let previewRequest = 0;
-  let previewTimer: ReturnType<typeof setTimeout> | undefined;
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let commandPreviews = $state<CommandPreview[]>([]);
   let commandPreviewError = $state('');
   let commandPreviewRequest = 0;
@@ -96,9 +107,11 @@
   let toolchainError = $state('');
   let contextMenuRegistered = $state(false);
   let errorMessage = $state('');
+  let noticeMessage = $state('');
+  let savingPreset = $state(false);
+  let collapsedGroups = $state(new Set<string>());
   let loaded = $state(false);
   let busy = $state(false);
-  let dragging = $state(false);
   let distance = $state(1.0);
   let effort = $state(7);
   let jpegLossless = $state(true);
@@ -133,7 +146,7 @@
   );
   let canConvert = $derived(inputPaths.length > 0 && files.length > 0 && presetName !== '' && !busy);
   let selectedResult = $derived(results.find((result) => result.input === selectedResultInput) ?? null);
-  let processing = $derived(busy && (view === 'basic' || view === 'expert'));
+  let processing = $derived(busy && (view === 'main' || view === 'expert'));
   let resultByInput = $derived.by(() => {
     const map = new Map<string, FileUpdate>();
     for (const result of results) map.set(result.input, result);
@@ -172,33 +185,77 @@
     return sections;
   });
   let visibleFlagCount = $derived(flagSections.reduce((count, section) => count + section.flags.length, 0));
+  let activePresetSummary = $derived(presets.find((preset) => preset.name === presetName) ?? null);
+  // The strip spells out every rule of the active preset, so file types with
+  // dedicated settings are visible instead of hiding behind the catch-all.
+  let stripRules = $derived.by(() => {
+    if (!activePresetSummary?.rules) return [] as string[];
+    return activePresetSummary.rules.map((rule) => {
+      const parts: string[] = [];
+      if (rule.jpegMode && rule.jpegMode !== 'n/a') parts.push(rule.jpegMode === 'lossless' ? 'transcode' : 'lossy');
+      if (rule.coreValue && rule.coreValue !== 'n/a') parts.push(rule.coreValue);
+      if (rule.effort && rule.effort !== 'default') parts.push(`e ${rule.effort}`);
+      const matches = (rule.matches ?? []).join(' / ') || '*';
+      return `${matches}: ${parts.join(' · ') || 'cjxl defaults'}`;
+    });
+  });
+  let groups = $derived.by<FileGroup[]>(() => {
+    const map = new Map<string, FileGroup>();
+    for (const file of files) {
+      const route = file.skip ? 'Skip' : file.route || 'pending';
+      const key = `${route}|${file.format}|${file.skip ? file.reason : file.settings}|${file.flagsSet}`;
+      let group = map.get(key);
+      if (!group) {
+        group = {
+          key,
+          format: file.format,
+          route,
+          skip: file.skip,
+          reason: file.reason,
+          settings: file.settings,
+          flagsSet: file.flagsSet,
+          files: [],
+          sizeIn: 0,
+          sizeOut: 0,
+          hasResults: false,
+        };
+        map.set(key, group);
+      }
+      group.files.push(file);
+      group.sizeIn += file.size;
+      const result = resultByInput.get(file.path);
+      if (result && !result.error && !result.skipped && !result.cancelled) {
+        group.sizeOut += result.outputSize;
+        group.hasResults = true;
+      }
+    }
+    const order = (route: string) => (route === 'Transcode' ? 0 : route === 'Reencode' ? 1 : route === 'Encode' ? 2 : 3);
+    return [...map.values()].sort((a, b) => order(a.route) - order(b.route));
+  });
 
   onMount(() => {
     const offFiles = Events.On('files', (event: any) => {
       const incoming = Array.isArray(event?.data) ? event.data : [];
       if (incoming.length === 0) return;
-      const wasRunning = view === 'running' || view === 'automatic';
       acceptPaths(incoming);
-      if (wasRunning) view = 'automatic';
     });
     const offPreset = Events.On('preset', (event: any) => {
       const selected = String(event?.data ?? '');
       if (selected) {
         presetName = selected;
-        void refreshPreview();
+        void applyPresetCore();
       }
     });
     const offProgress = Events.On('progress', (event: any) => {
       if (event?.data) {
         progress = event.data as ProgressUpdate;
         busy = true;
-        // GUI runs stay in the Basic/Expert view (queue shown inline). Only the
-        // coalesced auto path uses the compact window, and a cold CLI start with
-        // no UI context falls back to the running screen.
+        // The queue is shown inline in the Main/Expert views; only coalesced
+        // external invocations use the compact window.
         if (progress.coalesced > 1) {
           view = 'automatic';
-        } else if (view === 'drop') {
-          view = 'running';
+        } else if (view === 'presets' || view === 'tools') {
+          view = 'main';
         }
       }
     });
@@ -210,7 +267,6 @@
     const offDone = Events.On('conversion-done', (event: any) => {
       summary = event?.data as ConversionSummary;
       progress = { ...progress, paused: false, percent: 100 };
-      view = 'done';
       busy = false;
       if (summary?.cancelled) {
         errorMessage = '! cancelled by user';
@@ -253,14 +309,14 @@
       const activePreset = await Service.GetActivePreset();
       if (pendingPreset) presetName = pendingPreset;
       if (activePreset) presetName = activePreset;
+      await applyPresetCore();
       if (pending.length > 0) {
         acceptPaths(pending);
-        await refreshPreview();
       }
       const runningProgress = await Service.GetProgress();
       if (runningProgress.total > 0) {
         progress = runningProgress;
-        view = runningProgress.coalesced > 1 ? 'automatic' : 'running';
+        view = runningProgress.coalesced > 1 ? 'automatic' : 'main';
         busy = true;
       }
       void refreshCommandPreview();
@@ -279,11 +335,12 @@
       jpegMode: jpegLossless ? 'transcode' : 'reencode',
       distance,
       useDistance: true,
+      useQuality: qualityUnit === 'quality',
       effort,
       useEffort: true,
       outputPolicy,
       expertFlags: expertOverrides,
-      resetExpert: expertFlagsReset,
+      resetExpert: false, // flags live in the preset; Expert edits persist there
     };
   }
 
@@ -310,11 +367,6 @@
     }
   }
 
-  function schedulePreviewRefresh(): void {
-    clearTimeout(previewTimer);
-    previewTimer = setTimeout(() => void refreshPreview(), 180);
-  }
-
   async function refreshCommandPreview(): Promise<void> {
     const request = ++commandPreviewRequest;
     if (presetName === '') {
@@ -337,8 +389,8 @@
   function acceptPaths(paths: string[]): void {
     const incoming = paths.filter((path) => path.trim() !== '');
     if (incoming.length === 0) return;
-    const wasRunning = view === 'running' || view === 'automatic';
-    if (view === 'done') {
+    if (!busy) {
+      // Adding files after a finished run starts a fresh batch.
       results = [];
       summary = null;
       selectedResultInput = '';
@@ -350,7 +402,9 @@
     const next = [...inputPaths, ...incoming];
     inputPaths = [...new Set(next)];
     errorMessage = '';
-    view = wasRunning ? 'automatic' : 'basic';
+    if (view !== 'automatic') {
+      view = 'main';
+    }
     void refreshPreview();
   }
 
@@ -372,18 +426,9 @@
     }
   }
 
-  function handleDrop(event: DragEvent): void {
-    event.preventDefault();
-    dragging = false;
-    const paths = Array.from(event.dataTransfer?.files ?? [])
-      .map((file) => (file as File & { path?: string }).path ?? '')
-      .filter(Boolean);
-    if (paths.length === 0) {
-      errorMessage = 'The WebView did not expose local paths. Use Open File or Open Folder.';
-      return;
-    }
-    acceptPaths(paths);
-  }
+  // Drops are native in Wails v3: EnableFileDrop + data-file-drop-target route
+  // absolute paths through WindowFilesDropped -> AddPaths -> the "files" event.
+  // WebView2 never exposes paths on JS DataTransfer, so no JS drop handler exists.
 
   async function startConversion(): Promise<void> {
     if (inputPaths.length === 0) {
@@ -412,12 +457,10 @@
     metadataRequest += 1;
     summary = null;
     progress = { ...progress, total: files.length, completed: 0, failed: 0, skipped: 0, inFlight: 0, percent: 0, paused: false };
-    view = 'basic';
     try {
       await Service.StartConversion(inputPaths, currentOptions());
     } catch (error) {
       busy = false;
-      view = 'basic';
       errorMessage = errorText(error);
     }
   }
@@ -472,7 +515,7 @@
       await Service.CreatePreset(name, description);
       await refreshPresets();
       presetName = name.trim();
-      await refreshPreview();
+      await applyPresetCore();
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -547,7 +590,7 @@
       bindings = { ...bindings, [bindingKey(entryPoint)]: value };
       if (entryPoint === 'gui') {
         presetName = value;
-        await refreshPreview();
+        await applyPresetCore();
       }
       appStatus = await Service.GetStatus();
       if (entryPoint === 'contextmenu') {
@@ -590,7 +633,7 @@
     return 'contextMenu';
   }
 
-  function resetDrop(): void {
+  function clearAll(): void {
     inputPaths = [];
     files = [];
     previewRequest += 1;
@@ -605,7 +648,61 @@
     metadataRequest += 1;
     summary = null;
     progress = { ...progress, total: 0, completed: 0, failed: 0, skipped: 0, percent: 0 };
-    view = 'drop';
+    view = 'main';
+  }
+
+  // The active preset is the single source of truth: the controls below read
+  // it (applyPresetCore) and write every change back (queuePresetSave).
+  async function applyPresetCore(): Promise<void> {
+    if (presetName === '') return;
+    try {
+      const core = await Service.GetPresetCore(presetName);
+      distance = core.distance;
+      effort = core.effort;
+      qualityUnit = core.useQuality ? 'quality' : 'distance';
+      routeMode = core.distance === 0 ? 'lossless' : 'lossy';
+      if (core.distance > 0) lossyDistance = core.distance;
+      jpegLossless = core.jpegMode !== 'reencode';
+      outputPolicy = core.policy || 'alongside';
+      expertOverrides = core.flags ?? [];
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+    void refreshPreview();
+  }
+
+  function queuePresetSave(): void {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => void persistCore(), 300);
+    void refreshCommandPreview();
+  }
+
+  async function persistCore(): Promise<void> {
+    if (presetName === '') return;
+    savingPreset = true;
+    try {
+      const saved = await Service.SavePresetCore({
+        name: presetName,
+        readOnly: false,
+        distance,
+        useQuality: qualityUnit === 'quality',
+        effort,
+        jpegMode: jpegLossless ? 'transcode' : 'reencode',
+        policy: outputPolicy,
+        flags: expertOverrides,
+      });
+      if (saved.duplicated) {
+        noticeMessage = `“${presetName}” is read-only — the edit created “${saved.name}”, which is now the active GUI preset.`;
+        presetName = saved.name;
+        bindings = { ...bindings, gui: saved.name };
+        await refreshPresets();
+      }
+      void refreshPreview();
+    } catch (error) {
+      errorMessage = errorText(error);
+    } finally {
+      savingPreset = false;
+    }
   }
 
   function routeClass(route: string): string {
@@ -620,10 +717,6 @@
     if (route === 'Reencode') return 'JXL reencode';
     if (route === 'Encode') return 'Pixel encode';
     return 'Skipped';
-  }
-
-  function compactFileName(name: string): string {
-    return name.length > 9 ? `${name.slice(0, 3)}...${name.slice(-6)}` : name;
   }
 
   function compactPath(path: string, maxLength = 80): string {
@@ -660,6 +753,26 @@
     return value > 0 ? `${formatBytes(value)}/s` : '--';
   }
 
+  function savedPct(before: number, after: number): number {
+    if (before <= 0) return 0;
+    return Math.round((1 - after / before) * 100);
+  }
+
+  function formatDelta(before: number, after: number): string {
+    const pct = savedPct(before, after);
+    return pct >= 0 ? `-${pct}%` : `+${-pct}%`;
+  }
+
+  function toggleGroup(key: string): void {
+    const next = new Set(collapsedGroups);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    collapsedGroups = next;
+  }
+
   function qualityFromDistance(value: number): number {
     if (value <= 0) return 100;
     if (value <= 6.4) return Math.max(0, Math.min(100, 100 - (value - 0.1) / 0.09));
@@ -672,8 +785,7 @@
   function setDistance(event: Event): void {
     distance = Number((event.currentTarget as HTMLInputElement).value);
     if (routeMode === 'lossy') lossyDistance = distance;
-    void refreshCommandPreview();
-    schedulePreviewRefresh();
+    queuePresetSave();
   }
 
   function setQuality(event: Event): void {
@@ -681,14 +793,12 @@
     const value = 100 - position; // slider is inverted so best quality (100) sits on the left, matching distance 0
     distance = value >= 100 ? 0 : 0.1 + (100 - value) * 0.09;
     if (routeMode === 'lossy') lossyDistance = distance;
-    void refreshCommandPreview();
-    schedulePreviewRefresh();
+    queuePresetSave();
   }
 
   function setEffort(event: Event): void {
     effort = Number((event.currentTarget as HTMLInputElement).value);
-    void refreshCommandPreview();
-    schedulePreviewRefresh();
+    queuePresetSave();
   }
 
   function expertFlagValue(key: string): string {
@@ -705,7 +815,7 @@
       next.push({ key, value, valueless: false });
     }
     expertOverrides = next;
-    void refreshCommandPreview();
+    queuePresetSave();
   }
 
   function setExpertFlagEnabled(key: string, enabled: boolean): void {
@@ -714,7 +824,7 @@
       next.push({ key, value: '', valueless: true });
     }
     expertOverrides = next;
-    void refreshCommandPreview();
+    queuePresetSave();
   }
 
   function isLinkedFlagKey(key: string): boolean {
@@ -750,8 +860,7 @@
 
   function resetExpertFlags(): void {
     expertOverrides = [];
-    expertFlagsReset = true;
-    void refreshCommandPreview();
+    queuePresetSave();
   }
 
   function setRouteMode(next: RouteMode): void {
@@ -763,7 +872,7 @@
       distance = lossyDistance > 0 ? lossyDistance : 1.0;
     }
     routeMode = next;
-    void refreshCommandPreview();
+    queuePresetSave();
   }
 
   function qualityStatusText(): string {
@@ -814,15 +923,15 @@
   }
 }} />
 
-<main class:running={view === 'running' || view === 'automatic'} class:narrow={view === 'automatic'} class="app">
+<main class:narrow={view === 'automatic'} class="app" data-file-drop-target>
   <div class="toolbar">
     <div class="seg" aria-label="Editor mode">
-      <button aria-pressed={mode === 'basic'} onclick={() => { mode = 'basic'; if (view === 'expert') view = 'basic'; }}>Basic</button>
-      <button aria-pressed={mode === 'expert'} onclick={() => { mode = 'expert'; view = 'expert'; }}>Expert</button>
+      <button aria-pressed={view === 'main'} onclick={() => { view = 'main'; }}>Main</button>
+      <button aria-pressed={view === 'expert'} onclick={() => { view = 'expert'; }}>Expert</button>
     </div>
     <div class="field">
       <label for="preset-select">Preset</label>
-      <select id="preset-select" bind:value={presetName} onchange={() => void refreshPreview()} disabled={presets.length === 0}>
+      <select id="preset-select" bind:value={presetName} onchange={() => void applyPresetCore()} disabled={presets.length === 0}>
         <option value="">Select a preset</option>
         {#each presets as preset}
           <option value={preset.name}>{preset.name}</option>
@@ -833,15 +942,27 @@
       <button class="btn" onclick={() => void openFile()}>Open File</button>
       <button class="btn" onclick={() => void openFolder()}>Open Folder</button>
     </div>
-    <button class="btn ghost" onclick={() => { view = 'presets'; mode = 'basic'; }}>Presets</button>
-    <button class="btn ghost" onclick={() => { view = 'tools'; mode = 'basic'; }}>Tools</button>
+    <button class="btn ghost" onclick={() => { view = 'presets'; }}>Presets</button>
+    <button class="btn ghost" onclick={() => { view = 'tools'; }}>Tools</button>
     <span class="spacer"></span>
-    {#if view === 'done'}
-      <button class="btn" onclick={resetDrop}>New drop</button>
-    {:else if view === 'presets' || view === 'tools'}
-      <button class="btn" onclick={() => { view = inputPaths.length > 0 ? 'basic' : 'drop'; }}>Back</button>
+    {#if view === 'presets' || view === 'tools'}
+      <button class="btn" onclick={() => { view = 'main'; }}>Back</button>
     {/if}
   </div>
+
+  {#if (view === 'main' || view === 'expert') && presetName !== ''}
+    <div class="preset-strip" data-testid="preset-strip">
+      <span class="strip-label">Preset</span>
+      <strong>{presetName}</strong>
+      {#if activePresetSummary?.readOnly}<span class="mini" title="Edits create an editable copy">read-only</span>{/if}
+      {#each stripRules as rule}
+        <code class="rule-chip">{rule}</code>
+      {/each}
+      <span class="spacer"></span>
+      {#if savingPreset}<span class="mini">saving…</span>{/if}
+      <span class="mini">output: {outputPolicy}</span>
+    </div>
+  {/if}
 
   {#if errorMessage}
     <div class="banner warn" role="alert">
@@ -849,10 +970,16 @@
       <button class="alert-close" aria-label="Dismiss message" title="Dismiss" onclick={dismissMessage}>x</button>
     </div>
   {/if}
+  {#if noticeMessage}
+    <div class="banner info" role="status">
+      <span class="ic">i</span><span>{noticeMessage}</span>
+      <button class="alert-close" aria-label="Dismiss notice" title="Dismiss" onclick={() => { noticeMessage = ''; }}>x</button>
+    </div>
+  {/if}
 
   {#if !loaded}
     <div class="body"><div class="empty">Loading jxleet...</div></div>
-  {:else if view === 'drop'}
+  {:else if view === 'main'}
     <div class="body">
       {#if toolchain?.needsInstall}
         <div class="banner warn">
@@ -868,19 +995,15 @@
           <button class="btn ghost" style="margin-left:auto" onclick={() => { view = 'presets'; }}>Set bindings</button>
         </div>
       {/if}
-      <div
-        class:dragging
-        class="drop"
-        data-file-drop-target="dropzone"
-        role="button"
-        tabindex="0"
-        aria-label="Drop files or folders"
-        ondragover={(event) => { event.preventDefault(); dragging = true; }}
-        ondragleave={() => { dragging = false; }}
-        ondrop={handleDrop}
-        onclick={() => void openFile()}
-        onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') void openFile(); }}
-      >
+      {#if files.length === 0 && !busy}
+        <div
+          class="drop"
+          role="button"
+          tabindex="0"
+          aria-label="Drop files or folders"
+          onclick={() => void openFile()}
+          onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') void openFile(); }}
+        >
         <div class="big">Drop files or folders here</div>
         <div class="sub">jxleet detects the input format and chooses the route. Unsupported files are skipped and reported.</div>
         <div style="display:flex;gap:14px;justify-content:center;margin-top:6px;flex-wrap:wrap">
@@ -894,9 +1017,7 @@
           <button class="btn" onclick={(event) => { event.stopPropagation(); void openFolder(); }}>Open Folder</button>
         </div>
       </div>
-    </div>
-  {:else if view === 'basic'}
-    <div class="body">
+      {:else}
       {#if processing}
         <div class="run-strip" data-testid="run-strip">
           <div class="run-head">
@@ -910,71 +1031,74 @@
           <div class="bar"><i style={`width:${Math.min(100, progress.percent)}%`}></i></div>
         </div>
       {/if}
-      <div class="paths">
-        <div class="path p1" class:off={routeCounts.Transcode === 0}>
-          <div class="t">JPEG transcode</div>
-          <div class="n">{routeCounts.Transcode}</div>
-          <div class="d">Lossless and byte-reversible. Distance does not apply.</div>
-        </div>
-        <div class="path p2" class:off={routeCounts.Reencode === 0}>
-          <div class="t">JXL reencode</div>
-          <div class="n">{routeCounts.Reencode}</div>
-          <div class="d">Decoded and encoded again with the selected settings.</div>
-        </div>
-        <div class="path p3" class:off={routeCounts.Encode === 0}>
-          <div class="t">Pixel encode</div>
-          <div class="n">{routeCounts.Encode}</div>
-          <div class="d">PNG, GIF, EXR and NetPBM formats; lossless at distance 0.</div>
-        </div>
-      </div>
-
+      {#if presetName === ''}
+        <div class="banner info" style="margin-bottom:12px"><span class="ic">i</span><span>Files are selected. Select a preset in the toolbar to classify their routes.</span></div>
+      {/if}
+      {#if files.length === 0}
+        <div class="empty">Preparing the queue...</div>
+      {:else}
       <div class="cols">
-        <div class="card">
-          <h3>Files <span class="r">{files.length} files - {formatBytes(totalSize)}</span></h3>
-          {#if inputPaths.length === 0}
-            <div class="empty">No files selected. Use Open File or Open Folder above to add inputs.</div>
-          {:else}
-            {#if presetName === ''}
-              <div class="banner info" style="margin:10px 10px 0"><span class="ic">i</span><span>Files are selected. Select a preset in the toolbar to classify their routes.</span></div>
-            {/if}
-            {#if files.length === 0}
-              <div class="empty">The selected paths could not be previewed.</div>
-            {:else}
-            <table class="files basic-files" data-testid="file-table">
-              <colgroup>
-                <col class="bf-file-col" />
-                <col class="bf-route-col" />
-                <col class="bf-settings-col" />
-                <col class="bf-size-col" />
-                {#if processing || results.length > 0}<col class="bf-status-col" />{/if}
-              </colgroup>
-              <thead><tr><th>File</th><th>Route</th><th>Settings</th><th style="text-align:right">Size</th>{#if processing || results.length > 0}<th>Status</th>{/if}</tr></thead>
-              <tbody>
-                {#each files as file}
-                  {@const status = fileStatus(file)}
-                  <tr>
-                    <td class="fn" title={file.path}>{compactFileName(file.name)}</td>
-                    <td class="route-cell"><span class={`badge ${routeClass(file.route)}`}>{file.skip ? 'skip' : file.route || 'pending'}</span></td>
-                    <td class="settings-cell" title={file.flagsSet ? `${file.settings} + extra flags` : file.settings}>
-                      {#if file.skip}<span class="mini">{file.reason || '-'}</span>{:else}<span class="mono-mini">{file.settings || '-'}</span>{#if file.flagsSet}<span class="flag-chip" title="Extra cjxl flags applied">+flags</span>{/if}{/if}
-                    </td>
-                    <td class="num">{formatBytes(file.size)}</td>
-                    {#if processing || results.length > 0}<td class="status-cell" class:success={status === 'done'} class:error={status === 'failed'}>{status}</td>{/if}
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-            {/if}
-          {/if}
+        <div class="groups-col">
+          {#each groups as group (group.key)}
+            <div class="card group" data-testid={`group-${group.route.toLowerCase()}`}>
+              <button type="button" class="group-head" aria-expanded={!collapsedGroups.has(group.key)} onclick={() => toggleGroup(group.key)}>
+                <span class={`badge ${routeClass(group.route)}`}>{group.skip ? 'skip' : group.format || 'file'}</span>
+                <span class="group-title">{group.route === 'pending' ? 'Select a preset' : routeTitle(group.route)}</span>
+                <span class="mini">{group.files.length} files - {formatBytes(group.sizeIn)}</span>
+                <span class="spacer"></span>
+                {#if group.skip}
+                  <span class="mini">{group.reason || 'skipped'}</span>
+                {:else}
+                  <span class="mono-mini" title={group.flagsSet ? `${group.settings} + extra flags` : group.settings}>{group.settings || '-'}</span>
+                  {#if group.flagsSet}<span class="flag-chip" title="Extra cjxl flags applied">+flags</span>{/if}
+                  {#if group.hasResults && group.sizeIn > 0}
+                    <span class="delta-chip" class:neg={savedPct(group.sizeIn, group.sizeOut) < 0}>{formatDelta(group.sizeIn, group.sizeOut)}</span>
+                  {/if}
+                {/if}
+                <svg class="chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"></path></svg>
+              </button>
+              {#if !collapsedGroups.has(group.key)}
+                <table class="files group-files" data-testid="file-table">
+                  <thead><tr><th>File</th><th style="text-align:right">Size</th><th style="text-align:right">JXL</th><th>Result</th></tr></thead>
+                  <tbody>
+                    {#each group.files as file (file.path)}
+                      {@const result = resultByInput.get(file.path)}
+                      {@const failed = result != null && result.error !== ''}
+                      {@const inspectable = summary != null && !busy && result != null && !failed && !result.skipped && !result.cancelled}
+                      <tr
+                        class:selected={result != null && selectedResultInput === result.input}
+                        class:clickable={inspectable}
+                        onclick={() => { if (inspectable && result) void selectResult(result); }}
+                      >
+                        <td class="fn" title={file.path}>{file.name}</td>
+                        <td class="num">{formatBytes(file.size)}</td>
+                        <td class="num">{result && !failed && !result.skipped && !result.cancelled ? formatBytes(result.outputSize) : '-'}</td>
+                        <td class="status-cell" class:success={result != null && !failed && !result.skipped && !result.cancelled} class:error={failed}>
+                          {#if result}
+                            {failed ? (result.error || 'failed') : result.skipped ? (result.skipReason || 'skipped') : result.cancelled ? 'cancelled' : formatDelta(result.inputSize, result.outputSize)}
+                          {:else if group.skip}
+                            {file.reason || 'skipped'}
+                          {:else if busy}
+                            {fileStatus(file)}
+                          {/if}
+                        </td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              {/if}
+            </div>
+          {/each}
+          <div class="mini" style="padding:0 2px">Drop more files or folders anywhere in the window to add them.</div>
         </div>
 
         <div style="display:flex;flex-direction:column;gap:12px">
           <div class="card">
-            <h3>Compression <span class="r">applies to non-transcoded files</span></h3>
+            <h3>Compression <span class="r">stored in the preset</span></h3>
             <div class="in">
               <div class="seg" style="width:100%;margin-bottom:9px">
-                <button aria-pressed={qualityUnit === 'distance'} style="flex:1" onclick={() => qualityUnit = 'distance'}>Distance</button>
-                <button aria-pressed={qualityUnit === 'quality'} style="flex:1" onclick={() => qualityUnit = 'quality'}>Quality</button>
+                <button aria-pressed={qualityUnit === 'distance'} style="flex:1" onclick={() => { qualityUnit = 'distance'; queuePresetSave(); }}>Distance</button>
+                <button aria-pressed={qualityUnit === 'quality'} style="flex:1" onclick={() => { qualityUnit = 'quality'; queuePresetSave(); }}>Quality</button>
               </div>
               <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
                 <span class="qnum" class:out-of-range={outOfRange}>{qualityUnit === 'distance' ? distance.toFixed(1) : quality}</span>
@@ -1011,11 +1135,11 @@
             <h3>JPEG handling <span class="r">{routeCounts.Transcode + routeCounts.Reencode} files</span></h3>
             <div class="in policy" data-testid="jpeg-mode">
               <label class="opt" data-sel={jpegLossless}>
-                <input type="radio" name="jpeg-mode" checked={jpegLossless} onchange={() => { jpegLossless = true; void refreshPreview(); }} />
+                <input type="radio" name="jpeg-mode" checked={jpegLossless} onchange={() => { jpegLossless = true; queuePresetSave(); }} />
                 <span><span class="ot">Transcode</span><span class="od">Bit-exactly reversible; the original JPEG can be reconstructed.</span></span>
               </label>
               <label class="opt" data-sel={!jpegLossless}>
-                <input type="radio" name="jpeg-mode" checked={!jpegLossless} onchange={() => { jpegLossless = false; void refreshPreview(); }} />
+                <input type="radio" name="jpeg-mode" checked={!jpegLossless} onchange={() => { jpegLossless = false; queuePresetSave(); }} />
                 <span><span class="ot">Reencode</span><span class="od">Uses distance and effort; not reversible.</span></span>
               </label>
               <div class="mini" style="padding:6px 8px 0;border-top:1px solid var(--line-soft);margin-top:4px">--lossless_jpeg={jpegLossless ? 1 : 0}</div>
@@ -1026,26 +1150,63 @@
             <h3>Output</h3>
             <div class="in policy" data-testid="output-policy">
               <label class="opt" data-sel={outputPolicy === 'alongside'}>
-                <input type="radio" name="output" checked={outputPolicy === 'alongside'} onchange={() => outputPolicy = 'alongside'} />
+                <input type="radio" name="output" checked={outputPolicy === 'alongside'} onchange={() => { outputPolicy = 'alongside'; queuePresetSave(); }} />
                 <span><span class="ot">Alongside</span><span class="od">The original stays untouched.</span></span>
               </label>
               <label class="opt" data-sel={outputPolicy === 'subfolder'}>
-                <input type="radio" name="output" checked={outputPolicy === 'subfolder'} onchange={() => outputPolicy = 'subfolder'} />
+                <input type="radio" name="output" checked={outputPolicy === 'subfolder'} onchange={() => { outputPolicy = 'subfolder'; queuePresetSave(); }} />
                 <span><span class="ot">Into subfolder</span><span class="od">./jxl/ relative to the source.</span></span>
               </label>
               <label class="opt risk" data-sel={outputPolicy === 'replace'}>
-                <input type="radio" name="output" checked={outputPolicy === 'replace'} onchange={() => outputPolicy = 'replace'} />
+                <input type="radio" name="output" checked={outputPolicy === 'replace'} onchange={() => { outputPolicy = 'replace'; queuePresetSave(); }} />
                 <span><span class="ot">Replace, original to recycle bin</span><span class="od">Only after verification. Irreversible routes require confirmation.</span></span>
               </label>
             </div>
           </div>
 
-          <button class="btn primary convert-action" style={`background:var(--p-${dominantRoute === 'Transcode' ? 'transcode' : dominantRoute === 'Encode' ? 'encode' : 'reencode'});padding:11px`} data-testid="start-convert" onclick={() => void startConversion()} disabled={!canConvert}>
-            Convert {files.length} files
-          </button>
+          {#if summary && !busy}
+            <div class="card">
+              <h3>Output summary</h3>
+              <div class="in kv">
+                <div><span>Converted</span><span>{summary.completed}{#if summary.failed > 0} - {summary.failed} failed{/if}{#if summary.skipped > 0} - {summary.skipped} skipped{/if}</span></div>
+                <div><span>Bytes</span><span>{formatBytes(summary.bytesIn)} -&gt; {formatBytes(summary.bytesOut)}</span></div>
+                <div><span>Saved</span><span class="success">{formatDelta(summary.bytesIn, summary.bytesOut)}</span></div>
+              </div>
+            </div>
+            <div class="card">
+              <h3>jxlinfo <span class="r">{selectedResult ? (selectedResult.output ? compactPath(selectedResult.output, 34) : 'unavailable') : 'select a converted file'}</span></h3>
+              <div class="in">
+                {#if !selectedResult}
+                  <div class="empty">Select a converted file to inspect its JPEG XL metadata.</div>
+                {:else if metadataLoading}
+                  <div class="empty">Reading jxlinfo metadata...</div>
+                {:else if metadataError}
+                  <div class="banner warn" style="margin:0"><span class="ic">!</span><span>{metadataError}</span></div>
+                {:else}
+                  <pre class="metadata-output">{metadataOutput}</pre>
+                {/if}
+              </div>
+            </div>
+          {/if}
         </div>
       </div>
+      {/if}
+      {/if}
     </div>
+    {#if files.length > 0}
+      <div class="convertbar" data-testid="convertbar">
+        {#if summary && !busy}
+          <span class:error={summary.failed > 0} class:success={summary.failed === 0}>{summary.completed} converted{#if summary.failed > 0} - {summary.failed} failed{/if}{#if summary.skipped > 0} - {summary.skipped} skipped{/if}</span>
+          <span class="mono-mini">{formatBytes(summary.bytesIn)} -&gt; {formatBytes(summary.bytesOut)}</span>
+          <span class="delta-chip" class:neg={savedPct(summary.bytesIn, summary.bytesOut) < 0}>{formatDelta(summary.bytesIn, summary.bytesOut)}</span>
+        {:else}
+          <span class="mini">{files.length} files - {formatBytes(totalSize)}</span>
+        {/if}
+        <span class="spacer"></span>
+        {#if summary && !busy}<button class="btn" data-testid="new-files" onclick={clearAll}>New files</button>{/if}
+        <button class="btn primary convert-action" style={`background:var(--p-${dominantRoute === 'Transcode' ? 'transcode' : dominantRoute === 'Encode' ? 'encode' : 'reencode'});padding:11px`} data-testid="start-convert" onclick={() => void startConversion()} disabled={!canConvert}>Convert {files.length} files</button>
+      </div>
+    {/if}
   {:else if view === 'expert'}
     <div class="body">
       <div class="toolbar" style="margin:-12px -12px 12px">
@@ -1056,7 +1217,7 @@
           </div>
         </div>
         <span class="spacer"></span>
-        <button class="btn ghost" onclick={() => { setRouteMode('lossy'); distance = 1; effort = 7; jpegLossless = true; }}>Reset to preset</button>
+        <span class="mini">Editing preset: {presetName || 'none'}</span>
       </div>
       <div class="cols wide-right">
         <div class="card">
@@ -1120,8 +1281,8 @@
             <h3>Quality</h3>
             <div class="in">
               <div class="seg" style="width:100%;margin-bottom:9px">
-                <button aria-pressed={qualityUnit === 'distance'} style="flex:1" data-testid="unit-distance" onclick={() => qualityUnit = 'distance'}>Distance</button>
-                <button aria-pressed={qualityUnit === 'quality'} style="flex:1" data-testid="unit-quality" onclick={() => qualityUnit = 'quality'}>Quality</button>
+                <button aria-pressed={qualityUnit === 'distance'} style="flex:1" data-testid="unit-distance" onclick={() => { qualityUnit = 'distance'; queuePresetSave(); }}>Distance</button>
+                <button aria-pressed={qualityUnit === 'quality'} style="flex:1" data-testid="unit-quality" onclick={() => { qualityUnit = 'quality'; queuePresetSave(); }}>Quality</button>
               </div>
               <div style="display:flex;align-items:baseline;gap:8px">
                 <span class="qnum" class:out-of-range={outOfRange}>{qualityUnit === 'distance' ? distance.toFixed(1) : quality}</span>
@@ -1151,14 +1312,14 @@
             <div class="in">
               <div class="banner info flag-notice">
                 <span class="ic">i</span>
-                <span>Changes apply to the next conversion only. Use Convert to test the current cjxl command; they are not saved automatically.</span>
+                <span>Changes are saved to preset "{presetName}" and apply to every run using it.{activePresetSummary?.readOnly ? ' The preset is read-only: the first change creates an editable copy and switches to it.' : ''}</span>
               </div>
               {#if toolchain?.flagsLocked}
                 <div class="banner warn"><span class="ic">!</span><span>Expert flags are locked because the installed cjxl version differs from the generated help.</span></div>
               {/if}
               <div class="flag-actions">
                 <button class="btn ghost" onclick={resetExpertFlags} disabled={Boolean(toolchain?.flagsLocked)}>Reset Expert flags</button>
-                <span class="mini">{expertFlagsReset ? 'Expert flags reset: cjxl defaults apply.' : 'Reset clears explicit flags so cjxl defaults apply.'}</span>
+                <span class="mini">Reset removes the extra flags stored in the preset so cjxl defaults apply.</span>
               </div>
               {#each flagSections as section}
                 <div class="flag-section">
@@ -1203,7 +1364,7 @@
         </div>
       </div>
     </div>
-  {:else if view === 'running' || view === 'automatic'}
+  {:else if view === 'automatic'}
     <div class="body">
       <div class="toolbar" style="margin:-12px -12px 12px">
         <span class="badge b-reencode">Running</span>
@@ -1244,70 +1405,6 @@
               <div>{file.name} <span class="st">{index < progress.completed ? 'done' : index < progress.completed + progress.inFlight ? 'running' : 'waiting'}</span></div>
             {/each}
             {#if files.length > 12}<div class="st" style="padding-top:6px">... {files.length - 12} more</div>{/if}
-          </div>
-        </div>
-      </div>
-    </div>
-  {:else if view === 'done'}
-    <div class="body">
-      <div class="toolbar" style="margin:-12px -12px 12px">
-        <span class:success={!summary?.failed} class:error={Boolean(summary?.failed)}>{summary?.completed ?? 0} converted - {summary?.failed ?? 0} failed</span>
-        <span class="mini">{formatBytes(summary?.bytesIn ?? 0)} -> {formatBytes(summary?.bytesOut ?? 0)}</span>
-        <span class="spacer"></span>
-        <button class="btn ghost" onclick={() => { view = 'tools'; }}>Tools</button>
-        <button class="btn" onclick={resetDrop}>New drop</button>
-      </div>
-      <div class="cols wide-right">
-        <div class="card">
-          <h3>Result <span class="r">{results.length} files</span></h3>
-          {#if results.length === 0}
-            <div class="empty">No file results were reported.</div>
-          {:else}
-            <table class="files results-table" data-testid="result-table">
-              <colgroup>
-                <col class="result-file-col" />
-                <col class="result-route-col" />
-                <col class="result-before-col" />
-                <col class="result-after-col" />
-                <col class="result-status-col" />
-              </colgroup>
-              <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Before</th><th style="text-align:right">After</th><th>Status</th></tr></thead>
-              <tbody>
-                {#each results as result}
-                  <tr class:selected={selectedResultInput === result.input} aria-selected={selectedResultInput === result.input} tabindex="0" onclick={() => void selectResult(result)} onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') void selectResult(result); }}>
-                    <td class="fn" title={result.input}>{compactPath(result.input)}</td>
-                    <td class="route-cell"><span class={`badge ${routeClass(result.route)}`}>{result.route || 'Skip'}</span></td>
-                    <td class="num">{formatBytes(result.inputSize)}</td>
-                    <td class="num">{formatBytes(result.outputSize)}</td>
-                    <td class="status-cell" title={result.error || result.skipReason || (result.cancelled ? 'cancelled' : 'done')} class:error={Boolean(result.error)} class:success={!result.error && !result.skipped}>{result.error || result.skipReason || (result.cancelled ? 'cancelled' : 'done')}</td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          {/if}
-        </div>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          <div class="card">
-            <h3>jxlinfo <span class="r">{selectedResult ? (selectedResult.output ? compactPath(selectedResult.output, 34) : 'unavailable') : 'select a result'}</span></h3>
-            <div class="in">
-              {#if !selectedResult}
-                <div class="empty">Select a result row to inspect its detailed JPEG XL metadata.</div>
-              {:else if metadataLoading}
-                <div class="empty">Reading jxlinfo metadata...</div>
-              {:else if metadataError}
-                <div class="banner warn" style="margin:0"><span class="ic">!</span><span>{metadataError}</span></div>
-              {:else}
-                <pre class="metadata-output">{metadataOutput}</pre>
-              {/if}
-            </div>
-          </div>
-          <div class="card">
-            <h3>Output summary</h3>
-            <div class="in kv">
-              <div><span>Decoded results</span><span>verified by djxl</span></div>
-              <div><span>JPEG reconstruction</span><span class="success">checked on transcode</span></div>
-              <div><span>Output balance</span><span>{formatBytes(summary?.bytesOut ?? 0)} written</span></div>
-            </div>
           </div>
         </div>
       </div>
@@ -1505,7 +1602,7 @@
       <span class="warning"><span class="dotled"></span>libjxl not installed</span>
     {/if}
     <span class="spacer"></span>
-    {#if view === 'running' || view === 'automatic'}
+    {#if busy || view === 'automatic'}
       <span>{progress.completed} done - {progress.failed} failed</span><span>{formatRate(progress.throughput)}</span>
     {:else if view === 'tools' && toolchain?.updateAvailable}
       <span class="up">Update available</span>

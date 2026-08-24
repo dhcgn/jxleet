@@ -29,6 +29,7 @@ export interface ConversionOptions {
     "jpegMode": string;
     "distance": number;
     "useDistance": boolean;
+    "useQuality": boolean;
     "effort": number;
     "useEffort": boolean;
     "outputPolicy": string;
@@ -103,6 +104,23 @@ export interface FlagOverride {
 }
 
 /**
+ * PresetCore is the editable core of the active preset: distance, effort, JPEG
+ * mode, output policy and the extra cjxl flags of the fallback ("*") rule. The
+ * GUI renders its controls from GetPresetCore and persists every change with
+ * SavePresetCore, so the preset is the single source of truth shown everywhere.
+ */
+export interface PresetCore {
+    "name": string;
+    "readOnly": boolean;
+    "distance": number;
+    "useQuality": boolean;
+    "effort": number;
+    "jpegMode": string;
+    "policy": string;
+    "flags": FlagOverride[] | null;
+}
+
+/**
  * PresetRuleSummary is one file-filter rule shown in the selected-preset details.
  */
 export interface PresetRuleSummary {
@@ -110,6 +128,15 @@ export interface PresetRuleSummary {
     "coreValue": string;
     "effort": string;
     "jpegMode": string;
+}
+
+/**
+ * PresetSave describes the outcome of SavePresetCore. Duplicated is true when
+ * the target was read-only and the edit landed on an automatic copy instead.
+ */
+export interface PresetSave {
+    "name": string;
+    "duplicated": boolean;
 }
 
 /**

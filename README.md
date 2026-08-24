@@ -115,28 +115,33 @@ jxleet refuses to run only when a binding is missing or invalid.
 
 ### 1. The window
 
-Drag files or folders in. The toolbar keeps separate **Open File** and **Open Folder**
-actions available after you leave the Drop view, and native Windows drag-and-drop accepts
-files or folders in every view. A selected folder contributes only regular files directly
+Drag files or folders in - native Windows drag-and-drop accepts
+files or folders in every view, and the toolbar keeps separate **Open File** and **Open Folder**
+actions always available. A selected folder contributes only regular files directly
 inside it; subfolders are not traversed, and anything unsupported is skipped rather than
 aborting the batch. If no preset is selected, the files stay in the queue and the window
 explains that a preset is needed for route classification.
 
-Settings split into **Basic** — the essentials — and **Expert**, which exposes the full
-generated `cjxl` flag surface. Every flag includes its help text as a tooltip. Expert flag
-edits are temporary overrides for the next conversion; **Reset Expert flags** clears them so
-cjxl defaults apply. The live preview shows the exact command line that will run.
+Settings split into **Main** - the essentials - and **Expert**, which exposes the full
+generated `cjxl` flag surface; every flag includes its help text as a tooltip. The active
+preset is the single source of truth: the Main and Expert controls show exactly what the
+preset contains, switching presets re-resolves everything immediately, and every edit is
+saved back into the preset (a read-only preset is first duplicated into an editable
+`<name>-copy`). The preset strip under the toolbar spells out each rule - the catch-all and
+every format with its own settings. The live preview shows the exact command line that will
+run.
 
-The Basic view makes the current plan explicit: the file list shows each file's route and the
-resolved settings it will be processed with (e.g. `D 0.3 · E 7`, with a `+flags` chip when
-extra cjxl flags apply), and Effort is a simple slider alongside Distance/Quality. While a
-conversion runs the Basic view stays in place and shows an inline progress strip with
-pause/cancel and a live per-file status column, so the queue is visible without leaving the
-main view.
+The Main view makes the current plan explicit: files group by detected type and each group
+header shows the route and the resolved settings it will be processed with (e.g.
+`D 0.3 · E 7`, with a `+flags` chip when extra cjxl flags apply); Effort is a simple slider
+alongside Distance/Quality. While a conversion runs, an inline progress strip with
+pause/cancel and live per-file status keeps the queue visible without leaving the view, and
+finished files show their output size and saving ratio in place - the convert bar totals the
+whole batch.
 
 *TODO: Screenshot of the expert view with the effort ladder*
 
-After a conversion, click a result row to run `jxlinfo -v` for its JXL output and show the
+After a conversion, click a finished file to run `jxlinfo -v` for its JXL output and show the
 detailed metadata. Failed or skipped results without a JXL output report why metadata is
 unavailable.
 
