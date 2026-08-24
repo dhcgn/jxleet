@@ -15,10 +15,11 @@ results. Never add encoding logic; only orchestrate the libjxl tools.
   toolchain install/status, and irreversible-replace confirmation. The current
   UI uses Wails-native file drops, separate Open File/Open Folder actions,
   one-level folder enumeration, a full-bleed shell, scrollable content with
-  pinned conversion actions, hidden child processes, fixed-width result tables,
+  pinned conversion actions, hidden child processes, non-overlapping result tables,
   compact capability icons, backend-derived preset summaries, selected-preset
-  rule details, and Expert quality guidance. The visual port lives in
-  `frontend/src/App.svelte` + `frontend/public/style.css`.
+  rule details, persistent input actions, selectable results with jxlinfo
+  metadata, and Expert quality guidance plus all generated cjxl flags. The
+  visual port lives in `frontend/src/App.svelte` + `frontend/public/style.css`.
 - Toolchain: `internal/toolchain` — official libjxl
   GitHub release lookup, per-asset sha256 verification, Deflate64-compatible
   Windows extraction, immutable versioned install + atomic current pointer,
@@ -33,8 +34,8 @@ results. Never add encoding logic; only orchestrate the libjxl tools.
   a `files` Wails event. The engine was validated on the real committed
   `test-data/` sample (JPEG→transcode with byte-identical reconstruction,
   JXL→reencode, 8/16-bit PNG→encode). `task check` is green.
-- Still open nearby: jxlinfo metadata parsing, persistent logs, and the
-  effort-ladder source data. Phase 9 CLI/context-menu work is implemented:
+- Still open nearby: persistent logs and the effort-ladder source data. Phase 9
+  CLI/context-menu work is implemented:
   strict path invocation, `--preset` overrides, per-user Explorer registration,
   and registry cleanup. Next per the plan: **Phase 10 — polish**.
 - Authoritative documents (read these first):

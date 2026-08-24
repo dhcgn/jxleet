@@ -338,6 +338,7 @@ func (e *Engine) process(ctx context.Context, path string) FileResult {
 	runRes := e.deps.Encoder.Run(ctx, args, path, plan.TempPath)
 	if !runRes.Success() {
 		os.Remove(plan.TempPath)
+		res.Output = ""
 		if ctx.Err() != nil {
 			res.Cancelled = true
 		} else {
@@ -352,6 +353,7 @@ func (e *Engine) process(ctx context.Context, path string) FileResult {
 		finOpt.OriginalJPEG = path
 	}
 	if err := output.Finalize(ctx, plan, finOpt); err != nil {
+		res.Output = ""
 		if ctx.Err() != nil {
 			res.Cancelled = true
 		} else {

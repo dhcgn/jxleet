@@ -19,6 +19,7 @@ import (
 	"github.com/dhcgn/jxleet/internal/config"
 	"github.com/dhcgn/jxleet/internal/convert"
 	"github.com/dhcgn/jxleet/internal/djxl"
+	"github.com/dhcgn/jxleet/internal/jxlinfo"
 	"github.com/dhcgn/jxleet/internal/output"
 	"github.com/dhcgn/jxleet/internal/preset"
 	"github.com/dhcgn/jxleet/internal/routes"
@@ -166,6 +167,44 @@ func (s *Service) OpenFolders() ([]string, error) {
 	}
 	s.AddPaths(paths)
 	return paths, nil
+}
+
+// ListCJXLFlags returns the generated cjxl flag surface and its help text.
+func (s *Service) ListCJXLFlags() []FlagInfo {
+	definitions := flags.Default().Flags
+	result := make([]FlagInfo, 0, len(definitions))
+	for _, definition := range definitions {
+		result = append(result, FlagInfo{
+			Key:         definition.Canonical(),
+			Short:       definition.Short,
+			Long:        definition.Long,
+			TakesValue:  definition.TakesValue,
+			ValueSpec:   definition.ValueSpec,
+			Section:     definition.Section,
+			Description: definition.Description,
+		})
+	}
+	return result
+}
+
+// PreviewCommands returns the resolved command preview for every preset rule.
+func (s *Service) PreviewCommands(options ConversionOptions) ([]CommandPreview, error) {
+	p, err := s.effectivePreset(options)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]CommandPreview, 0, len(p.Rules))
+	for _, rule := range p.Rules {
+		args := append([]cjxl.Arg(nil), rule.Args...)
+		args = addPreviewThreads(args, options.Threads)
+		tokens := append([]string{"cjxl"}, cjxl.Args(args)...)
+		tokens = append(tokens, "input", "output.jxl")
+		result = append(result, CommandPreview{
+			Matches: append([]string(nil), rule.Match...),
+			Command: strings.Join(tokens, " "),
+		})
+	}
+	return result, nil
 }
 
 // Bindings contains the three explicit entry-point preset bindings.
@@ -362,15 +401,41 @@ func (s *Service) OpenStorageLocation(location string) error {
 // ConversionOptions are the temporary GUI settings applied to a preset for one
 // run. The stored preset is never modified by these overrides.
 type ConversionOptions struct {
-	Preset       string  `json:"preset"`
-	Processes    int     `json:"processes"`
-	Threads      int     `json:"threads"`
-	JPEGMode     string  `json:"jpegMode"`
-	Distance     float64 `json:"distance"`
-	UseDistance  bool    `json:"useDistance"`
-	Effort       int     `json:"effort"`
-	UseEffort    bool    `json:"useEffort"`
-	OutputPolicy string  `json:"outputPolicy"`
+	Preset       string         `json:"preset"`
+	Processes    int            `json:"processes"`
+	Threads      int            `json:"threads"`
+	JPEGMode     string         `json:"jpegMode"`
+	Distance     float64        `json:"distance"`
+	UseDistance  bool           `json:"useDistance"`
+	Effort       int            `json:"effort"`
+	UseEffort    bool           `json:"useEffort"`
+	OutputPolicy string         `json:"outputPolicy"`
+	ExpertFlags  []FlagOverride `json:"expertFlags"`
+	ResetExpert  bool           `json:"resetExpert"`
+}
+
+// FlagInfo describes one generated cjxl flag for the Expert UI.
+type FlagInfo struct {
+	Key         string `json:"key"`
+	Short       string `json:"short,omitempty"`
+	Long        string `json:"long,omitempty"`
+	TakesValue  bool   `json:"takesValue"`
+	ValueSpec   string `json:"valueSpec,omitempty"`
+	Section     string `json:"section,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+// FlagOverride is a temporary global cjxl flag override for one conversion.
+type FlagOverride struct {
+	Key       string `json:"key"`
+	Value     string `json:"value"`
+	Valueless bool   `json:"valueless"`
+}
+
+// CommandPreview is the resolved cjxl command for one preset rule.
+type CommandPreview struct {
+	Matches []string `json:"matches"`
+	Command string   `json:"command"`
 }
 
 // FilePreview is one item in the Basic view before conversion starts.
@@ -386,13 +451,17 @@ type FilePreview struct {
 
 // PreviewPaths classifies files using the same preset/options as StartConversion.
 func (s *Service) PreviewPaths(paths []string, options ConversionOptions) ([]FilePreview, error) {
-	p, err := s.effectivePreset(options)
-	if err != nil {
-		return nil, err
-	}
 	inputs, err := expandPaths(paths)
 	if err != nil {
 		return nil, err
+	}
+	var selected *preset.Preset
+	if strings.TrimSpace(options.Preset) != "" {
+		p, err := s.effectivePreset(options)
+		if err != nil {
+			return nil, err
+		}
+		selected = &p
 	}
 	result := make([]FilePreview, 0, len(inputs))
 	for _, path := range inputs {
@@ -408,7 +477,12 @@ func (s *Service) PreviewPaths(paths []string, options ConversionOptions) ([]Fil
 			result = append(result, item)
 			continue
 		}
-		route, _, ok := p.Route(format)
+		if selected == nil {
+			item.Reason = "select a preset to classify"
+			result = append(result, item)
+			continue
+		}
+		route, _, ok := selected.Route(format)
 		if !ok {
 			item.Skip = true
 			item.Reason = "no matching rule"
@@ -419,6 +493,32 @@ func (s *Service) PreviewPaths(paths []string, options ConversionOptions) ([]Fil
 		result = append(result, item)
 	}
 	return result, nil
+}
+
+// InspectJXL returns verbose metadata for one existing JPEG XL file.
+func (s *Service) InspectJXL(path string) (string, error) {
+	absolute, err := filepath.Abs(strings.TrimSpace(path))
+	if err != nil {
+		return "", fmt.Errorf("resolve metadata path: %w", err)
+	}
+	if strings.ToLower(filepath.Ext(absolute)) != ".jxl" {
+		return "", fmt.Errorf("metadata inspection requires a .jxl file")
+	}
+	info, err := os.Stat(absolute)
+	if err != nil {
+		return "", fmt.Errorf("stat metadata path: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", errors.New("metadata path is not a regular file")
+	}
+	if s.tools == nil {
+		return "", errors.New("toolchain service is not configured")
+	}
+	installed, err := s.tools.Installed(context.Background())
+	if err != nil {
+		return "", fmt.Errorf("toolchain is not ready: %w", err)
+	}
+	return jxlinfo.NewRunner(installed.JXLInfoPath).Inspect(context.Background(), absolute)
 }
 
 // FileUpdate is emitted when one file finishes.
@@ -482,6 +582,15 @@ func (s *Service) StartConversion(paths []string, options ConversionOptions) err
 	installed, err := s.tools.Installed(context.Background())
 	if err != nil {
 		return fmt.Errorf("toolchain is not ready: %w", err)
+	}
+	if hasExpertArguments(p) {
+		flagStatus, err := s.tools.CheckFlags(context.Background(), installed)
+		if err != nil {
+			return fmt.Errorf("read installed cjxl flags: %w", err)
+		}
+		if flagStatus.Locked || len(flagStatus.Added) > 0 || len(flagStatus.Removed) > 0 {
+			return fmt.Errorf("Expert flags are locked for cjxl %s; generated flags target %s", installed.Version, flags.GeneratedVersion)
+		}
 	}
 
 	s.mu.Lock()
@@ -671,6 +780,9 @@ func (s *Service) effectivePreset(options ConversionOptions) (preset.Preset, err
 	if options.UseEffort && (options.Effort < 1 || options.Effort > 10) {
 		return preset.Preset{}, errors.New("effort must be between 1 and 10")
 	}
+	if err := validateExpertFlags(options.ExpertFlags); err != nil {
+		return preset.Preset{}, err
+	}
 	if options.OutputPolicy != "" {
 		policy := preset.Policy(options.OutputPolicy)
 		if policy != preset.PolicyAlongside && policy != preset.PolicySubfolder && policy != preset.PolicyReplace {
@@ -683,6 +795,10 @@ func (s *Service) effectivePreset(options ConversionOptions) (preset.Preset, err
 	}
 	for i := range p.Rules {
 		args := append([]cjxl.Arg(nil), p.Rules[i].Args...)
+		if options.ResetExpert {
+			args = clearExpertFlags(args)
+		}
+		args = applyExpertOverrides(args, options.ExpertFlags)
 		if options.JPEGMode != "" && ruleMatchesJPEG(p.Rules[i]) {
 			value := "1"
 			if options.JPEGMode == "reencode" {
@@ -709,6 +825,95 @@ func (s *Service) effectivePreset(options ConversionOptions) (preset.Preset, err
 		return preset.Preset{}, err
 	}
 	return p, nil
+}
+
+func validateExpertFlags(overrides []FlagOverride) error {
+	set := flags.Default()
+	for _, override := range overrides {
+		key := strings.TrimSpace(override.Key)
+		if key == "" {
+			return errors.New("Expert flag key is required")
+		}
+		definition, ok := set.Lookup(key)
+		if !ok {
+			return fmt.Errorf("unknown cjxl flag %q (not present in cjxl %s)", key, set.Version)
+		}
+		if definition.TakesValue && override.Valueless {
+			return fmt.Errorf("Expert flag %q requires a value", key)
+		}
+		if !definition.TakesValue && !override.Valueless {
+			return fmt.Errorf("Expert flag %q does not take a value", key)
+		}
+		if definition.TakesValue && override.Value == "" {
+			return fmt.Errorf("Expert flag %q requires a value", key)
+		}
+		if !definition.TakesValue && override.Value != "" {
+			return fmt.Errorf("Expert flag %q is valueless", key)
+		}
+	}
+	return nil
+}
+
+func applyExpertOverrides(args []cjxl.Arg, overrides []FlagOverride) []cjxl.Arg {
+	set := flags.Default()
+	for _, override := range overrides {
+		key := strings.TrimSpace(override.Key)
+		if key == "" {
+			continue
+		}
+		arg := cjxl.Arg{Key: key, Value: override.Value, Valueless: override.Valueless}
+		aliases := []string{key}
+		if definition, ok := set.Lookup(key); ok {
+			aliases = definition.Tokens()
+		}
+		args = removeArgs(args, aliases...)
+		args = append(args, arg)
+	}
+	return args
+}
+
+func clearExpertFlags(args []cjxl.Arg) []cjxl.Arg {
+	set := flags.Default()
+	result := args[:0]
+	for _, arg := range args {
+		if _, known := set.Lookup(arg.Key); known && !isCoreFlag(arg.Key) {
+			continue
+		}
+		result = append(result, arg)
+	}
+	return result
+}
+
+func isCoreFlag(key string) bool {
+	switch key {
+	case "-d", "--distance", "-q", "--quality", "-e", "--effort", "-j", "--lossless_jpeg", "--num_threads":
+		return true
+	default:
+		return false
+	}
+}
+
+func hasExpertArguments(p preset.Preset) bool {
+	for _, rule := range p.Rules {
+		for _, arg := range rule.Args {
+			if !isCoreFlag(arg.Key) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func addPreviewThreads(args []cjxl.Arg, threads int) []cjxl.Arg {
+	if threads <= 0 {
+		return args
+	}
+	for _, arg := range args {
+		if arg.Key == "--num_threads" {
+			return args
+		}
+	}
+	return append(args, cjxl.Arg{Key: "--num_threads", Value: strconv.Itoa(threads)})
 }
 
 func summarizeCoreValue(p preset.Preset) string {

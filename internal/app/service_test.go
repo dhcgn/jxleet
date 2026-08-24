@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dhcgn/jxleet/internal/cjxl"
@@ -257,5 +258,200 @@ func TestSavePresetOutputPolicy(t *testing.T) {
 	service.paths.PresetsDir = defaultStore.Dir
 	if err := service.SavePresetOutputPolicy("default-gui", string(preset.PolicyReplace)); err == nil {
 		t.Error("read-only default policy change should fail")
+	}
+}
+
+func TestPreviewPathsRetainsFilesWithoutPreset(t *testing.T) {
+	service := testService(t)
+	input := filepath.Join(t.TempDir(), "image.png")
+	if err := os.WriteFile(input, []byte("not a real PNG"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	preview, err := service.PreviewPaths([]string{input}, ConversionOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(preview) != 1 {
+		t.Fatalf("preview length = %d", len(preview))
+	}
+	if preview[0].Path != input || preview[0].Format != "PNG" || preview[0].Reason != "select a preset to classify" {
+		t.Fatalf("preview = %+v", preview[0])
+	}
+}
+
+func TestListCJXLFlagsIncludesGeneratedHelp(t *testing.T) {
+	service := testService(t)
+	flags := service.ListCJXLFlags()
+	if len(flags) < 10 {
+		t.Fatalf("got only %d cjxl flags", len(flags))
+	}
+	var foundDistance, foundProgressive bool
+	for _, flag := range flags {
+		if flag.Key == "--distance" && flag.Description != "" {
+			foundDistance = true
+		}
+		if flag.Key == "--progressive" && !flag.TakesValue {
+			foundProgressive = true
+		}
+	}
+	if !foundDistance || !foundProgressive {
+		t.Fatalf("generated flag set missing expected entries: distance=%v progressive=%v", foundDistance, foundProgressive)
+	}
+}
+
+func TestEffectivePresetAppliesExpertFlagOverrides(t *testing.T) {
+	service := testService(t)
+	saveTestPreset(t, service)
+	p, err := service.effectivePreset(ConversionOptions{
+		Preset: "test",
+		ExpertFlags: []FlagOverride{
+			{Key: "--progressive", Valueless: true},
+			{Key: "--modular", Value: "1"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rule := range p.Rules {
+		var progressive, modular bool
+		for _, arg := range rule.Args {
+			switch arg.Key {
+			case "--progressive":
+				progressive = arg.Valueless
+			case "--modular":
+				modular = arg.Value == "1"
+			}
+		}
+		if !progressive || !modular {
+			t.Fatalf("expert overrides missing from rule: %+v", rule.Args)
+		}
+	}
+}
+
+func TestPreviewCommandsIncludesResolvedPresetFlags(t *testing.T) {
+	service := testService(t)
+	err := preset.NewStore(service.paths.PresetsDir).Save(preset.Preset{
+		Name:    "preview",
+		Version: preset.CurrentVersion,
+		Output:  preset.DefaultOutput(),
+		Rules: []preset.Rule{{
+			Match: []string{"*"},
+			Args: []cjxl.Arg{
+				{Key: "--distance", Value: "1.0"},
+				{Key: "--effort", Value: "7"},
+				{Key: "--progressive", Valueless: true},
+			},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	previews, err := service.PreviewCommands(ConversionOptions{
+		Preset:      "preview",
+		Threads:     4,
+		JPEGMode:    "reencode",
+		Distance:    1.5,
+		UseDistance: true,
+		Effort:      3,
+		UseEffort:   true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(previews) != 1 {
+		t.Fatalf("preview count = %d", len(previews))
+	}
+	for _, want := range []string{"--distance=1.5", "--effort=3", "--progressive", "--num_threads=4"} {
+		if !strings.Contains(previews[0].Command, want) {
+			t.Errorf("command %q does not contain %q", previews[0].Command, want)
+		}
+	}
+}
+
+func TestEffectivePresetRejectsInvalidExpertFlagShape(t *testing.T) {
+	service := testService(t)
+	saveTestPreset(t, service)
+	tests := []FlagOverride{
+		{Key: "--progressive", Value: "1"},
+		{Key: "--distance", Valueless: true},
+		{Key: "--distance"},
+	}
+	for _, override := range tests {
+		t.Run(override.Key, func(t *testing.T) {
+			_, err := service.effectivePreset(ConversionOptions{
+				Preset:      "test",
+				ExpertFlags: []FlagOverride{override},
+			})
+			if err == nil {
+				t.Fatalf("override %+v should be rejected", override)
+			}
+		})
+	}
+}
+
+func TestEffectivePresetResetsPresetExpertFlags(t *testing.T) {
+	service := testService(t)
+	presetName := "expert"
+	err := preset.NewStore(service.paths.PresetsDir).Save(preset.Preset{
+		Name:    presetName,
+		Version: preset.CurrentVersion,
+		Output:  preset.DefaultOutput(),
+		Rules: []preset.Rule{{
+			Match: []string{"*"},
+			Args: []cjxl.Arg{
+				{Key: "--distance", Value: "1.0"},
+				{Key: "--effort", Value: "7"},
+				{Key: "--progressive", Valueless: true},
+				{Key: "--modular", Value: "1"},
+			},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := service.effectivePreset(ConversionOptions{
+		Preset:      presetName,
+		ResetExpert: true,
+		ExpertFlags: []FlagOverride{{Key: "--container", Value: "1"}},
+		UseDistance: false,
+		UseEffort:   false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, arg := range resolved.Rules[0].Args {
+		if arg.Key == "--progressive" || arg.Key == "--modular" {
+			t.Fatalf("preset Expert flag survived reset: %+v", arg)
+		}
+	}
+	foundContainer := false
+	for _, arg := range resolved.Rules[0].Args {
+		if arg.Key == "--container" && arg.Value == "1" {
+			foundContainer = true
+		}
+	}
+	if !foundContainer {
+		t.Fatalf("new Expert override missing: %+v", resolved.Rules[0].Args)
+	}
+}
+
+func TestHasExpertArguments(t *testing.T) {
+	if hasExpertArguments(preset.Preset{
+		Rules: []preset.Rule{{Args: []cjxl.Arg{{Key: "--distance", Value: "1.0"}, {Key: "--effort", Value: "7"}}}},
+	}) {
+		t.Error("core arguments should not require the Expert flag surface")
+	}
+	if !hasExpertArguments(preset.Preset{
+		Rules: []preset.Rule{{Args: []cjxl.Arg{{Key: "--progressive", Valueless: true}}}},
+	}) {
+		t.Error("advanced arguments should require the Expert flag surface")
+	}
+}
+
+func TestInspectJXLValidatesPathBeforeToolchain(t *testing.T) {
+	service := testService(t)
+	if _, err := service.InspectJXL(filepath.Join(t.TempDir(), "image.png")); err == nil {
+		t.Error("non-JXL metadata inspection should fail")
 	}
 }

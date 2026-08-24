@@ -247,27 +247,32 @@ will not be dropped in as-is. Porting plan:
   bindings/events, real preset previews, asynchronous engine progress, and
   toolchain status/install. The shell fills the Wails client area and leaves
   minimize/maximize/close controls to the native Wails host. Native Wails file
-  drops target the drop zone, Open File/Open Folder are separate multi-select
-  actions, folders enumerate only direct regular files, and conversion actions
-  remain visible while content scrolls. Storage rows open their corresponding
-  directories in Windows Explorer. File/result tables use fixed, non-overlapping
-  columns with compact path display and native full-path tooltips; the effort
-  matrix uses compact accessible capability icons; the Presets table displays
-  core distance/quality, effort, and JPEG mode summaries with `Mixed` for
-  differing rules. The selected preset exposes all file rules and a
-  read-only-aware output-policy editor with explicit Save. Expert Lossless
-  fixes distance at zero; lossy Distance/Quality controls mark the visually
-  lossless point and recommended ranges. Split into child components only when
-  the view logic materially grows.
+  drops target   the drop zone, persistent Open File/Open Folder actions, folders enumerate
+  only direct regular files, and conversion actions remain visible while
+  content scrolls. Storage rows open their corresponding directories in Windows
+  Explorer. File/result tables use non-overlapping columns with remaining-width
+  file paths, middle elision, and native full-path tooltips; the result rows are
+  selectable. The effort matrix uses compact accessible capability icons; the
+  Presets table displays core distance/quality, effort, and JPEG mode summaries
+  with `Mixed` for differing rules. The selected preset exposes all file rules
+  and a read-only-aware output-policy editor with explicit Save. Expert Lossless
+  fixes distance at zero; lossy Distance/Quality controls use green, dark-green,
+  and yellow recommendation bands and a neutral out-of-range state. The Expert
+  view exposes every generated cjxl flag with help tooltips, temporary global
+  overrides, an exact command preview, and a reset-to-cjxl-defaults action.
+  Selecting a result invokes verbose `jxlinfo` and renders its metadata. Full
+  multi-rule preset-to-global-control synchronization remains deferred. Split
+  into child components only when the view logic materially grows.
 
 ---
 
 ## 10. Testing
 
 - Pure domain (`routes`, `preset`, `cjxl` builder, `flags` parser, d↔q,
-  throughput/ETA): table-driven unit tests, no GUI, no cjxl.
+  throughput/ETA, Expert overrides): table-driven unit tests, no GUI, no cjxl.
 - Integration tests require `cjxl` on PATH; generate image fixtures at runtime
-  (no binaries committed). Cover each route + replace-verification path.
+  (no binaries committed). Cover each route, replace-verification path, and
+  jxlinfo inspection when the toolchain is available.
 - `task check` = build, vet, lint, race tests.
 
 ---

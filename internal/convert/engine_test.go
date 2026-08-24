@@ -99,9 +99,14 @@ func TestEngineFailurePropagates(t *testing.T) {
 	p := filepath.Join(dir, "a.png")
 	pngFile(t, p)
 	e := New(Deps{Encoder: &fakeEncoder{fail: true}}, Settings{Preset: encodePreset()})
+	var result FileResult
+	e.OnFile = func(r FileResult) { result = r }
 	sum := e.Run(context.Background(), []string{p})
 	if sum.Failed != 1 {
 		t.Fatalf("expected 1 failure, got %+v", sum)
+	}
+	if result.Output != "" {
+		t.Fatalf("failed result should not expose an output path: %q", result.Output)
 	}
 }
 

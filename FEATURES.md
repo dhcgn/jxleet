@@ -11,17 +11,18 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [ ] Distance and quality as one quantity with two displays (GUI can switch between them)
 - [ ] Effort 1–10 
 - [ ] Skip unsupported files instead of aborting 
-- [ ] GUI Expert Mode with all flags of cjxl
+- [x] GUI Expert Mode with all flags of cjxl
 - [x] Use `go:generate` to keep the available flags in sync with cjxl, trough call of `cjxl --help -v -v -v -v` and parsing the output
 
 ## Presets
 - [x] Create, duplicate, rename, delete named presets 
-- [ ] Separate binding per entry point 
+- [x] Separate binding per entry point
 - [x] Export to a file 
 - [x] Import from a file, without adopting the output policy 
 - [x] Format version with a migration path 
 - [x] Collision handling on import 
 - [x] Read-only entry-point defaults bound on first start
+- [ ] Synchronize every multi-rule preset value into global GUI controls (deferred design)
 
 ## Output
 - [x] Alongside 
@@ -67,10 +68,12 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Colour marking of routes, follows the setting
 - [x] Distance/quality toggle
 - [x] Effort slider with effort ladder
+- [x] Persistent Open File/Open Folder intake and native drops across views
+- [x] Expert flag overrides with cjxl help tooltips and reset to cjxl defaults
 - [x] Display of the command line to be executed
 - [x] Progress, remaining time, throughput, failures
 - [x] Note about coalesced invocations
 - [x] Size balance per file and in total
-- [ ] jxlinfo key figures including reconstruction data
+- [x] Selectable results with detailed jxlinfo metadata
 - [x] Compact window for the automatic invocation
 - [ ] Log view with tool messages 

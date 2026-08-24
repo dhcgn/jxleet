@@ -8,10 +8,13 @@ export {
 
 export type {
     Bindings,
+    CommandPreview,
     ConversionOptions,
     ConversionSummary,
     FilePreview,
     FileUpdate,
+    FlagInfo,
+    FlagOverride,
     PresetRuleSummary,
     PresetSummary,
     ProgressUpdate,

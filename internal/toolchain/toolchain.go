@@ -237,7 +237,13 @@ func (m *Manager) flagStatus(ctx context.Context, installation Installation) (Fl
 	added, removed := flags.Diff(flags.NewSet(installation.Version, flags.Default().Flags), flags.NewSet(installation.Version, current))
 	status.Added = added
 	status.Removed = removed
+	status.Locked = status.Locked || len(added) > 0 || len(removed) > 0
 	return status, nil
+}
+
+// CheckFlags compares the installed cjxl flag surface with the generated set.
+func (m *Manager) CheckFlags(ctx context.Context, installation Installation) (FlagStatus, error) {
+	return m.flagStatus(ctx, installation)
 }
 
 func lockedFlags(installedVersion string) FlagStatus {

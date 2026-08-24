@@ -96,11 +96,25 @@ export function GetToolchainStatus(): $CancellablePromise<$models.ToolchainStatu
 }
 
 /**
+ * InspectJXL returns verbose metadata for one existing JPEG XL file.
+ */
+export function InspectJXL(path: string): $CancellablePromise<string> {
+    return $Call.ByID(3229468240, path);
+}
+
+/**
  * InstallLatestToolchain performs the user-requested libjxl download and
  * atomic installation. It is deliberately not called by status queries.
  */
 export function InstallLatestToolchain(): $CancellablePromise<string> {
     return $Call.ByID(1078493661);
+}
+
+/**
+ * ListCJXLFlags returns the generated cjxl flag surface and its help text.
+ */
+export function ListCJXLFlags(): $CancellablePromise<$models.FlagInfo[] | null> {
+    return $Call.ByID(3994931890);
 }
 
 /**
@@ -136,6 +150,13 @@ export function OpenStorageLocation(location: string): $CancellablePromise<void>
  */
 export function PauseConversion(): $CancellablePromise<void> {
     return $Call.ByID(3136368964);
+}
+
+/**
+ * PreviewCommands returns the resolved command preview for every preset rule.
+ */
+export function PreviewCommands(options: $models.ConversionOptions): $CancellablePromise<$models.CommandPreview[] | null> {
+    return $Call.ByID(1100339228, options);
 }
 
 /**

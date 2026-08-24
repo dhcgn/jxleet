@@ -115,15 +115,23 @@ jxleet refuses to run only when a binding is missing or invalid.
 
 ### 1. The window
 
-Drag files or folders in. The window provides separate **Open File** and **Open Folder**
-actions, and native Windows drag-and-drop accepts files or folders. A selected folder
-contributes only regular files directly inside it;
-subfolders are not traversed, and anything unsupported is skipped rather than aborting the
-batch. Settings split into **Basic** — the essentials — and
-**Expert**, which exposes the full flag surface plus a live preview of the exact `cjxl`
-command line that will run.
+Drag files or folders in. The toolbar keeps separate **Open File** and **Open Folder**
+actions available after you leave the Drop view, and native Windows drag-and-drop accepts
+files or folders in every view. A selected folder contributes only regular files directly
+inside it; subfolders are not traversed, and anything unsupported is skipped rather than
+aborting the batch. If no preset is selected, the files stay in the queue and the window
+explains that a preset is needed for route classification.
+
+Settings split into **Basic** — the essentials — and **Expert**, which exposes the full
+generated `cjxl` flag surface. Every flag includes its help text as a tooltip. Expert flag
+edits are temporary overrides for the next conversion; **Reset Expert flags** clears them so
+cjxl defaults apply. The live preview shows the exact command line that will run.
 
 *TODO: Screenshot of the expert view with the effort ladder*
+
+After a conversion, click a result row to run `jxlinfo -v` for its JXL output and show the
+detailed metadata. Failed or skipped results without a JXL output report why metadata is
+unavailable.
 
 ### 2. The command line
 
@@ -175,6 +183,10 @@ On first start jxleet creates three read-only presets — `default-gui`,
 `default-cli`, and `default-explorer-context` — and binds each to its corresponding entry
 point. Duplicate one to create a writable preset; the built-in defaults cannot be renamed,
 deleted, or overwritten.
+
+The selected preset supplies the file rules used for classification. Basic and Expert
+controls are temporary run overrides and do not yet mirror every value in a multi-rule
+preset; the Presets view shows those format-specific rules.
 
 ```yaml
 # %APPDATA%\jxleet\presets\archive-lossless.yaml
@@ -292,6 +304,10 @@ follows is a summary, and `cjxl -v -v -v -v --help` remains the authority.
 interface a toggle switches the display between the two; it never changes the stored value,
 so you cannot end up with two settings that disagree. `90` is visually lossless; the
 recommended range is `68` to `96`.
+
+The Expert slider colors the recommended bands: Distance `0.5..1.0` green, `1.0..2.0`
+dark green, `2.0..3.0` yellow; Quality `86..96` green, `78..86` dark green, and
+`68..78` yellow. Values outside those bands remain neutral.
 
 **Effort** (`-e`) trades encoding time for file size, from `1` (lightning) to `10`
 (glacier), default `7` (squirrel). The number alone tells you nothing useful, so the expert

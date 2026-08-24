@@ -11,6 +11,14 @@ export interface Bindings {
 }
 
 /**
+ * CommandPreview is the resolved cjxl command for one preset rule.
+ */
+export interface CommandPreview {
+    "matches": string[] | null;
+    "command": string;
+}
+
+/**
  * ConversionOptions are the temporary GUI settings applied to a preset for one
  * run. The stored preset is never modified by these overrides.
  */
@@ -24,6 +32,8 @@ export interface ConversionOptions {
     "effort": number;
     "useEffort": boolean;
     "outputPolicy": string;
+    "expertFlags": FlagOverride[] | null;
+    "resetExpert": boolean;
 }
 
 /**
@@ -66,6 +76,28 @@ export interface FileUpdate {
     "skipReason": string;
     "cancelled": boolean;
     "error": string;
+}
+
+/**
+ * FlagInfo describes one generated cjxl flag for the Expert UI.
+ */
+export interface FlagInfo {
+    "key": string;
+    "short"?: string;
+    "long"?: string;
+    "takesValue": boolean;
+    "valueSpec"?: string;
+    "section"?: string;
+    "description"?: string;
+}
+
+/**
+ * FlagOverride is a temporary global cjxl flag override for one conversion.
+ */
+export interface FlagOverride {
+    "key": string;
+    "value": string;
+    "valueless": boolean;
 }
 
 /**
