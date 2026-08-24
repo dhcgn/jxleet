@@ -17,7 +17,6 @@ export type {
     FlagOverride,
     PresetCore,
     PresetRuleSummary,
-    PresetSave,
     PresetSummary,
     ProgressUpdate,
     Status,

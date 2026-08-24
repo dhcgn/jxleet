@@ -38,7 +38,7 @@ export function ContextMenuRegistered(): $CancellablePromise<boolean> {
 }
 
 /**
- * CreatePreset creates a usable basic preset.
+ * CreatePreset writes the commented starter template as a new preset.
  */
 export function CreatePreset(name: string, description: string): $CancellablePromise<void> {
     return $Call.ByID(2808243405, name, description);
@@ -147,6 +147,13 @@ export function OpenFolders(): $CancellablePromise<string[] | null> {
 }
 
 /**
+ * OpenPresetInEditor opens a preset's YAML file in the system default editor.
+ */
+export function OpenPresetInEditor(name: string): $CancellablePromise<void> {
+    return $Call.ByID(1010812251, name);
+}
+
+/**
  * OpenStorageLocation opens one of jxleet's storage directories in Explorer.
  */
 export function OpenStorageLocation(location: string): $CancellablePromise<void> {
@@ -205,20 +212,12 @@ export function ResumeConversion(): $CancellablePromise<void> {
 }
 
 /**
- * SavePresetCore persists the editable core to the fallback rule and the output
- * policy of the named preset, and applies the JPEG mode to every JPEG-matching
- * rule. Read-only presets are not modified: they are duplicated as
- * "<name>-copy" and the GUI binding switches to the copy (PresetSave.Duplicated).
+ * SavePresetOutput persists output policy and collision handling of a writable
+ * preset. Saving re-marshals the YAML and drops any comments in that file;
+ * comment-heavy, hand-edited presets should be changed in the editor instead.
  */
-export function SavePresetCore(core: $models.PresetCore): $CancellablePromise<$models.PresetSave> {
-    return $Call.ByID(1455864335, core);
-}
-
-/**
- * SavePresetOutputPolicy persists a policy change for a writable preset.
- */
-export function SavePresetOutputPolicy(name: string, policy: string): $CancellablePromise<void> {
-    return $Call.ByID(4076282471, name, policy);
+export function SavePresetOutput(name: string, policy: string, collision: string): $CancellablePromise<void> {
+    return $Call.ByID(445715341, name, policy, collision);
 }
 
 /**

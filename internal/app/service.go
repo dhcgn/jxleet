@@ -23,6 +23,7 @@ import (
 	"github.com/dhcgn/jxleet/internal/jxlinfo"
 	"github.com/dhcgn/jxleet/internal/output"
 	"github.com/dhcgn/jxleet/internal/preset"
+	"github.com/dhcgn/jxleet/internal/process"
 	"github.com/dhcgn/jxleet/internal/routes"
 	"github.com/dhcgn/jxleet/internal/shellext"
 	"github.com/dhcgn/jxleet/internal/toolchain"
@@ -255,6 +256,7 @@ type PresetSummary struct {
 	Name        string              `json:"name"`
 	Description string              `json:"description"`
 	Policy      string              `json:"policy"`
+	Collision   string              `json:"collision"`
 	ReadOnly    bool                `json:"readOnly"`
 	CoreValue   string              `json:"coreValue"`
 	Effort      string              `json:"effort"`
@@ -270,6 +272,15 @@ type PresetRuleSummary struct {
 	JPEGMode  string   `json:"jpegMode"`
 }
 
+// collisionOrDefault reports skip when a preset omits collision handling
+// (matching DefaultOutput).
+func collisionOrDefault(c preset.Collision) string {
+	if c == "" {
+		return string(preset.CollisionSkip)
+	}
+	return string(c)
+}
+
 // ListPresets returns valid stored presets.
 func (s *Service) ListPresets() ([]PresetSummary, error) {
 	items, err := preset.NewStore(s.paths.PresetsDir).List()
@@ -282,6 +293,7 @@ func (s *Service) ListPresets() ([]PresetSummary, error) {
 			Name:        p.Name,
 			Description: p.Description,
 			Policy:      string(p.Output.Policy),
+			Collision:   collisionOrDefault(p.Output.OnCollision),
 			ReadOnly:    p.ReadOnly,
 			CoreValue:   summarizeCoreValue(p),
 			Effort:      summarizeEffort(p),
@@ -292,8 +304,10 @@ func (s *Service) ListPresets() ([]PresetSummary, error) {
 	return result, nil
 }
 
-// SavePresetOutputPolicy persists a policy change for a writable preset.
-func (s *Service) SavePresetOutputPolicy(name, policy string) error {
+// SavePresetOutput persists output policy and collision handling of a writable
+// preset. Saving re-marshals the YAML and drops any comments in that file;
+// comment-heavy, hand-edited presets should be changed in the editor instead.
+func (s *Service) SavePresetOutput(name, policy, collision string) error {
 	p, err := preset.NewStore(s.paths.PresetsDir).Load(name)
 	if err != nil {
 		return err
@@ -307,17 +321,24 @@ func (s *Service) SavePresetOutputPolicy(name, policy string) error {
 	default:
 		return fmt.Errorf("unknown output policy %q", policy)
 	}
+	selectedCollision := preset.Collision(collision)
+	switch selectedCollision {
+	case preset.CollisionSkip, preset.CollisionNumber, preset.CollisionOverwrite:
+	default:
+		return fmt.Errorf("unknown collision handling %q", collision)
+	}
 	p.Output.Policy = selected
 	if selected == preset.PolicySubfolder && p.Output.Subfolder == "" {
 		p.Output.Subfolder = "jxl"
 	}
+	p.Output.OnCollision = selectedCollision
 	return preset.NewStore(s.paths.PresetsDir).Save(p)
 }
 
-// PresetCore is the editable core of the active preset: distance, effort, JPEG
-// mode, output policy and the extra cjxl flags of the fallback ("*") rule. The
-// GUI renders its controls from GetPresetCore and persists every change with
-// SavePresetCore, so the preset is the single source of truth shown everywhere.
+// PresetCore is the readable core of a preset: distance, effort, JPEG mode,
+// output policy and the extra cjxl flags of the fallback ("*") rule. The GUI
+// snapshots it via GetPresetCore when a preset is selected and uses the
+// snapshot for the dirty check and the Revert action.
 type PresetCore struct {
 	Name       string         `json:"name"`
 	ReadOnly   bool           `json:"readOnly"`
@@ -327,13 +348,6 @@ type PresetCore struct {
 	JPEGMode   string         `json:"jpegMode"`
 	Policy     string         `json:"policy"`
 	Flags      []FlagOverride `json:"flags"`
-}
-
-// PresetSave describes the outcome of SavePresetCore. Duplicated is true when
-// the target was read-only and the edit landed on an automatic copy instead.
-type PresetSave struct {
-	Name       string `json:"name"`
-	Duplicated bool   `json:"duplicated"`
 }
 
 // fallbackRuleIndex returns the index of the catch-all rule (matching "*");
@@ -397,121 +411,26 @@ func (s *Service) GetPresetCore(name string) (PresetCore, error) {
 	return core, nil
 }
 
-// SavePresetCore persists the editable core to the fallback rule and the output
-// policy of the named preset, and applies the JPEG mode to every JPEG-matching
-// rule. Read-only presets are not modified: they are duplicated as
-// "<name>-copy" and the GUI binding switches to the copy (PresetSave.Duplicated).
-func (s *Service) SavePresetCore(core PresetCore) (PresetSave, error) {
-	name := strings.TrimSpace(core.Name)
-	if name == "" {
-		return PresetSave{}, errors.New("preset name is required")
-	}
-	if core.Distance < 0 || core.Distance > 25 {
-		return PresetSave{}, errors.New("distance must be between 0 and 25")
-	}
-	if core.Effort < 1 || core.Effort > 10 {
-		return PresetSave{}, errors.New("effort must be between 1 and 10")
-	}
-	if core.JPEGMode != "transcode" && core.JPEGMode != "reencode" {
-		return PresetSave{}, fmt.Errorf("unknown JPEG mode %q", core.JPEGMode)
-	}
-	policy := preset.Policy(core.Policy)
-	switch policy {
-	case preset.PolicyAlongside, preset.PolicySubfolder, preset.PolicyReplace:
-	default:
-		return PresetSave{}, fmt.Errorf("unknown output policy %q", core.Policy)
-	}
-	if err := validateExpertFlags(core.Flags); err != nil {
-		return PresetSave{}, err
-	}
-
-	store := preset.NewStore(s.paths.PresetsDir)
-	p, err := store.Load(name)
-	if err != nil {
-		return PresetSave{}, err
-	}
-	result := PresetSave{Name: name}
-	if p.ReadOnly {
-		candidate := name + "-copy"
-		for i := 2; store.Exists(candidate); i++ {
-			candidate = fmt.Sprintf("%s-copy-%d", name, i)
-		}
-		if err := store.Duplicate(name, candidate); err != nil {
-			return PresetSave{}, err
-		}
-		if err := s.SetBinding(string(config.EntryGUI), candidate); err != nil {
-			return PresetSave{}, err
-		}
-		result.Name, result.Duplicated = candidate, true
-		if p, err = store.Load(candidate); err != nil {
-			return PresetSave{}, err
-		}
-	}
-
-	index := fallbackRuleIndex(p)
-	if index < 0 {
-		p.Rules = append(p.Rules, preset.Rule{Match: []string{"*"}})
-		index = 0
-	}
-	coreArg := cjxl.Arg{Key: "-d", Value: formatFloat(core.Distance)}
-	if core.UseQuality {
-		coreArg = cjxl.Arg{Key: "-q", Value: formatFloat(round1(cjxl.QualityFromDistance(core.Distance)))}
-	}
-	args := []cjxl.Arg{
-		coreArg,
-		{Key: "-e", Value: strconv.Itoa(core.Effort)},
-	}
-	for _, arg := range p.Rules[index].Args {
-		if arg.Key == "--num_threads" { // runtime knob, keep whatever the YAML set
-			args = append(args, arg)
-		}
-	}
-	for _, override := range core.Flags {
-		args = append(args, cjxl.Arg{Key: strings.TrimSpace(override.Key), Value: override.Value, Valueless: override.Valueless})
-	}
-	p.Rules[index].Args = args
-	for i := range p.Rules {
-		if !ruleMatchesJPEG(p.Rules[i]) {
-			continue
-		}
-		value := "1"
-		if core.JPEGMode == "reencode" {
-			value = "0"
-		}
-		p.Rules[i].Args = setArg(p.Rules[i].Args, []string{"-j", "--lossless_jpeg"}, cjxl.Arg{Key: "--lossless_jpeg", Value: value})
-	}
-	p.Output.Policy = policy
-	if policy == preset.PolicySubfolder && p.Output.Subfolder == "" {
-		p.Output.Subfolder = "jxl"
-	}
-	if err := p.Validate(); err != nil {
-		return PresetSave{}, err
-	}
-	if err := p.ValidateArgs(flags.Default()); err != nil {
-		return PresetSave{}, err
-	}
-	if err := store.Save(p); err != nil {
-		return PresetSave{}, err
-	}
-	return result, nil
-}
-
-// CreatePreset creates a usable basic preset.
+// CreatePreset writes the commented starter template as a new preset.
 func (s *Service) CreatePreset(name, description string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("preset name is required")
 	}
-	return preset.NewStore(s.paths.PresetsDir).Save(preset.Preset{
-		Name:        name,
-		Description: strings.TrimSpace(description),
-		Version:     preset.CurrentVersion,
-		Output:      preset.DefaultOutput(),
-		Rules: []preset.Rule{{
-			Match: []string{"*"},
-			Args:  []cjxl.Arg{{Key: "-d", Value: "1.0"}, {Key: "-e", Value: "7"}},
-		}},
-	})
+	return preset.NewStore(s.paths.PresetsDir).CreateTemplate(name, description)
+}
+
+// OpenPresetInEditor opens a preset's YAML file in the system default editor.
+func (s *Service) OpenPresetInEditor(name string) error {
+	store := preset.NewStore(s.paths.PresetsDir)
+	if _, err := store.Load(name); err != nil {
+		return err
+	}
+	cmd := process.CommandContext(context.Background(), "cmd", "/c", "start", "", store.PathFor(name))
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("open preset in editor: %w", err)
+	}
+	return cmd.Process.Release()
 }
 
 // DeletePreset deletes a named preset.

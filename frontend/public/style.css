@@ -1384,6 +1384,21 @@ tr.na .dot.on {
   font-weight: 600;
 }
 
+/* Session overrides: the slider/flag state differs from the stored preset. */
+.preset-strip.strip-dirty {
+  border-bottom-color: var(--p-reencode);
+  background: #1e1a12;
+}
+
+.strip-warning {
+  color: var(--p-reencode);
+  font-weight: 600;
+}
+
+.strip-btn {
+  padding: 2px 10px;
+}
+
 .preset-strip .strip-label {
   font: 600 10.5px/1 var(--mono);
   letter-spacing: 0.13em;

@@ -107,8 +107,6 @@
   let toolchainError = $state('');
   let contextMenuRegistered = $state(false);
   let errorMessage = $state('');
-  let noticeMessage = $state('');
-  let savingPreset = $state(false);
   let collapsedGroups = $state(new Set<string>());
   let loaded = $state(false);
   let busy = $state(false);
@@ -119,6 +117,7 @@
   let processes = $state(2);
   let threads = $state(8);
   let presetPolicyDraft = $state('');
+  let presetCollisionDraft = $state('skip');
   let lossyDistance = $state(1.0);
 
   let routeCounts = $derived.by(() => ({
@@ -131,7 +130,10 @@
   let selectedPresetData = $derived(presets.find((preset) => preset.name === selectedPreset) ?? null);
   let selectedPresetRules = $derived(selectedPresetData?.rules ?? []);
   let selectedPresetReadOnly = $derived(presets.find((preset) => preset.name === selectedPreset)?.readOnly ?? false);
-  let presetPolicyDirty = $derived(Boolean(selectedPresetData) && presetPolicyDraft !== selectedPresetData?.policy);
+  let presetOutputDirty = $derived(
+    Boolean(selectedPresetData) &&
+      (presetPolicyDraft !== selectedPresetData?.policy || presetCollisionDraft !== selectedPresetData?.collision),
+  );
   let dominantRoute = $derived(
     routeCounts.Reencode >= routeCounts.Encode && routeCounts.Reencode >= routeCounts.Transcode
       ? 'Reencode'
@@ -186,6 +188,27 @@
   });
   let visibleFlagCount = $derived(flagSections.reduce((count, section) => count + section.flags.length, 0));
   let activePresetSummary = $derived(presets.find((preset) => preset.name === presetName) ?? null);
+
+  function sameFlags(a: FlagOverride[], b: FlagOverride[]): boolean {
+    if (a.length !== b.length) return false;
+    const key = (flag: FlagOverride) => `${flag.key}${flag.value}${flag.valueless}`;
+    const left = a.map(key).sort();
+    const right = b.map(key).sort();
+    return left.every((value, index) => value === right[index]);
+  }
+
+  let presetChanged = $derived.by(() => {
+    if (!coreSnapshot || presetName === '') return false;
+    const snapshot: CoreSnapshot = coreSnapshot;
+    return (
+      distance !== snapshot.distance ||
+      effort !== snapshot.effort ||
+      qualityUnit === 'quality' !== snapshot.useQuality ||
+      jpegLossless !== snapshot.jpegLossless ||
+      outputPolicy !== snapshot.policy ||
+      !sameFlags(expertOverrides, snapshot.flags)
+    );
+  });
   // The strip spells out every rule of the active preset, so file types with
   // dedicated settings are visible instead of hiding behind the catch-all.
   let stripRules = $derived.by(() => {
@@ -569,15 +592,28 @@
 
   function selectPreset(name: string): void {
     selectedPreset = name;
-    presetPolicyDraft = presets.find((preset) => preset.name === name)?.policy ?? '';
+    const selected = presets.find((preset) => preset.name === name);
+    presetPolicyDraft = selected?.policy ?? '';
+    presetCollisionDraft = selected?.collision ?? 'skip';
   }
 
-  async function savePresetPolicy(): Promise<void> {
-    if (!selectedPreset || selectedPresetReadOnly || !presetPolicyDirty) return;
+  async function savePresetOutput(): Promise<void> {
+    if (!selectedPreset || selectedPresetReadOnly || !presetOutputDirty) return;
     try {
-      await Service.SavePresetOutputPolicy(selectedPreset, presetPolicyDraft);
+      await Service.SavePresetOutput(selectedPreset, presetPolicyDraft, presetCollisionDraft);
       await refreshPresets();
       selectPreset(selectedPreset);
+      // A saved output block changes what the GUI controls show for this preset.
+      if (selectedPreset === presetName) await applyPresetCore();
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  async function openPresetInEditor(): Promise<void> {
+    if (!selectedPreset) return;
+    try {
+      await Service.OpenPresetInEditor(selectedPreset);
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -651,58 +687,78 @@
     view = 'main';
   }
 
-  // The active preset is the single source of truth: the controls below read
-  // it (applyPresetCore) and write every change back (queuePresetSave).
+  // Selecting a preset snapshots its core (applyPresetCore). GUI edits are
+  // session-only: preview and conversion run with the overrides, the preset
+  // file is never touched, and presetChanged marks the strip. Revert restores
+  // the snapshot; persisting happens by editing the YAML (Presets view).
+  interface CoreSnapshot {
+    distance: number;
+    useQuality: boolean;
+    effort: number;
+    jpegLossless: boolean;
+    policy: string;
+    flags: FlagOverride[];
+  }
+
+  let coreSnapshot = $state<CoreSnapshot | null>(null);
+
+  function applyCore(core: {
+    distance: number;
+    useQuality: boolean;
+    effort: number;
+    jpegMode: string;
+    policy: string;
+    flags: FlagOverride[] | null;
+  }): CoreSnapshot {
+    const flags = core.flags ?? [];
+    distance = core.distance;
+    effort = core.effort;
+    qualityUnit = core.useQuality ? 'quality' : 'distance';
+    routeMode = core.distance === 0 ? 'lossless' : 'lossy';
+    if (core.distance > 0) lossyDistance = core.distance;
+    jpegLossless = core.jpegMode !== 'reencode';
+    outputPolicy = core.policy || 'alongside';
+    expertOverrides = flags.map((flag) => ({ ...flag }));
+    return {
+      distance: core.distance,
+      useQuality: core.useQuality,
+      effort: core.effort,
+      jpegLossless,
+      policy: outputPolicy,
+      flags,
+    };
+  }
+
   async function applyPresetCore(): Promise<void> {
-    if (presetName === '') return;
+    if (presetName === '') {
+      coreSnapshot = null;
+      return;
+    }
     try {
-      const core = await Service.GetPresetCore(presetName);
-      distance = core.distance;
-      effort = core.effort;
-      qualityUnit = core.useQuality ? 'quality' : 'distance';
-      routeMode = core.distance === 0 ? 'lossless' : 'lossy';
-      if (core.distance > 0) lossyDistance = core.distance;
-      jpegLossless = core.jpegMode !== 'reencode';
-      outputPolicy = core.policy || 'alongside';
-      expertOverrides = core.flags ?? [];
+      coreSnapshot = applyCore(await Service.GetPresetCore(presetName));
     } catch (error) {
       errorMessage = errorText(error);
     }
     void refreshPreview();
   }
 
-  function queuePresetSave(): void {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => void persistCore(), 300);
-    void refreshCommandPreview();
+  function revertToPreset(): void {
+    if (!coreSnapshot) return;
+    applyCore({
+      distance: coreSnapshot.distance,
+      useQuality: coreSnapshot.useQuality,
+      effort: coreSnapshot.effort,
+      jpegMode: coreSnapshot.jpegLossless ? 'transcode' : 'reencode',
+      policy: coreSnapshot.policy,
+      flags: coreSnapshot.flags,
+    });
+    onSettingsChanged();
   }
 
-  async function persistCore(): Promise<void> {
-    if (presetName === '') return;
-    savingPreset = true;
-    try {
-      const saved = await Service.SavePresetCore({
-        name: presetName,
-        readOnly: false,
-        distance,
-        useQuality: qualityUnit === 'quality',
-        effort,
-        jpegMode: jpegLossless ? 'transcode' : 'reencode',
-        policy: outputPolicy,
-        flags: expertOverrides,
-      });
-      if (saved.duplicated) {
-        noticeMessage = `“${presetName}” is read-only — the edit created “${saved.name}”, which is now the active GUI preset.`;
-        presetName = saved.name;
-        bindings = { ...bindings, gui: saved.name };
-        await refreshPresets();
-      }
-      void refreshPreview();
-    } catch (error) {
-      errorMessage = errorText(error);
-    } finally {
-      savingPreset = false;
-    }
+  function onSettingsChanged(): void {
+    void refreshCommandPreview();
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => void refreshPreview(), 300);
   }
 
   function routeClass(route: string): string {
@@ -785,7 +841,7 @@
   function setDistance(event: Event): void {
     distance = Number((event.currentTarget as HTMLInputElement).value);
     if (routeMode === 'lossy') lossyDistance = distance;
-    queuePresetSave();
+    onSettingsChanged();
   }
 
   function setQuality(event: Event): void {
@@ -793,12 +849,12 @@
     const value = 100 - position; // slider is inverted so best quality (100) sits on the left, matching distance 0
     distance = value >= 100 ? 0 : 0.1 + (100 - value) * 0.09;
     if (routeMode === 'lossy') lossyDistance = distance;
-    queuePresetSave();
+    onSettingsChanged();
   }
 
   function setEffort(event: Event): void {
     effort = Number((event.currentTarget as HTMLInputElement).value);
-    queuePresetSave();
+    onSettingsChanged();
   }
 
   function expertFlagValue(key: string): string {
@@ -815,7 +871,7 @@
       next.push({ key, value, valueless: false });
     }
     expertOverrides = next;
-    queuePresetSave();
+    onSettingsChanged();
   }
 
   function setExpertFlagEnabled(key: string, enabled: boolean): void {
@@ -824,7 +880,7 @@
       next.push({ key, value: '', valueless: true });
     }
     expertOverrides = next;
-    queuePresetSave();
+    onSettingsChanged();
   }
 
   function isLinkedFlagKey(key: string): boolean {
@@ -860,7 +916,7 @@
 
   function resetExpertFlags(): void {
     expertOverrides = [];
-    queuePresetSave();
+    onSettingsChanged();
   }
 
   function setRouteMode(next: RouteMode): void {
@@ -872,7 +928,7 @@
       distance = lossyDistance > 0 ? lossyDistance : 1.0;
     }
     routeMode = next;
-    queuePresetSave();
+    onSettingsChanged();
   }
 
   function qualityStatusText(): string {
@@ -951,16 +1007,19 @@
   </div>
 
   {#if (view === 'main' || view === 'expert') && presetName !== ''}
-    <div class="preset-strip" data-testid="preset-strip">
+    <div class="preset-strip" class:strip-dirty={presetChanged} data-testid="preset-strip">
       <span class="strip-label">Preset</span>
       <strong>{presetName}</strong>
-      {#if activePresetSummary?.readOnly}<span class="mini" title="Edits create an editable copy">read-only</span>{/if}
+      {#if activePresetSummary?.readOnly}<span class="mini" title="Factory preset; it cannot be modified">read-only</span>{/if}
       {#each stripRules as rule}
         <code class="rule-chip">{rule}</code>
       {/each}
-      <span class="spacer"></span>
-      {#if savingPreset}<span class="mini">saving…</span>{/if}
       <span class="mini">output: {outputPolicy}</span>
+      {#if presetChanged}
+        <span class="spacer"></span>
+        <span class="strip-warning" role="status">! settings differ — preset “{presetName}” is not in effect</span>
+        <button class="btn ghost strip-btn" data-testid="revert-preset" onclick={revertToPreset}>Revert</button>
+      {/if}
     </div>
   {/if}
 
@@ -968,12 +1027,6 @@
     <div class="banner warn" role="alert">
       <span class="ic">!</span><span>{errorMessage}</span>
       <button class="alert-close" aria-label="Dismiss message" title="Dismiss" onclick={dismissMessage}>x</button>
-    </div>
-  {/if}
-  {#if noticeMessage}
-    <div class="banner info" role="status">
-      <span class="ic">i</span><span>{noticeMessage}</span>
-      <button class="alert-close" aria-label="Dismiss notice" title="Dismiss" onclick={() => { noticeMessage = ''; }}>x</button>
     </div>
   {/if}
 
@@ -1097,8 +1150,8 @@
             <h3>Compression <span class="r">stored in the preset</span></h3>
             <div class="in">
               <div class="seg" style="width:100%;margin-bottom:9px">
-                <button aria-pressed={qualityUnit === 'distance'} style="flex:1" onclick={() => { qualityUnit = 'distance'; queuePresetSave(); }}>Distance</button>
-                <button aria-pressed={qualityUnit === 'quality'} style="flex:1" onclick={() => { qualityUnit = 'quality'; queuePresetSave(); }}>Quality</button>
+                <button aria-pressed={qualityUnit === 'distance'} style="flex:1" onclick={() => { qualityUnit = 'distance'; onSettingsChanged(); }}>Distance</button>
+                <button aria-pressed={qualityUnit === 'quality'} style="flex:1" onclick={() => { qualityUnit = 'quality'; onSettingsChanged(); }}>Quality</button>
               </div>
               <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
                 <span class="qnum" class:out-of-range={outOfRange}>{qualityUnit === 'distance' ? distance.toFixed(1) : quality}</span>
@@ -1135,11 +1188,11 @@
             <h3>JPEG handling <span class="r">{routeCounts.Transcode + routeCounts.Reencode} files</span></h3>
             <div class="in policy" data-testid="jpeg-mode">
               <label class="opt" data-sel={jpegLossless}>
-                <input type="radio" name="jpeg-mode" checked={jpegLossless} onchange={() => { jpegLossless = true; queuePresetSave(); }} />
+                <input type="radio" name="jpeg-mode" checked={jpegLossless} onchange={() => { jpegLossless = true; onSettingsChanged(); }} />
                 <span><span class="ot">Transcode</span><span class="od">Bit-exactly reversible; the original JPEG can be reconstructed.</span></span>
               </label>
               <label class="opt" data-sel={!jpegLossless}>
-                <input type="radio" name="jpeg-mode" checked={!jpegLossless} onchange={() => { jpegLossless = false; queuePresetSave(); }} />
+                <input type="radio" name="jpeg-mode" checked={!jpegLossless} onchange={() => { jpegLossless = false; onSettingsChanged(); }} />
                 <span><span class="ot">Reencode</span><span class="od">Uses distance and effort; not reversible.</span></span>
               </label>
               <div class="mini" style="padding:6px 8px 0;border-top:1px solid var(--line-soft);margin-top:4px">--lossless_jpeg={jpegLossless ? 1 : 0}</div>
@@ -1150,15 +1203,15 @@
             <h3>Output</h3>
             <div class="in policy" data-testid="output-policy">
               <label class="opt" data-sel={outputPolicy === 'alongside'}>
-                <input type="radio" name="output" checked={outputPolicy === 'alongside'} onchange={() => { outputPolicy = 'alongside'; queuePresetSave(); }} />
+                <input type="radio" name="output" checked={outputPolicy === 'alongside'} onchange={() => { outputPolicy = 'alongside'; onSettingsChanged(); }} />
                 <span><span class="ot">Alongside</span><span class="od">The original stays untouched.</span></span>
               </label>
               <label class="opt" data-sel={outputPolicy === 'subfolder'}>
-                <input type="radio" name="output" checked={outputPolicy === 'subfolder'} onchange={() => { outputPolicy = 'subfolder'; queuePresetSave(); }} />
+                <input type="radio" name="output" checked={outputPolicy === 'subfolder'} onchange={() => { outputPolicy = 'subfolder'; onSettingsChanged(); }} />
                 <span><span class="ot">Into subfolder</span><span class="od">./jxl/ relative to the source.</span></span>
               </label>
               <label class="opt risk" data-sel={outputPolicy === 'replace'}>
-                <input type="radio" name="output" checked={outputPolicy === 'replace'} onchange={() => { outputPolicy = 'replace'; queuePresetSave(); }} />
+                <input type="radio" name="output" checked={outputPolicy === 'replace'} onchange={() => { outputPolicy = 'replace'; onSettingsChanged(); }} />
                 <span><span class="ot">Replace, original to recycle bin</span><span class="od">Only after verification. Irreversible routes require confirmation.</span></span>
               </label>
             </div>
@@ -1281,8 +1334,8 @@
             <h3>Quality</h3>
             <div class="in">
               <div class="seg" style="width:100%;margin-bottom:9px">
-                <button aria-pressed={qualityUnit === 'distance'} style="flex:1" data-testid="unit-distance" onclick={() => { qualityUnit = 'distance'; queuePresetSave(); }}>Distance</button>
-                <button aria-pressed={qualityUnit === 'quality'} style="flex:1" data-testid="unit-quality" onclick={() => { qualityUnit = 'quality'; queuePresetSave(); }}>Quality</button>
+                <button aria-pressed={qualityUnit === 'distance'} style="flex:1" data-testid="unit-distance" onclick={() => { qualityUnit = 'distance'; onSettingsChanged(); }}>Distance</button>
+                <button aria-pressed={qualityUnit === 'quality'} style="flex:1" data-testid="unit-quality" onclick={() => { qualityUnit = 'quality'; onSettingsChanged(); }}>Quality</button>
               </div>
               <div style="display:flex;align-items:baseline;gap:8px">
                 <span class="qnum" class:out-of-range={outOfRange}>{qualityUnit === 'distance' ? distance.toFixed(1) : quality}</span>
@@ -1312,7 +1365,7 @@
             <div class="in">
               <div class="banner info flag-notice">
                 <span class="ic">i</span>
-                <span>Changes are saved to preset "{presetName}" and apply to every run using it.{activePresetSummary?.readOnly ? ' The preset is read-only: the first change creates an editable copy and switches to it.' : ''}</span>
+                <span>Changes apply to this session only and are not saved to the preset. Persist them in the YAML file (Presets → Open in Editor); Reset restores the preset values.</span>
               </div>
               {#if toolchain?.flagsLocked}
                 <div class="banner warn"><span class="ic">!</span><span>Expert flags are locked because the installed cjxl version differs from the generated help.</span></div>
@@ -1479,7 +1532,7 @@
           <h3>Preset library <span class="r">{presets.length} stored
             <button class="icon-btn" aria-label="Reload presets from folder" title="Reload from folder" data-testid="preset-refresh" onclick={() => void refreshPresets()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-.9 4"></path><path d="M20 4v6h-6"></path></svg></button>
             <button class="icon-btn" aria-label="Open preset storage folder" title="Open in Explorer" onclick={() => void openStorage('presets')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></span></h3>
-          <div class="banner info" style="margin:10px 10px 0"><span class="ic">i</span><span>Rules are edited by changing the YAML files directly. Open the folder, edit a preset, then Reload. A JSON schema (<code>preset.schema.json</code>) is provided for editor validation.</span></div>
+          <div class="banner info" style="margin:10px 10px 0"><span class="ic">i</span><span>Rules are edited in the YAML file: select a preset below and use Open in Editor, then Reload. A JSON schema (<code>preset.schema.json</code>) validates the file in YAML-aware editors.</span></div>
           {#if presets.length === 0}
             <div class="empty">No presets yet. Create one or copy a YAML preset into %APPDATA%\\jxleet\\presets\\.</div>
           {:else}
@@ -1509,6 +1562,7 @@
             <button class="btn" data-testid="preset-new" onclick={() => void createPreset()}>New preset</button>
             <button class="btn ghost" onclick={() => void duplicatePreset()} disabled={!selectedPreset}>Duplicate</button>
             <button class="btn ghost" onclick={() => void renamePreset()} disabled={!selectedPreset || selectedPresetReadOnly}>Rename</button>
+            <button class="btn ghost" data-testid="preset-open-editor" onclick={() => void openPresetInEditor()} disabled={!selectedPreset}>Open in Editor</button>
             <button class="btn danger" style="margin-left:auto" onclick={() => void deletePreset()} disabled={!selectedPreset || selectedPresetReadOnly}>Delete</button>
           </div>
           {#if selectedPresetData}
@@ -1523,10 +1577,18 @@
                       <option value="subfolder">Into subfolder</option>
                       <option value="replace">Replace via recycle bin</option>
                     </select>
-                    <button class="btn" onclick={() => void savePresetPolicy()} disabled={selectedPresetReadOnly || !presetPolicyDirty}>Save</button>
+                    <label for="preset-collision">On collision</label>
+                    <select id="preset-collision" bind:value={presetCollisionDraft} disabled={selectedPresetReadOnly}>
+                      <option value="skip">Skip</option>
+                      <option value="number">Number the new file</option>
+                      <option value="overwrite">Overwrite existing</option>
+                    </select>
+                    <button class="btn" data-testid="preset-save-output" onclick={() => void savePresetOutput()} disabled={selectedPresetReadOnly || !presetOutputDirty}>Save</button>
                   </div>
                   {#if selectedPresetReadOnly}
-                    <div class="mini">This built-in preset is read-only. Duplicate it to change the policy.</div>
+                    <div class="mini">This factory preset is read-only. Duplicate it to change the output settings.</div>
+                  {:else if presetOutputDirty}
+                    <div class="mini warning">Saving rewrites the YAML file and drops comments in it. Hand-edited files: better use Open in Editor.</div>
                   {/if}
                 </div>
                 <div class="rule-details">

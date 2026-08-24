@@ -104,10 +104,10 @@ export interface FlagOverride {
 }
 
 /**
- * PresetCore is the editable core of the active preset: distance, effort, JPEG
- * mode, output policy and the extra cjxl flags of the fallback ("*") rule. The
- * GUI renders its controls from GetPresetCore and persists every change with
- * SavePresetCore, so the preset is the single source of truth shown everywhere.
+ * PresetCore is the readable core of a preset: distance, effort, JPEG mode,
+ * output policy and the extra cjxl flags of the fallback ("*") rule. The GUI
+ * snapshots it via GetPresetCore when a preset is selected and uses the
+ * snapshot for the dirty check and the Revert action.
  */
 export interface PresetCore {
     "name": string;
@@ -131,21 +131,13 @@ export interface PresetRuleSummary {
 }
 
 /**
- * PresetSave describes the outcome of SavePresetCore. Duplicated is true when
- * the target was read-only and the edit landed on an automatic copy instead.
- */
-export interface PresetSave {
-    "name": string;
-    "duplicated": boolean;
-}
-
-/**
  * PresetSummary is the compact data shown by the Presets view.
  */
 export interface PresetSummary {
     "name": string;
     "description": string;
     "policy": string;
+    "collision": string;
     "readOnly": boolean;
     "coreValue": string;
     "effort": string;

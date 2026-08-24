@@ -74,10 +74,10 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Effort as a simple slider in the Main view
 - [x] Files grouped by detected type with resolved settings (distance/quality, effort, flags) per group
 - [x] Preset strip below the toolbar spelling out every rule of the active preset
-- [x] Preset as single source of truth: controls read and save the active preset (read-only presets auto-duplicate)
+- [x] Presets seed the controls; edits are session-only overrides with amber warning + Revert; persistence via YAML (Open in Editor)
 - [x] Queue and live per-file status inline during processing; results (size balance) in place
 - [x] Persistent Open File/Open Folder intake and native drops across views
-- [x] Expert flag edits saved into the preset, with cjxl help tooltips and reset to cjxl defaults
+- [x] Expert flag edits as session overrides with cjxl help tooltips and reset to preset values
 - [x] Explicit libjxl update check in Tools
 - [x] Display of the command line to be executed
 - [x] Progress, remaining time, throughput, failures

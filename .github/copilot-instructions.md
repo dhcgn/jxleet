@@ -21,7 +21,8 @@ results. Never add encoding logic; only orchestrate the libjxl tools.
   metadata, Expert quality guidance plus all generated cjxl flags, files
   grouped by detected type with resolved settings and an inline processing
   queue in the Main view, a Main effort slider, the active preset as single
-  source of truth (controls save into it; read-only presets auto-duplicate),
+  source for the controls (edits are session-only overrides with a Revert
+  action),
   a preset JSON schema with a reload action, and an explicit
   libjxl update check. The
   visual port lives in `frontend/src/App.svelte` + `frontend/public/style.css`.

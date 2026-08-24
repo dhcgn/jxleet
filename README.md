@@ -123,13 +123,13 @@ aborting the batch. If no preset is selected, the files stay in the queue and th
 explains that a preset is needed for route classification.
 
 Settings split into **Main** - the essentials - and **Expert**, which exposes the full
-generated `cjxl` flag surface; every flag includes its help text as a tooltip. The active
-preset is the single source of truth: the Main and Expert controls show exactly what the
-preset contains, switching presets re-resolves everything immediately, and every edit is
-saved back into the preset (a read-only preset is first duplicated into an editable
-`<name>-copy`). The preset strip under the toolbar spells out each rule - the catch-all and
-every format with its own settings. The live preview shows the exact command line that will
-run.
+generated `cjxl` flag surface; every flag includes its help text as a tooltip. The selected
+preset seeds the controls: switching presets re-resolves everything immediately, and the
+preset strip under the toolbar spells out each rule - the catch-all and every format with
+its own settings. Edits in Main/Expert are session-only overrides; the strip then warns
+in amber ("settings differ — preset not in effect") and a **Revert** button restores the
+preset values. Persisting changes happens in the preset YAML itself (Presets → Open in
+Editor). The live preview shows the exact command line that will run.
 
 The Main view makes the current plan explicit: files group by detected type and each group
 header shows the route and the resolved settings it will be processed with (e.g.

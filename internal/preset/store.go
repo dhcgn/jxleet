@@ -126,6 +126,35 @@ func (s *Store) Save(p Preset) error {
 	return nil
 }
 
+// PathFor exposes the backing file of a preset (existing or derived).
+func (s *Store) PathFor(name string) string {
+	return s.pathFor(name)
+}
+
+// CreateTemplate writes the commented starter preset produced by TemplateYAML.
+// The active part is parsed and validated before anything hits disk.
+func (s *Store) CreateTemplate(name, description string) error {
+	if s.Exists(name) {
+		return fmt.Errorf("preset %q already exists", name)
+	}
+	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
+		return err
+	}
+	data := TemplateYAML(name, description)
+	p, err := Unmarshal(data)
+	if err != nil {
+		return err
+	}
+	if err := p.Validate(); err != nil {
+		return err
+	}
+	if err := os.WriteFile(s.pathFor(name), data, 0o644); err != nil {
+		return err
+	}
+	_ = s.EnsureSchema()
+	return nil
+}
+
 // pathFor returns the existing file for name, or a derived path when none exists.
 func (s *Store) pathFor(name string) string {
 	if entries, err := s.readAll(); err == nil {
