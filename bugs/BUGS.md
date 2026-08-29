@@ -17,7 +17,7 @@
 
 
 
-## Feautures
+## Features
 
 - [x] Add a "Clear All" button, which removes all files.
 - [x] Global Space counter, number of images converted and the space saved, should be shown in the bottom of the GUI.

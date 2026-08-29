@@ -6,13 +6,10 @@ author: Daniel
 # Resolution order: --target flag > this field > auto-detect from filesystem.
 # Accepted values: agent-skills, antigravity, claude, codex, copilot, cursor, gemini, grok-build, kiro, opencode, windsurf
 targets:
-  - claude
-  - copilot
   - opencode
 dependencies:
-  apm:
-    - id: dhcgn/personal-dev-skills
-
+  apm:  
+    - dhcgn/personal-dev-skills/profiles/go-dev
   mcp: []
 includes: auto
 scripts: {}
