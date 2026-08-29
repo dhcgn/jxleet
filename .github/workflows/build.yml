@@ -79,6 +79,6 @@ jobs:
           New-Item -ItemType File -Force -Path frontend/dist/.gitkeep | Out-Null
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
           version: latest
