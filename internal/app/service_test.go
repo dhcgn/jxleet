@@ -509,12 +509,3 @@ func TestGetPresetCore(t *testing.T) {
 		t.Errorf("flags = %+v", core.Flags)
 	}
 }
-
-func hasArg(args []cjxl.Arg, key, value string) bool {
-	for _, arg := range args {
-		if arg.Key == key && arg.Value == value {
-			return true
-		}
-	}
-	return false
-}

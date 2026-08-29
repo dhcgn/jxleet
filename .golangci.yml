@@ -12,6 +12,11 @@ linters:
     - unused
     - misspell
     - revive
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
 
 issues:
   max-issues-per-linter: 0
@@ -20,8 +25,3 @@ issues:
 formatters:
   enable:
     - gofmt
-
-exclude-rules:
-  - path: _test\.go
-    linters:
-      - errcheck

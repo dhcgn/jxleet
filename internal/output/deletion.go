@@ -9,6 +9,7 @@ import (
 // replace policy.
 type Deletion string
 
+// The available deletion rules.
 const (
 	DeletionRecycle Deletion = "recycle" // move original to the recycle bin (default)
 	DeletionKeep    Deletion = "keep"    // keep the original; do not replace it

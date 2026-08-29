@@ -2,6 +2,7 @@
 // starter file. Comments would not survive a YAML marshal, so the app never
 // rewrites presets it did not save itself (see Store.SavePresetOutput note in
 // internal/app).
+
 package preset
 
 import (

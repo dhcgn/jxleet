@@ -12,6 +12,7 @@ const CurrentVersion = 1
 // Policy selects where a converted file is written.
 type Policy string
 
+// The output policies a preset can select (see README "Output policies").
 const (
 	PolicyAlongside Policy = "alongside" // next to the original (default)
 	PolicySubfolder Policy = "subfolder" // into ./<subfolder>/
@@ -21,6 +22,7 @@ const (
 // Collision selects what happens when the output path already exists.
 type Collision string
 
+// How a preset handles an output path that already exists.
 const (
 	CollisionSkip      Collision = "skip"
 	CollisionNumber    Collision = "number"

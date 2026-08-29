@@ -3,7 +3,6 @@ package cjxl
 // Effort maps to cjxl's -e / --effort, trading encoding time for size.
 // The level codenames are libjxl's own; 7 (squirrel) is the cjxl default.
 // See README "Distance, quality and effort".
-
 const (
 	MinEffort     = 1
 	MaxEffort     = 10

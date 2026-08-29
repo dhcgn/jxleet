@@ -1,3 +1,6 @@
+// jxleet: a Windows front end for libjxl's cjxl. It decides which files to
+// hand over, assembles the cjxl arguments, runs the process, verifies the
+// result and reports — it encodes nothing itself (see README.md).
 package main
 
 import (
@@ -194,7 +197,7 @@ func main() {
 		go server.Serve(func(m ipc.Message) {
 			svc.ReceivePaths(m.Paths, m.Preset)
 		})
-		defer server.Close()
+		defer func() { _ = server.Close() }()
 	}
 
 	if len(arguments.Paths) > 0 {

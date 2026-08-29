@@ -415,7 +415,7 @@ func (e *Engine) process(ctx context.Context, path string) FileResult {
 	args = e.withThreads(args)
 	runRes := e.deps.Encoder.Run(ctx, args, path, plan.TempPath)
 	if !runRes.Success() {
-		os.Remove(plan.TempPath)
+		_ = os.Remove(plan.TempPath)
 		res.Output = ""
 		if ctx.Err() != nil {
 			res.Cancelled = true

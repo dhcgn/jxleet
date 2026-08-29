@@ -61,7 +61,7 @@ func (m *Manager) InstallRelease(ctx context.Context, release Release) (Installa
 	if err != nil {
 		return Installation{}, err
 	}
-	defer os.Remove(archivePath)
+	defer func() { _ = os.Remove(archivePath) }()
 
 	m.reportProgress(InstallProgress{Phase: "installing"})
 	return m.installArchive(ctx, release, archivePath)
@@ -78,7 +78,7 @@ func (m *Manager) installArchive(ctx context.Context, release Release, archivePa
 	if err != nil {
 		return Installation{}, err
 	}
-	defer os.RemoveAll(staging)
+	defer func() { _ = os.RemoveAll(staging) }()
 
 	if err := extractZip(ctx, archivePath, staging); err != nil {
 		return Installation{}, err
@@ -157,7 +157,7 @@ func (m *Manager) download(ctx context.Context, release Release) (string, error)
 	if err != nil {
 		return "", fmt.Errorf("toolchain: download %s: %w", release.Asset.Name, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return "", fmt.Errorf("toolchain: download returned %s: %s", resp.Status, strings.TrimSpace(string(body)))
@@ -233,7 +233,7 @@ func extractZip(ctx context.Context, archivePath, destination string) error {
 	if err != nil {
 		return fmt.Errorf("toolchain: open archive: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	var totalBytes uint64
 	for _, entry := range reader.File {

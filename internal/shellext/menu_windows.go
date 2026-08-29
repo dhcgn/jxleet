@@ -91,7 +91,7 @@ func Registered() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer key.Close()
+	defer func() { _ = key.Close() }()
 	_, _, err = key.GetStringValue("MUIVerb")
 	if errors.Is(err, registry.ErrNotExist) {
 		return false, nil

@@ -5,6 +5,7 @@ package config
 // its binding is set (see README "Three ways to run it").
 type EntryPoint string
 
+// The three entry points, as stored in Config.Bindings.
 const (
 	EntryGUI         EntryPoint = "gui"
 	EntryCLI         EntryPoint = "cli"
@@ -25,6 +26,7 @@ type Config struct {
 	RouteColors map[string]string `yaml:"route_colors,omitempty"`
 }
 
+// Names of the read-only presets created and bound on first start.
 const (
 	DefaultGUIPresetName             = "default-gui"
 	DefaultCLIPresetName             = "default-cli"

@@ -55,7 +55,7 @@ func (s *Store) Append(e Entry) error {
 	if err != nil {
 		return fmt.Errorf("history: open: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if _, err := f.Write(append(line, '\n')); err != nil {
 		return fmt.Errorf("history: append: %w", err)
 	}
@@ -74,7 +74,7 @@ func (s *Store) List() ([]Entry, error) {
 		}
 		return nil, fmt.Errorf("history: open: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var entries []Entry
 	scanner := bufio.NewScanner(f)

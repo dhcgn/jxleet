@@ -21,6 +21,8 @@ type GitHubClient struct {
 	UserAgent  string
 }
 
+// HTTPClientOrDefault returns the configured client, falling back to
+// http.DefaultClient.
 func (c *GitHubClient) HTTPClientOrDefault() *http.Client {
 	if c.HTTPClient != nil {
 		return c.HTTPClient
@@ -74,7 +76,7 @@ func (c *GitHubClient) Latest(ctx context.Context) (Release, error) {
 	if err != nil {
 		return Release{}, fmt.Errorf("toolchain: fetch latest libjxl release: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return Release{}, fmt.Errorf("toolchain: GitHub API returned %s: %s", resp.Status, strings.TrimSpace(string(body)))
@@ -128,7 +130,8 @@ func validateDigest(digest string) error {
 		return fmt.Errorf("toolchain: invalid sha256 digest length %d", len(hexDigest))
 	}
 	for _, r := range hexDigest {
-		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+		isHex := (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')
+		if !isHex {
 			return fmt.Errorf("toolchain: invalid sha256 digest %q", digest)
 		}
 	}

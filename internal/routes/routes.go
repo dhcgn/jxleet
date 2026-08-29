@@ -8,6 +8,7 @@ package routes
 // removes none beyond what cjxl supports.
 type Format string
 
+// Input formats cjxl accepts, as used in preset match rules.
 const (
 	FormatJPEG    Format = "JPEG"
 	FormatPNG     Format = "PNG"

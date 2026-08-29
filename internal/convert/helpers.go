@@ -15,7 +15,7 @@ func detectFormat(path string) routes.Format {
 	if err != nil {
 		return routes.DetectFormat(nil, path)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var header [512]byte
 	n, _ := f.Read(header[:])
 	return routes.DetectFormat(header[:n], path)

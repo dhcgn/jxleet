@@ -90,7 +90,7 @@ func NewVerifier(binary string) Verifier {
 // an error if decoding fails or produces no output.
 func (v Verifier) Readable(ctx context.Context, jxlPath string) error {
 	tmp := jxlPath + ".verify.png"
-	defer os.Remove(tmp)
+	defer func() { _ = os.Remove(tmp) }()
 	res := v.Runner.Decode(ctx, jxlPath, tmp)
 	if !res.Success() {
 		return decodeError("readability", res)
@@ -105,7 +105,7 @@ func (v Verifier) Readable(ctx context.Context, jxlPath string) error {
 // result is byte-identical to originalJPEG. Used on the transcode route.
 func (v Verifier) Reconstructs(ctx context.Context, jxlPath, originalJPEG string) error {
 	tmp := jxlPath + ".verify.jpg"
-	defer os.Remove(tmp)
+	defer func() { _ = os.Remove(tmp) }()
 	res := v.Runner.Decode(ctx, jxlPath, tmp)
 	if !res.Success() {
 		return decodeError("reconstruction", res)
@@ -134,12 +134,12 @@ func filesEqual(a, b string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer fa.Close()
+	defer func() { _ = fa.Close() }()
 	fb, err := os.Open(b)
 	if err != nil {
 		return false, err
 	}
-	defer fb.Close()
+	defer func() { _ = fb.Close() }()
 
 	if ia, err := fa.Stat(); err == nil {
 		if ib, err := fb.Stat(); err == nil && ia.Size() != ib.Size() {

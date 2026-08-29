@@ -737,7 +737,7 @@ func (s *Service) StartConversion(paths []string, options ConversionOptions) err
 			return fmt.Errorf("read installed cjxl flags: %w", err)
 		}
 		if flagStatus.Locked || len(flagStatus.Added) > 0 || len(flagStatus.Removed) > 0 {
-			return fmt.Errorf("Expert flags are locked for cjxl %s; generated flags target %s", installed.Version, flags.GeneratedVersion)
+			return fmt.Errorf("expert flags are locked for cjxl %s; generated flags target %s", installed.Version, flags.GeneratedVersion)
 		}
 	}
 
@@ -1149,23 +1149,23 @@ func validateExpertFlags(overrides []FlagOverride) error {
 	for _, override := range overrides {
 		key := strings.TrimSpace(override.Key)
 		if key == "" {
-			return errors.New("Expert flag key is required")
+			return errors.New("expert flag key is required")
 		}
 		definition, ok := set.Lookup(key)
 		if !ok {
 			return fmt.Errorf("unknown cjxl flag %q (not present in cjxl %s)", key, set.Version)
 		}
 		if definition.TakesValue && override.Valueless {
-			return fmt.Errorf("Expert flag %q requires a value", key)
+			return fmt.Errorf("expert flag %q requires a value", key)
 		}
 		if !definition.TakesValue && !override.Valueless {
-			return fmt.Errorf("Expert flag %q does not take a value", key)
+			return fmt.Errorf("expert flag %q does not take a value", key)
 		}
 		if definition.TakesValue && override.Value == "" {
-			return fmt.Errorf("Expert flag %q requires a value", key)
+			return fmt.Errorf("expert flag %q requires a value", key)
 		}
 		if !definition.TakesValue && override.Value != "" {
-			return fmt.Errorf("Expert flag %q is valueless", key)
+			return fmt.Errorf("expert flag %q is valueless", key)
 		}
 	}
 	return nil

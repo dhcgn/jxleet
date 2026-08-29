@@ -85,7 +85,7 @@ func SendName(name string, msg Message, timeout time.Duration) (bool, error) {
 		}
 		return false, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	_ = conn.SetDeadline(time.Now().Add(timeout))
 	if err := writeMessage(conn, msg); err != nil {
@@ -139,7 +139,7 @@ func (s *Server) Serve(handler func(Message)) {
 }
 
 func (s *Server) handleConn(conn net.Conn, handler func(Message)) {
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 	msg, err := readMessage(conn)
 	if err != nil {

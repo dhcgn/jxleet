@@ -56,12 +56,12 @@ func Finalize(ctx context.Context, plan Plan, opt FinalizeOptions) error {
 	// 1. Verify the result before touching anything else.
 	if opt.Verifier != nil {
 		if err := opt.Verifier.Readable(ctx, plan.TempPath); err != nil {
-			os.Remove(plan.TempPath)
+			_ = os.Remove(plan.TempPath)
 			return err
 		}
 		if opt.Route == routes.RouteTranscode && opt.OriginalJPEG != "" {
 			if err := opt.Verifier.Reconstructs(ctx, plan.TempPath, opt.OriginalJPEG); err != nil {
-				os.Remove(plan.TempPath)
+				_ = os.Remove(plan.TempPath)
 				return err
 			}
 		}
@@ -70,7 +70,7 @@ func Finalize(ctx context.Context, plan Plan, opt FinalizeOptions) error {
 	if plan.Policy != preset.PolicyReplace {
 		// alongside / subfolder: just move into place.
 		if err := os.Rename(plan.TempPath, plan.Final); err != nil {
-			os.Remove(plan.TempPath)
+			_ = os.Remove(plan.TempPath)
 			return fmt.Errorf("output: move result into place: %w", err)
 		}
 		return nil
@@ -79,7 +79,7 @@ func Finalize(ctx context.Context, plan Plan, opt FinalizeOptions) error {
 	// Replace policy: the recycle bin is mandatory; refuse rather than risk a
 	// permanent delete on a volume without one.
 	if !recycleCheck(plan.Input) {
-		os.Remove(plan.TempPath)
+		_ = os.Remove(plan.TempPath)
 		return fmt.Errorf("output: refusing to replace %s: the volume has no recycle bin", plan.Input)
 	}
 
@@ -93,7 +93,7 @@ func Finalize(ctx context.Context, plan Plan, opt FinalizeOptions) error {
 // (e.g. photo.jpg -> photo.jxl): move result into place, then recycle original.
 func finalizeReplace(plan Plan, recycle func(string) error) error {
 	if err := os.Rename(plan.TempPath, plan.Final); err != nil {
-		os.Remove(plan.TempPath)
+		_ = os.Remove(plan.TempPath)
 		return fmt.Errorf("output: move result into place: %w", err)
 	}
 	if err := recycle(plan.Input); err != nil {
@@ -110,13 +110,13 @@ func finalizeReplace(plan Plan, recycle func(string) error) error {
 func finalizeInPlace(plan Plan, recycle func(string) error) error {
 	backup := plan.Input + ".jxleet-bak"
 	if err := os.Rename(plan.Input, backup); err != nil {
-		os.Remove(plan.TempPath)
+		_ = os.Remove(plan.TempPath)
 		return fmt.Errorf("output: set aside original: %w", err)
 	}
 	if err := os.Rename(plan.TempPath, plan.Final); err != nil {
 		// Roll back: restore the original.
 		_ = os.Rename(backup, plan.Input)
-		os.Remove(plan.TempPath)
+		_ = os.Remove(plan.TempPath)
 		return fmt.Errorf("output: move result into place: %w", err)
 	}
 	if err := recycle(backup); err != nil {
