@@ -1,9 +1,11 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="100%" height="100%" viewBox="0 0 583 533" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-    <g transform="matrix(1,0,0,1,-246,-251)">
-        <g id="Ebene1">
-            <path d="M246,251L265,784L401,784L506,450L507,450L505,784L641,784L829,251L682,251L596,567L595,567L596,251L478,251L378,568L391,251L246,251Z"/>
-        </g>
-    </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="jxleet application icon, small size variant">
+  <title>jxleet</title>
+  <!-- No plate: at 16-32 px the dark plate disappears into a dark taskbar.
+       The bare wedge reads on any background. Bands and gaps are proportionally
+       thicker than the full-size mark so they survive at 16 px. -->
+  <g stroke-linejoin="round" stroke-width="10">
+    <polygon points="16,24 240,24 218.5,80 37.5,80"        fill="#4FB286" stroke="#4FB286"/>
+    <polygon points="45.2,100 210.8,100 189.2,156 66.8,156" fill="#E0A33E" stroke="#E0A33E"/>
+    <polygon points="74.5,176 181.5,176 160,232 96,232"     fill="#46A8C4" stroke="#46A8C4"/>
+  </g>
 </svg>

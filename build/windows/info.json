@@ -5,11 +5,11 @@
 	"info": {
 		"0000": {
 			"ProductVersion": "0.1.0",
-			"CompanyName": "My Company",
-			"FileDescription": "A jxleet application",
-			"LegalCopyright": "© 2026, My Company",
-			"ProductName": "My Product",
-			"Comments": "This is a comment"
+			"CompanyName": "dhcgn",
+			"FileDescription": "jxleet — a comfortable way to use cjxl on Windows",
+			"LegalCopyright": "© 2026, dhcgn (MIT)",
+			"ProductName": "jxleet",
+			"Comments": "https://github.com/dhcgn/jxleet"
 		}
 	}
 }
