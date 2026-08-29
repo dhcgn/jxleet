@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-08-29T15:17:40.422916+00:00'
+generated_at: '2026-08-29T15:26:11.176317+00:00'
 apm_version: 0.28.0
 dependencies:
 - repo_url: dhcgn/personal-dev-skills
@@ -15,9 +15,82 @@ dependencies:
   name: go-skills
   host: github.com
   resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
-  version: e67851c
+  version: unknown
+  virtual_path: fileflow-pathologize
+  is_virtual: true
   package_type: marketplace_plugin
-  content_hash: sha256:eb178c0b7b51540bc8224cc5c929dad9326e8bb2d65ee2e125dd2eaab05de2a1
+  deployed_files:
+  - .agents/skills/fileflow-pathologize
+  - .agents/skills/fileflow-pathologize/.claude-plugin/plugin.json
+  - .agents/skills/fileflow-pathologize/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/fileflow-pathologize/.claude-plugin/plugin.json: sha256:9d6354624b959a095e35d1bc877ab32efa1af1b4b35803c4e3ee110169644bae
+    .agents/skills/fileflow-pathologize/SKILL.md: sha256:46737a2f2bd13e6dccad8d590b84a68d25fd072a1455fce98bb8c1d918a436e3
+  content_hash: sha256:438258926c692054bf3d2f37586a59c37ee38c4b528572b65c4dd8a1d4fa93f9
+- repo_url: spf13/go-skills
+  name: go-skills
+  host: github.com
+  resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
+  version: unknown
+  virtual_path: go
+  is_virtual: true
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/go
+  - .agents/skills/go/.claude-plugin/plugin.json
+  - .agents/skills/go/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/go/.claude-plugin/plugin.json: sha256:94ad1407ed6cf8550e107977700c1fe617741ee785424ef82f825d3e989a420e
+    .agents/skills/go/SKILL.md: sha256:dbe226cf78b653be1a1a4cbd6a71ecd4637fa59f797a88c42a790b1d9796b77b
+  content_hash: sha256:e651ec9fdfa9b241f3636e3ad8513e8b9833b684af1d6b3390f34a1531d8fe45
+- repo_url: spf13/go-skills
+  name: go-skills
+  host: github.com
+  resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
+  version: unknown
+  virtual_path: go-release
+  is_virtual: true
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/go-release
+  - .agents/skills/go-release/.claude-plugin/plugin.json
+  - .agents/skills/go-release/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/go-release/.claude-plugin/plugin.json: sha256:679f7a72abe7d91274e35ce2b758a44d0dcc759d7367125f9095425342ab6e7e
+    .agents/skills/go-release/SKILL.md: sha256:11dec328adb715de7b93003db75ada6d783bc0cc0f1792095bc165c0f20d07cd
+  content_hash: sha256:deee1ee33a7cf6427a37af4883a49ab5d44fb0882da4d0298079c47e7d6efcc2
+- repo_url: spf13/go-skills
+  name: go-skills
+  host: github.com
+  resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
+  version: unknown
+  virtual_path: go-spec-reviewer
+  is_virtual: true
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/go-spec-reviewer
+  - .agents/skills/go-spec-reviewer/.claude-plugin/plugin.json
+  - .agents/skills/go-spec-reviewer/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/go-spec-reviewer/.claude-plugin/plugin.json: sha256:74469160212a32f1d2587eac56d74f81293262d34c7436d3fc14d03cb78b79a8
+    .agents/skills/go-spec-reviewer/SKILL.md: sha256:26a129c3cb5e80b30aebdb154801244d407370bd2cf80180d87524f64306d02d
+  content_hash: sha256:e7f787b4eafbbe3541ea4c654b1666361325b108ec75d15d27ea3e5673fa049f
+- repo_url: spf13/go-skills
+  name: go-skills
+  host: github.com
+  resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
+  version: unknown
+  virtual_path: wails
+  is_virtual: true
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/wails
+  - .agents/skills/wails/.claude-plugin/plugin.json
+  - .agents/skills/wails/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/wails/.claude-plugin/plugin.json: sha256:0c7f2274f32b38c71b2343ec45926c39b4470cac0064170add40cfdcbdd75312
+    .agents/skills/wails/SKILL.md: sha256:90a6dc2d796c739458751e83a41c2afc5fea1c1b38b2243dee05c8b8c899494d
+  content_hash: sha256:2525c86faaf8aa549e733f5725deaa8afd63e0a4df4a2c8b0a3dfe016f6eb75c
 - repo_url: dhcgn/personal-dev-skills
   name: gh
   host: github.com
@@ -164,7 +237,43 @@ dependencies:
     .agents/skills/ponytail-review/SKILL.md: sha256:40df33b58fc6ef889b93585733feb9566b76e9586efa7f376785c1e995197ac0
     .agents/skills/ponytail/SKILL.md: sha256:1316a2f3f95741d2300b116fe0c2d81ce4a9568656ed0a62643f54aaf09957f2
   content_hash: sha256:595855eee726cb344087c38d7a3c29586ce8a0dd9a2e7ad8e8eedc91c8d8c575
+- repo_url: spf13/go-skills
+  name: go-skills
+  host: github.com
+  resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
+  version: e67851c
+  depth: 2
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: marketplace_plugin
+  content_hash: sha256:eb178c0b7b51540bc8224cc5c929dad9326e8bb2d65ee2e125dd2eaab05de2a1
 deployments:
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/fileflow-pathologize
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/fileflow-pathologize
+  active_owner: spf13/go-skills/fileflow-pathologize
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/fileflow-pathologize/.claude-plugin/plugin.json
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/fileflow-pathologize
+  active_owner: spf13/go-skills/fileflow-pathologize
+  content_hash: sha256:9d6354624b959a095e35d1bc877ab32efa1af1b4b35803c4e3ee110169644bae
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/fileflow-pathologize/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/fileflow-pathologize
+  active_owner: spf13/go-skills/fileflow-pathologize
+  content_hash: sha256:46737a2f2bd13e6dccad8d590b84a68d25fd072a1455fce98bb8c1d918a436e3
 - kind: project-relative
   target: opencode
   value: .agents/skills/gh
@@ -183,6 +292,15 @@ deployments:
   - dhcgn/personal-dev-skills/.apm/skills/gh
   active_owner: dhcgn/personal-dev-skills/.apm/skills/gh
   content_hash: sha256:fb77a6b4d05ed8491399f1868a0b280c917116c0a4a3120324b3ea340aeb8c37
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go
+  active_owner: spf13/go-skills/go
+  content_hash: null
 - kind: project-relative
   target: opencode
   value: .agents/skills/go-1-27-features
@@ -237,6 +355,78 @@ deployments:
   - dhcgn/personal-dev-skills/.apm/skills/go-newest-version
   active_owner: dhcgn/personal-dev-skills/.apm/skills/go-newest-version
   content_hash: sha256:abf073d76b4af9d535c6f27d7271ac2dfb7ac4250ab34392236652757620fd9b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-release
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go-release
+  active_owner: spf13/go-skills/go-release
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-release/.claude-plugin/plugin.json
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go-release
+  active_owner: spf13/go-skills/go-release
+  content_hash: sha256:679f7a72abe7d91274e35ce2b758a44d0dcc759d7367125f9095425342ab6e7e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-release/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go-release
+  active_owner: spf13/go-skills/go-release
+  content_hash: sha256:11dec328adb715de7b93003db75ada6d783bc0cc0f1792095bc165c0f20d07cd
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-spec-reviewer
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go-spec-reviewer
+  active_owner: spf13/go-skills/go-spec-reviewer
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-spec-reviewer/.claude-plugin/plugin.json
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go-spec-reviewer
+  active_owner: spf13/go-skills/go-spec-reviewer
+  content_hash: sha256:74469160212a32f1d2587eac56d74f81293262d34c7436d3fc14d03cb78b79a8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-spec-reviewer/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go-spec-reviewer
+  active_owner: spf13/go-skills/go-spec-reviewer
+  content_hash: sha256:26a129c3cb5e80b30aebdb154801244d407370bd2cf80180d87524f64306d02d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go/.claude-plugin/plugin.json
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go
+  active_owner: spf13/go-skills/go
+  content_hash: sha256:94ad1407ed6cf8550e107977700c1fe617741ee785424ef82f825d3e989a420e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go
+  active_owner: spf13/go-skills/go
+  content_hash: sha256:dbe226cf78b653be1a1a4cbd6a71ecd4637fa59f797a88c42a790b1d9796b77b
 - kind: project-relative
   target: opencode
   value: .agents/skills/markdown-from-website
@@ -399,6 +589,33 @@ deployments:
   - dhcgn/personal-dev-skills/.apm/skills/rtk
   active_owner: dhcgn/personal-dev-skills/.apm/skills/rtk
   content_hash: sha256:a1250e77a0404e11156ee2709c8e592d70fcfc00df97169791dec7020a9f7141
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/wails
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/wails
+  active_owner: spf13/go-skills/wails
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/wails/.claude-plugin/plugin.json
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/wails
+  active_owner: spf13/go-skills/wails
+  content_hash: sha256:0c7f2274f32b38c71b2343ec45926c39b4470cac0064170add40cfdcbdd75312
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/wails/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/wails
+  active_owner: spf13/go-skills/wails
+  content_hash: sha256:90a6dc2d796c739458751e83a41c2afc5fea1c1b38b2243dee05c8b8c899494d
 - kind: project-relative
   target: opencode
   value: .agents/skills/wsl

@@ -8,8 +8,13 @@ author: Daniel
 targets:
   - opencode
 dependencies:
-  apm:  
+  apm:
     - dhcgn/personal-dev-skills/profiles/go-dev
+    - spf13/go-skills/go
+    - spf13/go-skills/wails
+    - spf13/go-skills/go-spec-reviewer
+    - spf13/go-skills/fileflow-pathologize
+    - spf13/go-skills/go-release
   mcp: []
 includes: auto
 scripts: {}
