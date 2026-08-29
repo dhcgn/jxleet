@@ -20,6 +20,7 @@ import (
 	"github.com/dhcgn/jxleet/internal/config"
 	"github.com/dhcgn/jxleet/internal/convert"
 	"github.com/dhcgn/jxleet/internal/djxl"
+	"github.com/dhcgn/jxleet/internal/history"
 	"github.com/dhcgn/jxleet/internal/jxlinfo"
 	"github.com/dhcgn/jxleet/internal/output"
 	"github.com/dhcgn/jxleet/internal/preset"
@@ -49,6 +50,17 @@ type Service struct {
 	pendingPreset string
 	engine        *convert.Engine
 	activePreset  string
+
+	// promptMu serializes output-exists prompts: at most one question is
+	// outstanding; further workers wait for the current decision.
+	promptMu      sync.Mutex
+	promptPending *collisionQuestion
+}
+
+// collisionQuestion is one outstanding output-exists decision.
+type collisionQuestion struct {
+	prompt CollisionPrompt
+	reply  chan string
 }
 
 // New constructs the root service with resolved paths, loaded config, and
@@ -761,7 +773,9 @@ func (s *Service) StartConversion(paths []string, options ConversionOptions) err
 	}
 	engine.OnFile = func(result convert.FileResult) {
 		s.emit("conversion-file", fileUpdate(result))
+		s.recordHistory(p.Name, result)
 	}
+	engine.CollisionHandler = s.askCollision
 	s.engine = engine
 	s.activePreset = p.Name
 	s.mu.Unlock()
@@ -823,6 +837,87 @@ func (s *Service) CancelConversion() error {
 	return nil
 }
 
+// CollisionPrompt describes one waiting output-exists decision. It is emitted
+// as "collision-prompt" and answered through ResolveCollision.
+type CollisionPrompt struct {
+	Input  string `json:"input"`
+	Output string `json:"output"`
+}
+
+// askCollision blocks a worker until the GUI answers the output-exists prompt
+// or the run is cancelled. It implements convert.CollisionHandler.
+func (s *Service) askCollision(input, target string) convert.CollisionAction {
+	s.promptMu.Lock()
+	defer s.promptMu.Unlock()
+
+	q := &collisionQuestion{
+		prompt: CollisionPrompt{Input: input, Output: target},
+		reply:  make(chan string, 1),
+	}
+	s.mu.Lock()
+	s.promptPending = q
+	engine := s.engine
+	s.mu.Unlock()
+	if engine == nil {
+		// No live engine (cleared concurrently); nothing is left to decide.
+		s.mu.Lock()
+		s.promptPending = nil
+		s.mu.Unlock()
+		return convert.CollisionSkip
+	}
+	s.emit("collision-prompt", q.prompt)
+
+	var answer string
+	select {
+	case answer = <-q.reply:
+	case <-engine.Done():
+		answer = "skip"
+	}
+
+	s.mu.Lock()
+	s.promptPending = nil
+	s.mu.Unlock()
+
+	switch answer {
+	case "overwrite":
+		return convert.CollisionOverwrite
+	case "overwrite-all":
+		return convert.CollisionOverwriteAll
+	case "skip-all":
+		return convert.CollisionSkipAll
+	default:
+		return convert.CollisionSkip
+	}
+}
+
+// ResolveCollision answers the outstanding output-exists prompt. Actions are
+// "overwrite", "overwrite-all", "skip" and "skip-all".
+func (s *Service) ResolveCollision(action string) {
+	s.mu.Lock()
+	q := s.promptPending
+	s.mu.Unlock()
+	if q == nil {
+		return
+	}
+	switch action {
+	case "overwrite", "overwrite-all", "skip", "skip-all":
+		q.reply <- action
+	}
+}
+
+// GetPendingCollision returns the currently waiting output-exists prompt, or
+// nil. The frontend calls it once on load to recover a prompt that fired
+// before it subscribed to the event (early CLI run).
+func (s *Service) GetPendingCollision() *CollisionPrompt {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.promptPending == nil {
+		return nil
+	}
+	prompt := s.promptPending.prompt
+	return &prompt
+}
+
 // GetProgress returns the current progress snapshot, or an empty snapshot when
 // no conversion is running.
 func (s *Service) GetProgress() ProgressUpdate {
@@ -879,6 +974,64 @@ func (s *Service) GetToolchainStatus() (ToolchainStatus, error) {
 		view.LatestVersion = status.Latest.Version
 	}
 	return view, nil
+}
+
+// HistoryEntry is one successful conversion shown by the History view.
+type HistoryEntry struct {
+	At         string `json:"at"`
+	Input      string `json:"input"`
+	Output     string `json:"output"`
+	Route      string `json:"route"`
+	Preset     string `json:"preset"`
+	InputSize  int64  `json:"inputSize"`
+	OutputSize int64  `json:"outputSize"`
+}
+
+// recordHistory appends a successful conversion to the persistent history.
+// Failures, skips and cancellations are not recorded.
+func (s *Service) recordHistory(presetName string, result convert.FileResult) {
+	if result.Err != nil || result.Skipped || result.Cancelled || result.Output == "" {
+		return
+	}
+	store := history.New(s.paths.HistoryFile)
+	if err := store.Append(history.Entry{
+		At:         time.Now(),
+		Input:      result.Input,
+		Output:     result.Output,
+		Route:      result.Route.String(),
+		Preset:     presetName,
+		InputSize:  result.InputSize,
+		OutputSize: result.OutputSize,
+	}); err != nil {
+		s.emit("conversion-error", "history: "+err.Error())
+	}
+}
+
+// GetHistoryEntries returns all recorded conversions, newest first.
+func (s *Service) GetHistoryEntries() ([]HistoryEntry, error) {
+	entries, err := history.New(s.paths.HistoryFile).List()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]HistoryEntry, 0, len(entries))
+	for i := len(entries) - 1; i >= 0; i-- {
+		e := entries[i]
+		result = append(result, HistoryEntry{
+			At:         e.At.Local().Format("2006-01-02 15:04:05"),
+			Input:      e.Input,
+			Output:     e.Output,
+			Route:      e.Route,
+			Preset:     e.Preset,
+			InputSize:  e.InputSize,
+			OutputSize: e.OutputSize,
+		})
+	}
+	return result, nil
+}
+
+// ClearHistory removes every recorded conversion.
+func (s *Service) ClearHistory() error {
+	return history.New(s.paths.HistoryFile).Clear()
 }
 
 // InstallLatestToolchain performs the user-requested libjxl download and

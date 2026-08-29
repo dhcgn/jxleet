@@ -4,6 +4,7 @@
   import { Service } from '../bindings/github.com/dhcgn/jxleet/internal/app';
   import type {
     Bindings,
+    CollisionPrompt,
     CommandPreview,
     ConversionOptions,
     ConversionSummary,
@@ -11,6 +12,7 @@
     FileUpdate,
     FlagInfo,
     FlagOverride,
+    HistoryEntry,
     PresetSummary,
     ProgressUpdate,
     Status,
@@ -18,7 +20,7 @@
     ToolchainStatus,
   } from '../bindings/github.com/dhcgn/jxleet/internal/app';
 
-  type View = 'main' | 'expert' | 'presets' | 'tools' | 'automatic';
+  type View = 'main' | 'expert' | 'presets' | 'tools' | 'automatic' | 'history';
   interface FileGroup {
     key: string;
     format: string;
@@ -115,6 +117,16 @@
   let installing = $state(false);
   let installProgress = $state<ToolchainProgress | null>(null);
   let sessionStats = $state({ count: 0, saved: 0 });
+  let historyEntries = $state<HistoryEntry[]>([]);
+  let historyLoaded = $state(false);
+  let historyMeta = $state<{ entry: HistoryEntry | null; output: string; error: string; loading: boolean }>({
+    entry: null,
+    output: '',
+    error: '',
+    loading: false,
+  });
+  let historyMetaRequest = 0;
+  let collisionPrompt = $state<CollisionPrompt | null>(null);
   let distance = $state(1.0);
   let effort = $state(7);
   let jpegLossless = $state(true);
@@ -321,12 +333,16 @@
       summary = event?.data as ConversionSummary;
       progress = { ...progress, paused: false, percent: 100 };
       busy = false;
+      collisionPrompt = null; // a cancelled run resolves outstanding prompts itself
       if (summary?.cancelled) {
         errorMessage = '! cancelled by user';
       }
     });
     const offError = Events.On('conversion-error', (event: any) => {
       errorMessage = String(event?.data ?? 'Conversion error');
+    });
+    const offCollision = Events.On('collision-prompt', (event: any) => {
+      if (event?.data) collisionPrompt = event.data as CollisionPrompt;
     });
 
     void load();
@@ -338,6 +354,7 @@
       offDone();
       offError();
       offToolchainProgress();
+      offCollision();
     };
   });
 
@@ -373,6 +390,8 @@
         view = runningProgress.coalesced > 1 ? 'automatic' : 'main';
         busy = true;
       }
+      // Recover an output-exists prompt that fired before the subscription.
+      collisionPrompt = await Service.GetPendingCollision();
       void refreshCommandPreview();
     } catch (error) {
       errorMessage = errorText(error);
@@ -720,6 +739,53 @@
     view = 'main';
   }
 
+  async function loadHistory(): Promise<void> {
+    try {
+      historyEntries = (await Service.GetHistoryEntries()) ?? [];
+      historyLoaded = true;
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  function openHistory(): void {
+    view = 'history';
+    historyLoaded = false;
+    historyMeta = { entry: null, output: '', error: '', loading: false };
+    void loadHistory();
+  }
+
+  async function clearHistoryAll(): Promise<void> {
+    if (!window.confirm(`Remove all ${historyEntries.length} history entries? The converted files are not touched.`)) return;
+    try {
+      await Service.ClearHistory();
+      historyEntries = [];
+      historyMeta = { entry: null, output: '', error: '', loading: false };
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  async function inspectHistoryEntry(entry: HistoryEntry): Promise<void> {
+    const request = ++historyMetaRequest;
+    historyMeta = { entry, output: '', error: '', loading: true };
+    try {
+      const output = await Service.InspectJXL(entry.output);
+      if (request !== historyMetaRequest) return;
+      historyMeta = { entry, output, error: '', loading: false };
+    } catch (error) {
+      if (request !== historyMetaRequest) return;
+      historyMeta = { entry, output: '', error: errorText(error), loading: false };
+    }
+  }
+
+  function resolveCollision(action: string): void {
+    collisionPrompt = null;
+    void Service.ResolveCollision(action).catch((error: unknown) => {
+      errorMessage = errorText(error);
+    });
+  }
+
   // Selecting a preset snapshots its core (applyPresetCore). GUI edits are
   // session-only: preview and conversion run with the overrides, the preset
   // file is never touched, and presetChanged marks the strip. Revert restores
@@ -1034,8 +1100,9 @@
     </div>
     <button class="btn ghost" onclick={() => { view = 'presets'; }}>Presets</button>
     <button class="btn ghost" onclick={() => { view = 'tools'; }}>Tools</button>
+    <button class="btn ghost" onclick={openHistory}>History</button>
     <span class="spacer"></span>
-    {#if view === 'presets' || view === 'tools'}
+    {#if view === 'presets' || view === 'tools' || view === 'history'}
       <button class="btn" onclick={() => { view = 'main'; }}>Back</button>
     {/if}
   </div>
@@ -1061,6 +1128,22 @@
     <div class="banner warn" role="alert">
       <span class="ic">!</span><span>{errorMessage}</span>
       <button class="alert-close" aria-label="Dismiss message" title="Dismiss" onclick={dismissMessage}>x</button>
+    </div>
+  {/if}
+
+  {#if collisionPrompt}
+    <div class="banner warn collision-banner" role="alertdialog" aria-label="Output file already exists" data-testid="collision-prompt">
+      <span class="ic">!</span>
+      <div class="collision-copy">
+        <b>The JXL output already exists.</b>
+        <div class="mini" title={collisionPrompt.input}>{collisionPrompt.input.split(/[\\/]/).pop()} -&gt; {collisionPrompt.output}</div>
+      </div>
+      <div class="collision-actions">
+        <button class="btn primary" style="background:var(--p-encode)" data-testid="collision-overwrite" onclick={() => resolveCollision('overwrite')}>Overwrite</button>
+        <button class="btn" data-testid="collision-overwrite-all" onclick={() => resolveCollision('overwrite-all')}>Overwrite all</button>
+        <button class="btn" data-testid="collision-skip" onclick={() => resolveCollision('skip')}>Skip file</button>
+        <button class="btn" data-testid="collision-skip-all" onclick={() => resolveCollision('skip-all')}>Skip all</button>
+      </div>
     </div>
   {/if}
 
@@ -1495,7 +1578,16 @@
             <div style="margin-top:14px">
               <div class="mini" style="margin-bottom:6px">Completed</div>
               {#each results.slice(-4).reverse() as result}
-                <div class="row" style="padding:5px 0"><span class="k" style="font-family:var(--mono);color:var(--ink)">{result.input.split(/[\\/]/).pop()}</span><span class="v">{result.error ? 'failed' : result.skipped ? 'skipped' : 'done'}</span></div>
+                {@const succeeded = !result.error && !result.skipped && !result.cancelled}
+                <div class="row" style="padding:5px 0">
+                  <span class="k" style="font-family:var(--mono);color:var(--ink)">{result.input.split(/[\\/]/).pop()}</span>
+                  {#if succeeded}
+                    <span class="v mono-mini">{formatBytes(result.inputSize)} -&gt; {formatBytes(result.outputSize)}</span>
+                    <span class="delta-chip" class:neg={savedPct(result.inputSize, result.outputSize) < 0}>{formatDelta(result.inputSize, result.outputSize)}</span>
+                  {:else}
+                    <span class="v">{result.error ? 'failed' : result.skipped ? 'skipped' : 'cancelled'}</span>
+                  {/if}
+                </div>
               {/each}
             </div>
           </div>
@@ -1701,10 +1793,68 @@
             </div>
           </div>
           <div class="card">
-            <h3>Invocation from outside</h3>
+             <h3>Invocation from outside</h3>
+             <div class="in">
+               <div class="cmd" style="margin:0">jxleet.exe --preset="Web d1.5 e7" "%1"</div>
+               <div class="mini" style="margin-top:7px">An explicit --preset overrides the CLI binding. Unknown names fail rather than fall back.</div>
+             </div>
+           </div>
+         </div>
+       </div>
+     </div>
+  {:else if view === 'history'}
+    <div class="body">
+      <div class="cols wide-right">
+        <div class="card">
+          <h3>History <span class="r">{historyEntries.length} conversions
+            <button class="icon-btn" aria-label="Reload history" title="Reload" onclick={() => void loadHistory()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-.9 4"></path><path d="M20 4v6h-6"></path></svg></button>
+            <button class="btn danger" style="padding:2px 10px" data-testid="history-clear" onclick={() => void clearHistoryAll()} disabled={historyEntries.length === 0}>Clear</button></span></h3>
+          {#if !historyLoaded}
+            <div class="empty">Loading history...</div>
+          {:else if historyEntries.length === 0}
+            <div class="empty">No conversions recorded yet. Successfully converted files appear here.</div>
+          {:else}
+            <table class="files group-files" data-testid="history-table">
+              <colgroup>
+                <col class="gf-file" />
+                <col class="gf-hug" />
+                <col class="gf-hug" />
+                <col class="gf-hug" />
+                <col class="gf-hug" />
+              </colgroup>
+              <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Original</th><th style="text-align:right">JXL</th><th style="text-align:right">Saved</th></tr></thead>
+              <tbody>
+                {#each historyEntries as entry (entry.at + entry.output)}
+                  <tr
+                    class="clickable"
+                    class:selected={historyMeta.entry === entry}
+                    onclick={() => { if (historyMeta.entry !== entry) void inspectHistoryEntry(entry); }}
+                    title="{entry.at} · preset {entry.preset}"
+                  >
+                    <td class="fn" title={`${entry.at} · ${entry.input}`}>{entry.input.split(/[\\/]/).pop()}</td>
+                    <td><span class={`badge ${routeClass(entry.route)}`}>{entry.route}</span></td>
+                    <td class="num">{formatBytes(entry.inputSize)}</td>
+                    <td class="num">{formatBytes(entry.outputSize)}</td>
+                    <td class="num"><span class="delta-chip" class:neg={savedPct(entry.inputSize, entry.outputSize) < 0}>{formatDelta(entry.inputSize, entry.outputSize)}</span></td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          {/if}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="card">
+            <h3>jxlinfo <span class="r">{historyMeta.entry ? (historyMeta.error ? 'unavailable' : compactPath(historyMeta.entry.output, 34)) : 'select an entry'}</span></h3>
             <div class="in">
-              <div class="cmd" style="margin:0">jxleet.exe --preset="Web d1.5 e7" "%1"</div>
-              <div class="mini" style="margin-top:7px">An explicit --preset overrides the CLI binding. Unknown names fail rather than fall back.</div>
+              {#if !historyMeta.entry}
+                <div class="empty">Select a history entry to inspect its JPEG XL metadata.</div>
+              {:else if historyMeta.loading}
+                <div class="empty">Reading jxlinfo metadata...</div>
+              {:else if historyMeta.error}
+                <div class="banner warn" style="margin:0"><span class="ic">!</span><span>{historyMeta.error}</span></div>
+              {:else}
+                <pre class="metadata-output">{historyMeta.output}</pre>
+              {/if}
             </div>
           </div>
         </div>

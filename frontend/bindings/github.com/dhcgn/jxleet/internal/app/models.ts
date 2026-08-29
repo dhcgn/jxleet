@@ -11,6 +11,15 @@ export interface Bindings {
 }
 
 /**
+ * CollisionPrompt describes one waiting output-exists decision. It is emitted
+ * as "collision-prompt" and answered through ResolveCollision.
+ */
+export interface CollisionPrompt {
+    "input": string;
+    "output": string;
+}
+
+/**
  * CommandPreview is the resolved cjxl command for one preset rule.
  */
 export interface CommandPreview {
@@ -101,6 +110,19 @@ export interface FlagOverride {
     "key": string;
     "value": string;
     "valueless": boolean;
+}
+
+/**
+ * HistoryEntry is one successful conversion shown by the History view.
+ */
+export interface HistoryEntry {
+    "at": string;
+    "input": string;
+    "output": string;
+    "route": string;
+    "preset": string;
+    "inputSize": number;
+    "outputSize": number;
 }
 
 /**

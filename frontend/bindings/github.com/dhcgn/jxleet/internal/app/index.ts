@@ -8,6 +8,7 @@ export {
 
 export type {
     Bindings,
+    CollisionPrompt,
     CommandPreview,
     ConversionOptions,
     ConversionSummary,
@@ -15,6 +16,7 @@ export type {
     FileUpdate,
     FlagInfo,
     FlagOverride,
+    HistoryEntry,
     PresetCore,
     PresetRuleSummary,
     PresetSummary,

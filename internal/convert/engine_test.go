@@ -52,6 +52,70 @@ func encodePreset() preset.Preset {
 	}
 }
 
+// skipCollisionPreset collides on existing outputs with the safe default.
+func skipCollisionPreset() preset.Preset {
+	p := encodePreset()
+	p.Output.OnCollision = preset.CollisionSkip
+	return p
+}
+
+// collidingInput writes an input PNG plus a pre-existing .jxl output so the
+// run hits an output-exists collision.
+func collidingInput(t *testing.T, dir, name string) string {
+	t.Helper()
+	p := filepath.Join(dir, name)
+	pngFile(t, p)
+	out := filepath.Join(dir, name[:len(name)-len(filepath.Ext(name))]+".jxl")
+	if err := os.WriteFile(out, []byte("existing"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestEngineCollisionNilHandlerSkips(t *testing.T) {
+	dir := t.TempDir()
+	input := collidingInput(t, dir, "a.png")
+	e := New(Deps{Encoder: &fakeEncoder{}}, Settings{Processes: 1, Preset: skipCollisionPreset()})
+	sum := e.Run(context.Background(), []string{input})
+	if sum.Skipped != 1 || sum.Completed != 0 {
+		t.Fatalf("summary = %+v, want 1 skipped", sum)
+	}
+}
+
+func TestEngineCollisionPromptDecisions(t *testing.T) {
+	cases := []struct {
+		name         string
+		action       CollisionAction
+		wantCalls    int
+		wantComplete int
+		wantSkip     int
+	}{
+		{"skip", CollisionSkip, 2, 0, 2},
+		{"overwrite", CollisionOverwrite, 2, 2, 0},
+		{"skip-all", CollisionSkipAll, 1, 0, 2},
+		{"overwrite-all", CollisionOverwriteAll, 1, 2, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			inputs := []string{collidingInput(t, dir, "a.png"), collidingInput(t, dir, "b.png")}
+			calls := 0
+			e := New(Deps{Encoder: &fakeEncoder{}}, Settings{Processes: 1, Preset: skipCollisionPreset()})
+			e.CollisionHandler = func(_, _ string) CollisionAction {
+				calls++
+				return tc.action
+			}
+			sum := e.Run(context.Background(), inputs)
+			if sum.Completed != tc.wantComplete || sum.Skipped != tc.wantSkip {
+				t.Fatalf("summary = %+v, want completed=%d skipped=%d", sum, tc.wantComplete, tc.wantSkip)
+			}
+			if calls != tc.wantCalls {
+				t.Fatalf("handler calls = %d, want %d", calls, tc.wantCalls)
+			}
+		})
+	}
+}
+
 func TestEngineBasicBatch(t *testing.T) {
 	dir := t.TempDir()
 	var inputs []string

@@ -31,6 +31,13 @@ export function CancelConversion(): $CancellablePromise<void> {
 }
 
 /**
+ * ClearHistory removes every recorded conversion.
+ */
+export function ClearHistory(): $CancellablePromise<void> {
+    return $Call.ByID(3663823565);
+}
+
+/**
  * ContextMenuRegistered reports whether the primary Explorer entry exists.
  */
 export function ContextMenuRegistered(): $CancellablePromise<boolean> {
@@ -70,6 +77,22 @@ export function GetActivePreset(): $CancellablePromise<string> {
  */
 export function GetBindings(): $CancellablePromise<$models.Bindings> {
     return $Call.ByID(822407320);
+}
+
+/**
+ * GetHistoryEntries returns all recorded conversions, newest first.
+ */
+export function GetHistoryEntries(): $CancellablePromise<$models.HistoryEntry[] | null> {
+    return $Call.ByID(2402018238);
+}
+
+/**
+ * GetPendingCollision returns the currently waiting output-exists prompt, or
+ * nil. The frontend calls it once on load to recover a prompt that fired
+ * before it subscribed to the event (early CLI run).
+ */
+export function GetPendingCollision(): $CancellablePromise<$models.CollisionPrompt | null> {
+    return $Call.ByID(2095697683);
 }
 
 /**
@@ -206,6 +229,14 @@ export function RegisterContextMenu(): $CancellablePromise<void> {
  */
 export function RenamePreset(name: string, newName: string): $CancellablePromise<void> {
     return $Call.ByID(869370011, name, newName);
+}
+
+/**
+ * ResolveCollision answers the outstanding output-exists prompt. Actions are
+ * "overwrite", "overwrite-all", "skip" and "skip-all".
+ */
+export function ResolveCollision(action: string): $CancellablePromise<void> {
+    return $Call.ByID(1261619658, action);
 }
 
 /**

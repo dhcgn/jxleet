@@ -12,6 +12,7 @@ import type * as app$0 from "../../../../dhcgn/jxleet/internal/app/models.js";
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "collision-prompt": app$0.CollisionPrompt;
             "conversion-done": app$0.ConversionSummary;
             "conversion-error": string;
             "conversion-file": app$0.FileUpdate;

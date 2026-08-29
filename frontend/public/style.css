@@ -1504,8 +1504,33 @@ tr.na .dot.on {
   white-space: normal;
 }
 
-.group .files tr.clickable {
+/* History view: rows are inspectable like the Main view results. */
+.files tr.clickable {
   cursor: pointer;
+}
+
+/* Output-exists prompt: one banner with file, target and four decisions. */
+.collision-banner {
+  flex-wrap: wrap;
+}
+
+.collision-copy {
+  flex: 1;
+  min-width: 220px;
+}
+
+.collision-copy .mini {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60ch;
+}
+
+.collision-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: auto;
 }
 
 /* Convert bar pinned under the scrollable body. */

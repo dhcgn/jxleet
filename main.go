@@ -36,6 +36,7 @@ func init() {
 	application.RegisterEvent[string]("conversion-error")
 	application.RegisterEvent[string]("preset")
 	application.RegisterEvent[app.ToolchainProgress]("toolchain-progress")
+	application.RegisterEvent[app.CollisionPrompt]("collision-prompt")
 }
 
 func main() {

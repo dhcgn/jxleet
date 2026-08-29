@@ -92,4 +92,7 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Session-wide counters: images converted and space saved in the statusbar
 - [x] Group header settings frozen during a running conversion
 - [x] Adding files after a finished run converts only the new files
+- [x] History view: every successful conversion with sizes, savings and jxlinfo drill-down, persisted across restarts
+- [x] Interactive output-exists prompt: overwrite / overwrite all / skip / skip all (only under the skip collision policy)
+- [x] Completed rows in the CLI progress view show output size and savings
 - [ ] Log view with tool messages 

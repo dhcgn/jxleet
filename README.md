@@ -354,6 +354,13 @@ The recycle bin is not optional. jxleet never deletes a file outright, and on vo
 without one (network shares, some removable media) it refuses to replace rather than falling
 back to deletion.
 
+### Name collisions
+
+When the target `.jxl` already exists, the preset's `on_collision` decides: `skip` (the safe
+default), `number` a new name, `overwrite` silently. Under `skip`, the GUI asks instead of
+skipping silently: overwrite this file, overwrite all, skip this file, or skip all — presets
+configured for `number` or `overwrite` never prompt.
+
 ## The managed toolchain
 
 jxleet does not bundle libjxl. It manages it.
@@ -379,6 +386,7 @@ absent:
 ```
 %APPDATA%\jxleet\config.yaml       settings and the three entry-point bindings
 %APPDATA%\jxleet\presets\          one YAML file per preset
+%APPDATA%\jxleet\history.jsonl     one JSON line per successful conversion (History view)
 %LOCALAPPDATA%\jxleet\bin\         the managed libjxl binaries
 %LOCALAPPDATA%\jxleet\logs\        run logs
 ```

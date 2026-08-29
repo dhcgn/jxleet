@@ -23,6 +23,20 @@ type Encoder interface {
 	Run(ctx context.Context, args []cjxl.Arg, input, output string) cjxl.Result
 }
 
+// CollisionAction is the answer to an interactive output-exists prompt.
+type CollisionAction int
+
+const (
+	// CollisionSkip skips this file only.
+	CollisionSkip CollisionAction = iota
+	// CollisionSkipAll skips this file and all later collisions without asking.
+	CollisionSkipAll
+	// CollisionOverwrite overwrites the existing output for this file only.
+	CollisionOverwrite
+	// CollisionOverwriteAll overwrites now and all later collisions without asking.
+	CollisionOverwriteAll
+)
+
 // Deps are the external collaborators the engine needs.
 type Deps struct {
 	Encoder  Encoder
@@ -91,6 +105,11 @@ type Engine struct {
 	OnFile     func(FileResult)
 	OnProgress func(Progress)
 
+	// CollisionHandler is invoked synchronously from a worker when the output
+	// file already exists under the skip-on-collision policy. It may block
+	// (e.g. waiting on a user decision). Nil keeps the silent-skip behavior.
+	CollisionHandler func(input, target string) CollisionAction
+
 	mu       sync.Mutex
 	cond     *sync.Cond
 	pending  []string
@@ -104,6 +123,10 @@ type Engine struct {
 	bytesDone  int64
 	bytesOut   int64
 	coalesced  int
+
+	// collisionAll is set by CollisionSkipAll/CollisionOverwriteAll answers and
+	// short-circuits later prompts for the rest of the run.
+	collisionAll CollisionAction
 
 	paused      bool
 	cancelled   bool
@@ -162,6 +185,19 @@ func (e *Engine) Start(ctx context.Context) {
 // after a run finished should use TryAdd and start a fresh run on false.
 func (e *Engine) Add(inputs []string) {
 	_ = e.TryAdd(inputs)
+}
+
+// Done returns a channel closed when the run is cancelled. Before Start it
+// returns an already-closed channel.
+func (e *Engine) Done() <-chan struct{} {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.ctx == nil {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}
+	return e.ctx.Done()
 }
 
 // TryAdd appends inputs to the queue and reports whether the engine can still
@@ -355,10 +391,24 @@ func (e *Engine) process(ctx context.Context, path string) FileResult {
 		return res
 	}
 	if plan.Skip {
-		res.Skipped = true
-		res.SkipReason = "output exists"
-		res.Duration = time.Since(start)
-		return res
+		// plan.Skip only arises from the output-exists collision branch, so an
+		// "overwrite" answer simply re-prepares with the overwrite policy.
+		if e.resolveCollision(path, plan.Final) {
+			retry := eff
+			retry.OnCollision = preset.CollisionOverwrite
+			plan, err = output.Prepare(path, retry)
+			if err != nil {
+				res.Err = err
+				res.Duration = time.Since(start)
+				return res
+			}
+		}
+		if plan.Skip {
+			res.Skipped = true
+			res.SkipReason = "output exists"
+			res.Duration = time.Since(start)
+			return res
+		}
 	}
 	res.Output = plan.Final
 
@@ -396,6 +446,32 @@ func (e *Engine) process(ctx context.Context, path string) FileResult {
 	}
 	res.Duration = time.Since(start)
 	return res
+}
+
+// resolveCollision decides an output-exists collision and reports whether the
+// existing target should be overwritten. Sticky answers (skip-all /
+// overwrite-all) short-circuit later collisions without calling the handler.
+func (e *Engine) resolveCollision(input, target string) bool {
+	e.mu.Lock()
+	sticky := e.collisionAll
+	cancelled := e.cancelled
+	e.mu.Unlock()
+	switch sticky {
+	case CollisionSkipAll:
+		return false
+	case CollisionOverwriteAll:
+		return true
+	}
+	if cancelled || e.CollisionHandler == nil {
+		return false
+	}
+	action := e.CollisionHandler(input, target)
+	if action == CollisionSkipAll || action == CollisionOverwriteAll {
+		e.mu.Lock()
+		e.collisionAll = action
+		e.mu.Unlock()
+	}
+	return action == CollisionOverwrite || action == CollisionOverwriteAll
 }
 
 // withThreads injects --num_threads when configured and not already set.

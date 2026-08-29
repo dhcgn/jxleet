@@ -5,6 +5,7 @@
 //
 //	%APPDATA%\jxleet\config.yaml       settings and the three entry-point bindings
 //	%APPDATA%\jxleet\presets\          one YAML file per preset
+//	%APPDATA%\jxleet\history.jsonl     one JSON line per successful conversion
 //	%LOCALAPPDATA%\jxleet\bin\         the managed libjxl binaries
 //	%LOCALAPPDATA%\jxleet\logs\        run logs
 package config
@@ -25,6 +26,8 @@ type Paths struct {
 	ConfigFile string
 	// PresetsDir is %APPDATA%\jxleet\presets.
 	PresetsDir string
+	// HistoryFile is %APPDATA%\jxleet\history.jsonl.
+	HistoryFile string
 	// BinDir is %LOCALAPPDATA%\jxleet\bin.
 	BinDir string
 	// LogsDir is %LOCALAPPDATA%\jxleet\logs.
@@ -50,11 +53,12 @@ func ResolvePaths() (Paths, error) {
 	localDir := filepath.Join(localAppData, appDir)
 
 	return Paths{
-		ConfigDir:  configDir,
-		ConfigFile: filepath.Join(configDir, "config.yaml"),
-		PresetsDir: filepath.Join(configDir, "presets"),
-		BinDir:     filepath.Join(localDir, "bin"),
-		LogsDir:    filepath.Join(localDir, "logs"),
+		ConfigDir:   configDir,
+		ConfigFile:  filepath.Join(configDir, "config.yaml"),
+		PresetsDir:  filepath.Join(configDir, "presets"),
+		HistoryFile: filepath.Join(configDir, "history.jsonl"),
+		BinDir:      filepath.Join(localDir, "bin"),
+		LogsDir:     filepath.Join(localDir, "logs"),
 	}, nil
 }
 
