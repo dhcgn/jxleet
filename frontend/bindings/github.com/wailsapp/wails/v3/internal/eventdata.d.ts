@@ -18,6 +18,7 @@ declare module "@wailsio/runtime" {
             "files": string[] | null;
             "preset": string;
             "progress": app$0.ProgressUpdate;
+            "toolchain-progress": app$0.ToolchainProgress;
         }
     }
 }

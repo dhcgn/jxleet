@@ -84,6 +84,17 @@ type Status struct {
 type Manager struct {
 	BinDir string
 	Client *GitHubClient
+	// OnInstallProgress reports download/install progress during InstallRelease.
+	// It is invoked from the install goroutine and may be nil.
+	OnInstallProgress func(InstallProgress)
+}
+
+// InstallProgress reports progress during an install. Phase is "downloading"
+// (Downloaded/Total in bytes) or "installing" (Downloaded/Total are zero).
+type InstallProgress struct {
+	Phase      string `json:"phase"`
+	Downloaded int64  `json:"downloaded"`
+	Total      int64  `json:"total"`
 }
 
 // NewManager constructs a manager rooted at binDir.

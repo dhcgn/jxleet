@@ -236,6 +236,9 @@ input[type="range"] {
 }
 
 .card > h3 .r {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin-left: auto;
   color: var(--ink3);
   font-family: var(--ui);
@@ -1464,6 +1467,41 @@ tr.na .dot.on {
 
 .group .files {
   border-top: 1px solid var(--line-soft);
+}
+
+/* Group file table: File takes leftover space, Size/JXL/Result hug content. */
+.group-files {
+  table-layout: auto;
+}
+
+.group-files col.gf-file {
+  width: auto;
+}
+
+.group-files col.gf-hug {
+  width: 1%;
+}
+
+.group-files col.gf-status {
+  width: 1%;
+}
+
+.group-files td {
+  max-width: none;
+}
+
+.group-files td.fn {
+  width: auto;
+  max-width: 0;
+  min-width: 0;
+}
+
+.group-files .num {
+  white-space: nowrap;
+}
+
+.group-files .status-cell {
+  white-space: normal;
 }
 
 .group .files tr.clickable {

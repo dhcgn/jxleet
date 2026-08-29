@@ -14,6 +14,7 @@
     PresetSummary,
     ProgressUpdate,
     Status,
+    ToolchainProgress,
     ToolchainStatus,
   } from '../bindings/github.com/dhcgn/jxleet/internal/app';
 
@@ -29,6 +30,7 @@
     files: FilePreview[];
     sizeIn: number;
     sizeOut: number;
+    sizeDoneIn: number;
     hasResults: boolean;
   }
   type QualityUnit = 'distance' | 'quality';
@@ -110,6 +112,9 @@
   let collapsedGroups = $state(new Set<string>());
   let loaded = $state(false);
   let busy = $state(false);
+  let installing = $state(false);
+  let installProgress = $state<ToolchainProgress | null>(null);
+  let sessionStats = $state({ count: 0, saved: 0 });
   let distance = $state(1.0);
   let effort = $state(7);
   let jpegLossless = $state(true);
@@ -146,7 +151,7 @@
     routeMode !== 'lossless' &&
       (qualityUnit === 'distance' ? distance < 0.5 || distance > 3 : quality < 68 || quality > 96),
   );
-  let canConvert = $derived(inputPaths.length > 0 && files.length > 0 && presetName !== '' && !busy);
+  let canConvert = $derived(inputPaths.length > 0 && files.length > 0 && presetName !== '' && !busy && !installing);
   let selectedResult = $derived(results.find((result) => result.input === selectedResultInput) ?? null);
   let processing = $derived(busy && (view === 'main' || view === 'expert'));
   let resultByInput = $derived.by(() => {
@@ -154,6 +159,17 @@
     for (const result of results) map.set(result.input, result);
     return map;
   });
+  // Files that still need conversion: no result yet, or failed/cancelled (retry).
+  // Successfully converted files are excluded so adding files after a finished
+  // run only converts the new ones.
+  let pendingPaths = $derived(
+    files
+      .filter((file) => {
+        const result = resultByInput.get(file.path);
+        return !result || result.error !== '' || result.cancelled;
+      })
+      .map((file) => file.path),
+  );
   let fileStatuses = $derived.by(() => {
     const map = new Map<string, string>();
     let runningLeft = processing ? progress.inFlight : 0;
@@ -240,6 +256,7 @@
           files: [],
           sizeIn: 0,
           sizeOut: 0,
+          sizeDoneIn: 0,
           hasResults: false,
         };
         map.set(key, group);
@@ -249,6 +266,7 @@
       const result = resultByInput.get(file.path);
       if (result && !result.error && !result.skipped && !result.cancelled) {
         group.sizeOut += result.outputSize;
+        group.sizeDoneIn += result.inputSize;
         group.hasResults = true;
       }
     }
@@ -284,7 +302,19 @@
     });
     const offFile = Events.On('conversion-file', (event: any) => {
       if (event?.data) {
-        results = [...results, event.data as FileUpdate];
+        const update = event.data as FileUpdate;
+        results = [...results, update];
+        if (!update.error && !update.skipped && !update.cancelled && update.inputSize >= 0) {
+          sessionStats = {
+            count: sessionStats.count + 1,
+            saved: sessionStats.saved + (update.inputSize - update.outputSize),
+          };
+        }
+      }
+    });
+    const offToolchainProgress = Events.On('toolchain-progress', (event: any) => {
+      if (event?.data) {
+        installProgress = event.data as ToolchainProgress;
       }
     });
     const offDone = Events.On('conversion-done', (event: any) => {
@@ -307,6 +337,7 @@
       offFile();
       offDone();
       offError();
+      offToolchainProgress();
     };
   });
 
@@ -413,8 +444,8 @@
     const incoming = paths.filter((path) => path.trim() !== '');
     if (incoming.length === 0) return;
     if (!busy) {
-      // Adding files after a finished run starts a fresh batch.
-      results = [];
+      // Adding files after a finished run keeps existing results; only the
+      // pending files (no result, or failed/cancelled) are converted next.
       summary = null;
       selectedResultInput = '';
       metadataOutput = '';
@@ -454,8 +485,9 @@
   // WebView2 never exposes paths on JS DataTransfer, so no JS drop handler exists.
 
   async function startConversion(): Promise<void> {
-    if (inputPaths.length === 0) {
-      errorMessage = 'Drop files or use Open File/Open Folder first.';
+    const runPaths = pendingPaths;
+    if (runPaths.length === 0) {
+      errorMessage = 'Nothing to convert — all files are already done.';
       return;
     }
     if (presetName === '') {
@@ -472,16 +504,15 @@
     }
     busy = true;
     errorMessage = '';
-    results = [];
     selectedResultInput = '';
     metadataOutput = '';
     metadataError = '';
     metadataLoading = false;
     metadataRequest += 1;
     summary = null;
-    progress = { ...progress, total: files.length, completed: 0, failed: 0, skipped: 0, inFlight: 0, percent: 0, paused: false };
+    progress = { ...progress, total: runPaths.length, completed: 0, failed: 0, skipped: 0, inFlight: 0, percent: 0, paused: false };
     try {
-      await Service.StartConversion(inputPaths, currentOptions());
+      await Service.StartConversion(runPaths, currentOptions());
     } catch (error) {
       busy = false;
       errorMessage = errorText(error);
@@ -518,7 +549,8 @@
   }
 
   async function installToolchain(): Promise<void> {
-    busy = true;
+    installing = true;
+    installProgress = null;
     toolchainError = '';
     try {
       await Service.InstallLatestToolchain();
@@ -526,7 +558,8 @@
     } catch (error) {
       toolchainError = errorText(error);
     } finally {
-      busy = false;
+      installing = false;
+      installProgress = null;
     }
   }
 
@@ -739,7 +772,7 @@
     } catch (error) {
       errorMessage = errorText(error);
     }
-    void refreshPreview();
+    if (!busy) void refreshPreview();
   }
 
   function revertToPreset(): void {
@@ -757,6 +790,7 @@
 
   function onSettingsChanged(): void {
     void refreshCommandPreview();
+    if (busy) return; // running engine keeps its start-time snapshot; don't relabel files
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => void refreshPreview(), 300);
   }
@@ -1034,11 +1068,24 @@
     <div class="body"><div class="empty">Loading jxleet...</div></div>
   {:else if view === 'main'}
     <div class="body">
-      {#if toolchain?.needsInstall}
+      {#if installing}
+        <div class="run-strip" data-testid="install-strip">
+          <div class="run-head">
+            <span class="badge b-encode">Installing</span>
+            <span class="run-count">{installProgress?.phase === 'downloading' ? 'Downloading libjxl' : 'Verifying & installing'}</span>
+            {#if installProgress?.phase === 'downloading'}
+              <span class="mini">{formatBytes(installProgress.downloaded)} of {installProgress.total > 0 ? formatBytes(installProgress.total) : '?'}</span>
+            {/if}
+          </div>
+          {#if installProgress?.phase === 'downloading' && installProgress.total > 0}
+            <div class="bar"><i style={`width:${Math.min(100, (installProgress.downloaded / installProgress.total) * 100)}%`}></i></div>
+          {/if}
+        </div>
+      {:else if toolchain?.needsInstall}
         <div class="banner warn">
           <span class="ic">!</span>
           <span><b>libjxl is not installed.</b> Install the managed cjxl/djxl/jxlinfo toolchain before converting.</span>
-          <button class="btn primary" style="margin-left:auto;background:var(--p-encode)" onclick={() => void installToolchain()} disabled={busy}>Install</button>
+          <button class="btn primary" style="margin-left:auto;background:var(--p-encode)" onclick={() => void installToolchain()} disabled={installing}>Install</button>
         </div>
       {/if}
       {#if appStatus && !appStatus.ready}
@@ -1051,11 +1098,7 @@
       {#if files.length === 0 && !busy}
         <div
           class="drop"
-          role="button"
-          tabindex="0"
           aria-label="Drop files or folders"
-          onclick={() => void openFile()}
-          onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') void openFile(); }}
         >
         <div class="big">Drop files or folders here</div>
         <div class="sub">jxleet detects the input format and chooses the route. Unsupported files are skipped and reported.</div>
@@ -1066,8 +1109,8 @@
         </div>
         <div class="sub" style="margin-top:10px">or use one of the native open actions</div>
         <div style="display:flex;gap:8px;justify-content:center;margin:4px auto 0;flex-wrap:wrap">
-          <button class="btn primary" style="background:var(--p-encode)" onclick={(event) => { event.stopPropagation(); void openFile(); }}>Open File</button>
-          <button class="btn" onclick={(event) => { event.stopPropagation(); void openFolder(); }}>Open Folder</button>
+          <button class="btn primary" style="background:var(--p-encode)" onclick={() => void openFile()}>Open File</button>
+          <button class="btn" onclick={() => void openFolder()}>Open Folder</button>
         </div>
       </div>
       {:else}
@@ -1104,14 +1147,20 @@
                 {:else}
                   <span class="mono-mini" title={group.flagsSet ? `${group.settings} + extra flags` : group.settings}>{group.settings || '-'}</span>
                   {#if group.flagsSet}<span class="flag-chip" title="Extra cjxl flags applied">+flags</span>{/if}
-                  {#if group.hasResults && group.sizeIn > 0}
-                    <span class="delta-chip" class:neg={savedPct(group.sizeIn, group.sizeOut) < 0}>{formatDelta(group.sizeIn, group.sizeOut)}</span>
+                  {#if group.hasResults && group.sizeDoneIn > 0}
+                    <span class="delta-chip" class:neg={savedPct(group.sizeDoneIn, group.sizeOut) < 0}>{formatDelta(group.sizeDoneIn, group.sizeOut)}</span>
                   {/if}
                 {/if}
                 <svg class="chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"></path></svg>
               </button>
               {#if !collapsedGroups.has(group.key)}
                 <table class="files group-files" data-testid="file-table">
+                  <colgroup>
+                    <col class="gf-file" />
+                    <col class="gf-hug" />
+                    <col class="gf-hug" />
+                    <col class="gf-status" />
+                  </colgroup>
                   <thead><tr><th>File</th><th style="text-align:right">Size</th><th style="text-align:right">JXL</th><th>Result</th></tr></thead>
                   <tbody>
                     {#each group.files as file (file.path)}
@@ -1256,8 +1305,8 @@
           <span class="mini">{files.length} files - {formatBytes(totalSize)}</span>
         {/if}
         <span class="spacer"></span>
-        {#if summary && !busy}<button class="btn" data-testid="new-files" onclick={clearAll}>New files</button>{/if}
-        <button class="btn primary convert-action" style={`background:var(--p-${dominantRoute === 'Transcode' ? 'transcode' : dominantRoute === 'Encode' ? 'encode' : 'reencode'});padding:11px`} data-testid="start-convert" onclick={() => void startConversion()} disabled={!canConvert}>Convert {files.length} files</button>
+        {#if !busy}<button class="btn" data-testid="new-files" onclick={clearAll}>Clear All</button>{/if}
+        <button class="btn primary convert-action" style={`background:var(--p-${dominantRoute === 'Transcode' ? 'transcode' : dominantRoute === 'Encode' ? 'encode' : 'reencode'});padding:11px`} data-testid="start-convert" onclick={() => void startConversion()} disabled={!canConvert}>Convert {pendingPaths.length || files.length} files</button>
       </div>
     {/if}
   {:else if view === 'expert'}
@@ -1413,7 +1462,7 @@
               {/each}
             </div>
           </div>
-          <button class="btn primary convert-action" style="background:var(--p-encode);padding:11px" onclick={() => void startConversion()} disabled={!canConvert}>Convert {files.length} files</button>
+          <button class="btn primary convert-action" style="background:var(--p-encode);padding:11px" onclick={() => void startConversion()} disabled={!canConvert}>Convert {pendingPaths.length || files.length} files</button>
         </div>
       </div>
     </div>
@@ -1481,11 +1530,17 @@
             <div class="row"><span class="k">Latest version</span><span class:warning={toolchain?.updateAvailable} class="v">{toolchain?.latestVersion || '-'}</span></div>
             <div class="row"><span class="k">Asset</span><span class="v">jxl-x64-windows-static.zip</span></div>
             <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-              <button class="btn" data-testid="check-updates" onclick={() => void refreshToolchain()} disabled={busy}>Check for updates</button>
+              <button class="btn" data-testid="check-updates" onclick={() => void refreshToolchain()} disabled={installing}>Check for updates</button>
               {#if toolchain?.updateAvailable || toolchain?.needsInstall}
-                <button class="btn primary" style="background:var(--p-encode)" onclick={() => void installToolchain()} disabled={busy}>{toolchain?.needsInstall ? 'Install toolchain' : `Update to ${toolchain.latestVersion}`}</button>
+                <button class="btn primary" style="background:var(--p-encode)" onclick={() => void installToolchain()} disabled={installing}>{toolchain?.needsInstall ? 'Install toolchain' : `Update to ${toolchain.latestVersion}`}</button>
               {/if}
             </div>
+            {#if installing && installProgress}
+              <div class="mini" style="margin-top:8px">{installProgress.phase === 'downloading' ? 'Downloading' : 'Installing'}{#if installProgress.phase === 'downloading' && installProgress.total > 0} — {formatBytes(installProgress.downloaded)} / {formatBytes(installProgress.total)}{/if}</div>
+              {#if installProgress.phase === 'downloading' && installProgress.total > 0}
+                <div class="bar" style="margin-top:4px"><i style={`width:${Math.min(100, (installProgress.downloaded / installProgress.total) * 100)}%`}></i></div>
+              {/if}
+            {/if}
             {#if toolchain && !toolchain.updateAvailable && !toolchain.needsInstall}
               <div class="mini" style="margin-top:6px">libjxl is up to date.</div>
             {/if}
@@ -1664,7 +1719,9 @@
       <span class="warning"><span class="dotled"></span>libjxl not installed</span>
     {/if}
     <span class="spacer"></span>
-    {#if busy || view === 'automatic'}
+    {#if installing && installProgress}
+      <span>{installProgress.phase === 'downloading' ? 'Downloading libjxl' : 'Installing libjxl'}{#if installProgress.phase === 'downloading' && installProgress.total > 0} — {formatBytes(installProgress.downloaded)} / {formatBytes(installProgress.total)}{/if}</span>
+    {:else if busy || view === 'automatic'}
       <span>{progress.completed} done - {progress.failed} failed</span><span>{formatRate(progress.throughput)}</span>
     {:else if view === 'tools' && toolchain?.updateAvailable}
       <span class="up">Update available</span>
@@ -1672,6 +1729,9 @@
       <span>{files.length} files - {formatBytes(totalSize)}</span>
     {:else}
       <span>Queue empty</span>
+    {/if}
+    {#if sessionStats.count > 0}
+      <span class="mini">{sessionStats.count} converted · {formatBytes(Math.abs(sessionStats.saved))} {sessionStats.saved >= 0 ? 'saved' : 'grew'}</span>
     {/if}
     <span>1 instance</span>
   </div>

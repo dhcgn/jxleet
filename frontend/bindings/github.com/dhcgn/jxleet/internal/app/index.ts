@@ -20,5 +20,6 @@ export type {
     PresetSummary,
     ProgressUpdate,
     Status,
+    ToolchainProgress,
     ToolchainStatus
 } from "./models.js";

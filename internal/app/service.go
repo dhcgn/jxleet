@@ -82,26 +82,30 @@ func (s *Service) AddPaths(paths []string) {
 	if len(paths) == 0 {
 		return
 	}
-	s.mu.Lock()
-	engine := s.engine
-	if engine == nil {
-		s.pending = append(s.pending, paths...)
-	}
-	s.mu.Unlock()
+	engine := s.currentEngine()
 	if engine != nil {
 		expanded, err := expandPaths(paths)
 		if err != nil {
 			s.emit("conversion-error", err.Error())
 			return
 		}
-		engine.Add(expanded)
+		engine.TryAdd(expanded)
 	}
 	s.emit("files", paths)
 }
 
-// ReceivePaths accepts an external invocation, retaining its explicit preset
-// override until the frontend starts the run.
+// ReceivePaths accepts an external invocation. When a conversion is running and
+// the preset matches, paths are coalesced into it. Otherwise a fresh run is
+// started automatically so external callers (Lightroom, CLI) never have to be
+// triggered manually — the GUI-bound preset binding is used when no explicit
+// --preset was supplied.
 func (s *Service) ReceivePaths(paths []string, presetName string) {
+	if len(paths) == 0 {
+		if presetName != "" {
+			s.emit("preset", presetName)
+		}
+		return
+	}
 	s.mu.Lock()
 	engine := s.engine
 	activePreset := s.activePreset
@@ -109,11 +113,37 @@ func (s *Service) ReceivePaths(paths []string, presetName string) {
 		s.pendingPreset = presetName
 	}
 	s.mu.Unlock()
-	if engine != nil && presetName != "" && activePreset != "" && presetName != activePreset {
-		s.emit("conversion-error", fmt.Sprintf("an invocation selected preset %q while %q is already running", presetName, activePreset))
+
+	if engine != nil {
+		if presetName != "" && activePreset != "" && presetName != activePreset {
+			s.emit("conversion-error", fmt.Sprintf("an invocation selected preset %q while %q is already running", presetName, activePreset))
+			return
+		}
+		expanded, err := expandPaths(paths)
+		if err != nil {
+			s.emit("conversion-error", err.Error())
+			return
+		}
+		if engine.TryAdd(expanded) {
+			s.emit("files", paths)
+			return
+		}
+		// The engine finished after the check above; fall through to start a new run.
+	}
+
+	// No live engine: start a fresh run automatically with the explicit preset
+	// or the CLI entry-point binding (mirroring main.go's first-invocation logic).
+	runPreset := presetName
+	if strings.TrimSpace(runPreset) == "" {
+		s.mu.Lock()
+		runPreset = s.cfg.Bindings[config.EntryCLI]
+		s.mu.Unlock()
+	}
+	if err := s.StartConversion(paths, ConversionOptions{Preset: runPreset}); err != nil {
+		s.emit("conversion-error", err.Error())
 		return
 	}
-	s.AddPaths(paths)
+	s.emit("files", paths)
 	if presetName != "" {
 		s.emit("preset", presetName)
 	}
@@ -702,9 +732,16 @@ func (s *Service) StartConversion(paths []string, options ConversionOptions) err
 	s.mu.Lock()
 	if s.engine != nil {
 		engine := s.engine
-		s.mu.Unlock()
-		engine.Add(inputs)
-		return nil
+		if engine.TryAdd(inputs) {
+			s.mu.Unlock()
+			return nil
+		}
+		// The engine has finished (workers exited) but has not been cleared yet;
+		// drop it so a fresh run is started below.
+		if s.engine == engine {
+			s.engine = nil
+			s.activePreset = ""
+		}
 	}
 
 	engine := convert.New(
@@ -846,15 +883,31 @@ func (s *Service) GetToolchainStatus() (ToolchainStatus, error) {
 
 // InstallLatestToolchain performs the user-requested libjxl download and
 // atomic installation. It is deliberately not called by status queries.
+// Download and install progress is emitted as "toolchain-progress" events.
 func (s *Service) InstallLatestToolchain() (string, error) {
 	if s.tools == nil {
 		return "", errors.New("toolchain service is not configured")
 	}
+	s.tools.OnInstallProgress = func(p toolchain.InstallProgress) {
+		s.emit("toolchain-progress", ToolchainProgress{
+			Phase:      p.Phase,
+			Downloaded: p.Downloaded,
+			Total:      p.Total,
+		})
+	}
+	defer func() { s.tools.OnInstallProgress = nil }()
 	installed, err := s.tools.InstallLatest(context.Background())
 	if err != nil {
 		return "", err
 	}
 	return installed.Version, nil
+}
+
+// ToolchainProgress is emitted during a libjxl download/install.
+type ToolchainProgress struct {
+	Phase      string `json:"phase"`
+	Downloaded int64  `json:"downloaded"`
+	Total      int64  `json:"total"`
 }
 
 func (s *Service) effectivePreset(options ConversionOptions) (preset.Preset, error) {

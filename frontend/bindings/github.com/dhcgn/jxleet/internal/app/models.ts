@@ -172,6 +172,15 @@ export interface Status {
 }
 
 /**
+ * ToolchainProgress is emitted during a libjxl download/install.
+ */
+export interface ToolchainProgress {
+    "phase": string;
+    "downloaded": number;
+    "total": number;
+}
+
+/**
  * ToolchainStatus is the compact toolchain state rendered by the Tools view.
  * Updates are notify-only: querying status never downloads or installs anything.
  */

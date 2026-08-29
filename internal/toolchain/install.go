@@ -63,6 +63,7 @@ func (m *Manager) InstallRelease(ctx context.Context, release Release) (Installa
 	}
 	defer os.Remove(archivePath)
 
+	m.reportProgress(InstallProgress{Phase: "installing"})
 	return m.installArchive(ctx, release, archivePath)
 }
 
@@ -165,6 +166,12 @@ func (m *Manager) download(ctx context.Context, release Release) (string, error)
 		return "", fmt.Errorf("toolchain: download is too large: %d bytes", resp.ContentLength)
 	}
 
+	total := resp.ContentLength
+	if total <= 0 {
+		total = release.Asset.Size
+	}
+	m.reportProgress(InstallProgress{Phase: "downloading", Total: total})
+
 	if err := os.MkdirAll(m.BinDir, 0o755); err != nil {
 		return "", fmt.Errorf("toolchain: create binary directory: %w", err)
 	}
@@ -182,7 +189,8 @@ func (m *Manager) download(ctx context.Context, release Release) (string, error)
 	}()
 
 	hasher := sha256.New()
-	written, err := io.Copy(io.MultiWriter(tmp, hasher), io.LimitReader(resp.Body, maxDownloadBytes+1))
+	body := &progressReader{inner: io.LimitReader(resp.Body, maxDownloadBytes+1), total: total, onRead: m.reportProgress}
+	written, err := io.Copy(io.MultiWriter(tmp, hasher), body)
 	if err != nil {
 		return "", fmt.Errorf("toolchain: write download: %w", err)
 	}
@@ -427,4 +435,39 @@ func samePath(a, b string) bool {
 
 func urlParse(raw string) (*url.URL, error) {
 	return url.Parse(raw)
+}
+
+// reportProgress forwards an install progress update to the manager callback, if
+// one is configured. It never blocks the install.
+func (m *Manager) reportProgress(p InstallProgress) {
+	if m.OnInstallProgress != nil {
+		m.OnInstallProgress(p)
+	}
+}
+
+// progressReader wraps a reader and reports cumulative bytes read to a callback.
+// Updates are throttled to at most one per 256 KiB so a large download does not
+// flood the event channel.
+type progressReader struct {
+	inner  io.Reader
+	total  int64
+	read   int64
+	last   int64
+	onRead func(InstallProgress)
+}
+
+const progressReportInterval = 256 << 10
+
+func (r *progressReader) Read(p []byte) (int, error) {
+	n, err := r.inner.Read(p)
+	if n > 0 {
+		r.read += int64(n)
+		if r.read-r.last >= progressReportInterval || err == io.EOF {
+			r.last = r.read
+			if r.onRead != nil {
+				r.onRead(InstallProgress{Phase: "downloading", Downloaded: r.read, Total: r.total})
+			}
+		}
+	}
+	return n, err
 }

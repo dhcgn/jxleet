@@ -109,6 +109,11 @@ type Engine struct {
 	cancelled   bool
 	inputClosed bool
 
+	// workersExited counts workers that have returned. TryAdd refuses work once
+	// all workers have exited so a caller can start a fresh run instead of
+	// appending to an engine that will never process the input.
+	workersExited int
+
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -152,12 +157,26 @@ func (e *Engine) Start(ctx context.Context) {
 }
 
 // Add appends inputs to the queue. Safe to call while running; late arrivals are
-// coalesced into the same run and progress bar.
+// coalesced into the same run and progress bar. Inputs queued after the workers
+// have exited are dropped silently — callers that must guarantee processing
+// after a run finished should use TryAdd and start a fresh run on false.
 func (e *Engine) Add(inputs []string) {
+	_ = e.TryAdd(inputs)
+}
+
+// TryAdd appends inputs to the queue and reports whether the engine can still
+// process them. It returns false once every worker has exited (input closed and
+// drained, or cancelled), so a caller can start a new run instead of handing
+// paths to a dead engine.
+func (e *Engine) TryAdd(inputs []string) bool {
 	if len(inputs) == 0 {
-		return
+		return true
 	}
 	e.mu.Lock()
+	if e.workersExited >= e.settings.Processes {
+		e.mu.Unlock()
+		return false
+	}
 	for _, in := range inputs {
 		e.pending = append(e.pending, in)
 		e.total++
@@ -169,6 +188,7 @@ func (e *Engine) Add(inputs []string) {
 	e.cond.Broadcast()
 	e.mu.Unlock()
 	e.emitProgress()
+	return true
 }
 
 // CloseInput signals that no more Add calls will come; workers finish the queue
@@ -228,6 +248,14 @@ func (e *Engine) Wait() Summary {
 // worker pulls files off the queue and processes them until told to stop.
 func (e *Engine) worker() {
 	defer e.wg.Done()
+	defer func() {
+		e.mu.Lock()
+		e.workersExited++
+		// Wake any sibling workers so they observe the exit count and leave
+		// once the queue is fully drained.
+		e.cond.Broadcast()
+		e.mu.Unlock()
+	}()
 	for {
 		path, ok := e.acquire()
 		if !ok {

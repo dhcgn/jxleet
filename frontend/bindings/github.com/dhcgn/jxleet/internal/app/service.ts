@@ -113,6 +113,7 @@ export function InspectJXL(path: string): $CancellablePromise<string> {
 /**
  * InstallLatestToolchain performs the user-requested libjxl download and
  * atomic installation. It is deliberately not called by status queries.
+ * Download and install progress is emitted as "toolchain-progress" events.
  */
 export function InstallLatestToolchain(): $CancellablePromise<string> {
     return $Call.ByID(1078493661);
@@ -182,8 +183,11 @@ export function PreviewPaths(paths: string[] | null, options: $models.Conversion
 }
 
 /**
- * ReceivePaths accepts an external invocation, retaining its explicit preset
- * override until the frontend starts the run.
+ * ReceivePaths accepts an external invocation. When a conversion is running and
+ * the preset matches, paths are coalesced into it. Otherwise a fresh run is
+ * started automatically so external callers (Lightroom, CLI) never have to be
+ * triggered manually — the GUI-bound preset binding is used when no explicit
+ * --preset was supplied.
  */
 export function ReceivePaths(paths: string[] | null, presetName: string): $CancellablePromise<void> {
     return $Call.ByID(4082249969, paths, presetName);

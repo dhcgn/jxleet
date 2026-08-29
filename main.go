@@ -35,6 +35,7 @@ func init() {
 	application.RegisterEvent[app.ConversionSummary]("conversion-done")
 	application.RegisterEvent[string]("conversion-error")
 	application.RegisterEvent[string]("preset")
+	application.RegisterEvent[app.ToolchainProgress]("toolchain-progress")
 }
 
 func main() {

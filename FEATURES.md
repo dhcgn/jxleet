@@ -47,6 +47,7 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Single instance 
 - [x] Handover to the running instance, second process returns immediately 
 - [x] Coalesce invocations into one run
+- [x] Auto-start a new run when a handover arrives after the previous run finished
 - [x] Takeover when the instance is unreachable 
 - [x] Pause and cancel 
 - [x] Processes and threads configurable separately 
@@ -56,6 +57,7 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Show versions of cjxl, djxl, jxlinfo
 - [x] Compare with the latest release
 - [x] Download with checksum verification
+- [x] Download progress reported to the UI (phase + bytes)
 - [x] Atomic update
 - [x] Lock expert flags on version mismatch
 - [x] Offer first-time installation of the toolchain
@@ -83,6 +85,11 @@ Complete inventory as a checklist. The bracket names the spec area.
 - [x] Progress, remaining time, throughput, failures
 - [x] Note about coalesced invocations
 - [x] Size balance per file and in total
+- [x] Live savings counted only from converted files (not zero-filled pending)
 - [x] Selectable results with detailed jxlinfo metadata
 - [x] Compact window for the automatic invocation
+- [x] Clear All button to remove the entire queue
+- [x] Session-wide counters: images converted and space saved in the statusbar
+- [x] Group header settings frozen during a running conversion
+- [x] Adding files after a finished run converts only the new files
 - [ ] Log view with tool messages 

@@ -225,3 +225,39 @@ func TestEnginePauseResume(t *testing.T) {
 		t.Errorf("after resume, completed = %d, want 3", sum.Completed)
 	}
 }
+
+// TestEngineTryAddAfterDrainReturnsFalse verifies that TryAdd reports false
+// once all workers have exited, so a caller can start a fresh run instead of
+// queueing into a dead engine.
+func TestEngineTryAddAfterDrainReturnsFalse(t *testing.T) {
+	dir := t.TempDir()
+	mk := func(n string) string { p := filepath.Join(dir, n); pngFile(t, p); return p }
+	e := New(Deps{Encoder: &fakeEncoder{}}, Settings{Processes: 1, Preset: encodePreset()})
+	e.Start(context.Background())
+	e.Add([]string{mk("a.png")})
+	e.CloseInput()
+	sum := e.Wait()
+	if sum.Completed != 1 {
+		t.Fatalf("completed = %d, want 1", sum.Completed)
+	}
+	// Engine is done; TryAdd must refuse.
+	if e.TryAdd([]string{mk("b.png")}) {
+		t.Fatal("TryAdd returned true after the engine drained")
+	}
+}
+
+// TestEngineTryAddWhileRunningReturnsTrue verifies that TryAdd accepts work
+// while the engine is still processing.
+func TestEngineTryAddWhileRunningReturnsTrue(t *testing.T) {
+	dir := t.TempDir()
+	mk := func(n string) string { p := filepath.Join(dir, n); pngFile(t, p); return p }
+	e := New(Deps{Encoder: &fakeEncoder{blockCtx: true}}, Settings{Processes: 1, Preset: encodePreset()})
+	e.Start(context.Background())
+	e.Add([]string{mk("a.png")})
+	// Worker is blocked on a.png; TryAdd should still accept.
+	if !e.TryAdd([]string{mk("b.png")}) {
+		t.Fatal("TryAdd returned false while the engine is running")
+	}
+	e.Cancel()
+	_ = e.Wait()
+}
