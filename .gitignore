@@ -16,3 +16,7 @@ build/android/
 develop-time/cjxl/
 **/do-not-commit/
 test-data/jxl/
+
+
+# APM dependencies
+apm_modules/
