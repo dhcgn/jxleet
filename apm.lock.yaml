@@ -1,16 +1,16 @@
 lockfile_version: '1'
-generated_at: '2026-08-29T15:26:11.176317+00:00'
+generated_at: '2026-08-29T20:56:59.979598+00:00'
 apm_version: 0.28.0
 dependencies:
 - repo_url: dhcgn/personal-dev-skills
   name: go-dev
   host: github.com
-  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
-  version: 1.0.0
+  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
+  version: 1.0.1
   virtual_path: profiles/go-dev
   is_virtual: true
   package_type: apm_package
-  content_hash: sha256:0a0fd1fa16a50734d4fe71c0308d876f9a954f85f9fa1590de83a94b7b72c5be
+  content_hash: sha256:0548ae5f99322aa7cf0d1cf0e884f4f3ca65d87691c188ec437460617944740e
 - repo_url: spf13/go-skills
   name: go-skills
   host: github.com
@@ -94,7 +94,7 @@ dependencies:
 - repo_url: dhcgn/personal-dev-skills
   name: gh
   host: github.com
-  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
   version: unknown
   virtual_path: .apm/skills/gh
   is_virtual: true
@@ -108,9 +108,25 @@ dependencies:
     .agents/skills/gh/SKILL.md: sha256:fb77a6b4d05ed8491399f1868a0b280c917116c0a4a3120324b3ea340aeb8c37
   content_hash: sha256:11b1620bd3cd417f86cb6ae6af940cd13ffdba26ea6163d4ed88bc9a259d2d77
 - repo_url: dhcgn/personal-dev-skills
+  name: github-markdown-images
+  host: github.com
+  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
+  version: unknown
+  virtual_path: .apm/skills/github-markdown-images
+  is_virtual: true
+  depth: 2
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/github-markdown-images
+  - .agents/skills/github-markdown-images/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/github-markdown-images/SKILL.md: sha256:189ff0c432e2cdc1655dc6ec9a64a96372d0ece902c7ade8a9c86349c1ec34e7
+  content_hash: sha256:d5e9ab8cea311c665ef50b79b3240a41353417058bf3f8c957ab3e36938f575c
+- repo_url: dhcgn/personal-dev-skills
   name: go-1-27-features
   host: github.com
-  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
   version: unknown
   virtual_path: .apm/skills/go-1-27-features
   is_virtual: true
@@ -126,7 +142,7 @@ dependencies:
 - repo_url: dhcgn/personal-dev-skills
   name: go-linq
   host: github.com
-  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
   version: unknown
   virtual_path: .apm/skills/go-linq
   is_virtual: true
@@ -142,7 +158,7 @@ dependencies:
 - repo_url: dhcgn/personal-dev-skills
   name: go-newest-version
   host: github.com
-  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
   version: unknown
   virtual_path: .apm/skills/go-newest-version
   is_virtual: true
@@ -158,7 +174,7 @@ dependencies:
 - repo_url: dhcgn/personal-dev-skills
   name: markdown-from-website
   host: github.com
-  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
   version: unknown
   virtual_path: .apm/skills/markdown-from-website
   is_virtual: true
@@ -178,7 +194,7 @@ dependencies:
 - repo_url: dhcgn/personal-dev-skills
   name: rtk
   host: github.com
-  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
   version: unknown
   virtual_path: .apm/skills/rtk
   is_virtual: true
@@ -194,7 +210,7 @@ dependencies:
 - repo_url: dhcgn/personal-dev-skills
   name: wsl
   host: github.com
-  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
   version: unknown
   virtual_path: .apm/skills/wsl
   is_virtual: true
@@ -292,6 +308,24 @@ deployments:
   - dhcgn/personal-dev-skills/.apm/skills/gh
   active_owner: dhcgn/personal-dev-skills/.apm/skills/gh
   content_hash: sha256:fb77a6b4d05ed8491399f1868a0b280c917116c0a4a3120324b3ea340aeb8c37
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-markdown-images
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/github-markdown-images
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/github-markdown-images
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-markdown-images/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/github-markdown-images
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/github-markdown-images
+  content_hash: sha256:189ff0c432e2cdc1655dc6ec9a64a96372d0ece902c7ade8a9c86349c1ec34e7
 - kind: project-relative
   target: opencode
   value: .agents/skills/go
