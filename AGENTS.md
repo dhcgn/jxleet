@@ -23,7 +23,6 @@ is green.
 - Log view with tool messages; persistent run logs
 - Effort-ladder source data (currently authored reference data)
 - Full multi-rule preset → global-controls sync (session-only overrides today)
-- `release.yml`: on `v*` tags, `wails3 package` → zip → `SHA256SUMS` → GitHub Release
 
 ## Locked decisions (do not silently change)
 - **Windows 10/11 x64 only** for v1. Core features are Windows-specific (recycle
@@ -79,6 +78,9 @@ task check      # build, vet, lint, race tests  (the CI gate)
 ## CI
 - `.github/workflows/build.yml`: `windows-latest`, Go 1.27 + Node, `task check`.
   The README build badge points at this.
+- `.github/workflows/release.yml`: `v*` tags publish a GitHub Release (a tag
+  like `v1.3.0-rc.1` becomes a pre-release); pushes to `dev` publish
+  `vX.Y.Z-beta.N` pre-releases. Artifact: zip with `jxleet.exe` + `SHA256SUMS`.
 
 ## Conventions
 - Windows paths use backslashes. This machine has WSL, Docker, and `gh` available.

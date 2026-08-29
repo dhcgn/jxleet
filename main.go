@@ -26,6 +26,10 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// version is stamped at release time via -ldflags "-X main.version=v1.2.3";
+// local and CI builds report "dev".
+var version = "dev"
+
 func init() {
 	// Files handed over from secondary invocations are delivered to the frontend
 	// as this event; registering it gives the binding generator a typed API.
@@ -51,7 +55,7 @@ func main() {
 		return
 	}
 	if arguments.Version {
-		fmt.Println("jxleet 0.0.1")
+		fmt.Println("jxleet", version)
 		return
 	}
 
