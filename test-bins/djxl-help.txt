@@ -1,0 +1,80 @@
+JPEG XL decoder v0.12.0 4128790 [_AVX2_,SSE4,SSE2] {Clang 22.1.3}
+Usage: D:\jpegxl-expert-encoding-tool\test-bins\djxl.exe INPUT OUTPUT [OPTIONS...]
+ INPUT
+    The compressed input file (JXL). Use '-' for input from stdin.
+ OUTPUT
+    The output format can be PPM, PNM, PFM, PAM, PGX, PNG, APNG, JPEG
+    To extract metadata, use output format EXIF, XMP, or JUMBF.
+    The format is selected based on extension ('filename.png') or can be overwritten by using --output_format.
+    Use '-' for output to stdout (e.g. '- --output_format ppm')
+
+Basic options:
+ --output_format=OUTPUT_FORMAT_DESC
+    Set the output format. This overrides the output format detected from a potential file extension in the OUTPUT filename.
+Must be one of png, apng, jpg, jpeg, npy, pgx, pam, pgm, ppm, pnm, pfm, exr, exif, xmp, xml, jumb, jumbf when converted to lower case.
+ -V, --version
+    Print version number and exit.
+ --quiet
+    Silence output (except for errors).
+ -v, --verbose
+    Verbose output; can be repeated and also applies to help (!).
+
+Advanced options:
+ --num_threads=N
+    Number of worker threads (-1 == use machine default, 0 == do not use multithreading).
+ --bits_per_sample=N
+    Sets the output bit depth. The value 0 (default for PNM) means the original (input) bit depth.
+    The value -1 (default for other codecs) means it depends on the output format capabilities
+    and the input bit depth (e.g. decoding a 12-bit image to PNG will produce a 16-bit PNG).
+ --display_nits=N
+    If set to a non-zero value, tone maps the image the given peak display luminance.
+ --color_space=COLORSPACE_DESC
+    Sets the desired output color space of the image. For example:
+      --color_space=RGB_D65_SRG_Per_SRG is sRGB with perceptual rendering intent
+      --color_space=RGB_D65_202_Rel_PeQ is Rec.2100 PQ with relative rendering intent
+ -s 1|2|4|8, --downsampling=1|2|4|8
+    If the input JXL stream contains hints for target downsampling ratios,
+    only decode what is needed to produce an image intended for this downsampling ratio.
+ --allow_partial_files
+    Allow decoding of truncated files.
+ -j, --pixels_to_jpeg
+    By default, if the input JXL is a recompressed JPEG file, djxl reconstructs that JPEG file.
+    This flag causes the decoder to instead decode to pixels and encode a new (lossy) JPEG.
+ -J, --reconstruct_jpeg
+    Losslessly reconstruct a JPEG if possible, and fail otherwise.
+ -q N, --jpeg_quality=N
+    Sets the JPEG output quality, default is 95. Setting this option implies --pixels_to_jpeg.
+
+Options for experimentation / benchmarking:
+ --num_reps=N
+    Sets the number of times to decompress the image. Useful for benchmarking. Default is 1.
+ --disable_output
+    No output file will be written (for benchmarking)
+ --output_extra_channels
+    If set, all extra channels will be written either as part of the main output file (e.g. alpha channel in png) or as separate output files with suffix -ecN in their names. If not set, the (first) alpha channel will only be written when the output format supports alpha channels and all other extra channels won't be decoded. Files are concatenated when outputting to stdout. Only has an effect when decoding to (A)PNG or PPM/PNM/PFM/PAM
+ --output_frames
+    If set, all frames will be written either as part of the main output file if that supports animation, or as separate output files with suffix -N in their names. Files are concatenated when outputting to stdout.
+ --use_sjpeg
+    Use sjpeg instead of libjpeg for JPEG output.
+ --norender_spotcolors
+    Disables rendering of spot colors.
+ --no_coalescing
+    Disables coalescing of layers.
+ --preview_out=FILENAME
+    If specified, writes the preview image to this file.
+ --icc_out=FILENAME
+    If specified, writes the ICC profile of the decoded image to this file.
+ --orig_icc_out=FILENAME
+    If specified, writes the ICC profile of the original image to this file
+    This can be different from the ICC profile of the decoded image if --color_space was specified.
+ --metadata_out=FILENAME
+    If specified, writes metadata info to a JSON file. Used by the conformance test script
+ --background=#NNNNNN
+    Specifies the background color for the --alpha_blend option. Recognized values are 'black', 'white' (default), or '#NNNNNN'
+ --alpha_blend
+    Blends alpha channel with the color image using background color specified by --background (default is white).
+ --print_read_bytes
+    Print total number of decoded bytes.
+
+ -h, --help
+    Prints this help message. All options are shown above.

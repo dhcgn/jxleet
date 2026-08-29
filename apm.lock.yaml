@@ -1,0 +1,636 @@
+lockfile_version: '1'
+generated_at: '2026-08-29T15:26:11.176317+00:00'
+apm_version: 0.28.0
+dependencies:
+- repo_url: dhcgn/personal-dev-skills
+  name: go-dev
+  host: github.com
+  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  version: 1.0.0
+  virtual_path: profiles/go-dev
+  is_virtual: true
+  package_type: apm_package
+  content_hash: sha256:0a0fd1fa16a50734d4fe71c0308d876f9a954f85f9fa1590de83a94b7b72c5be
+- repo_url: spf13/go-skills
+  name: go-skills
+  host: github.com
+  resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
+  version: unknown
+  virtual_path: fileflow-pathologize
+  is_virtual: true
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/fileflow-pathologize
+  - .agents/skills/fileflow-pathologize/.claude-plugin/plugin.json
+  - .agents/skills/fileflow-pathologize/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/fileflow-pathologize/.claude-plugin/plugin.json: sha256:9d6354624b959a095e35d1bc877ab32efa1af1b4b35803c4e3ee110169644bae
+    .agents/skills/fileflow-pathologize/SKILL.md: sha256:46737a2f2bd13e6dccad8d590b84a68d25fd072a1455fce98bb8c1d918a436e3
+  content_hash: sha256:438258926c692054bf3d2f37586a59c37ee38c4b528572b65c4dd8a1d4fa93f9
+- repo_url: spf13/go-skills
+  name: go-skills
+  host: github.com
+  resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
+  version: unknown
+  virtual_path: go
+  is_virtual: true
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/go
+  - .agents/skills/go/.claude-plugin/plugin.json
+  - .agents/skills/go/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/go/.claude-plugin/plugin.json: sha256:94ad1407ed6cf8550e107977700c1fe617741ee785424ef82f825d3e989a420e
+    .agents/skills/go/SKILL.md: sha256:dbe226cf78b653be1a1a4cbd6a71ecd4637fa59f797a88c42a790b1d9796b77b
+  content_hash: sha256:e651ec9fdfa9b241f3636e3ad8513e8b9833b684af1d6b3390f34a1531d8fe45
+- repo_url: spf13/go-skills
+  name: go-skills
+  host: github.com
+  resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
+  version: unknown
+  virtual_path: go-release
+  is_virtual: true
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/go-release
+  - .agents/skills/go-release/.claude-plugin/plugin.json
+  - .agents/skills/go-release/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/go-release/.claude-plugin/plugin.json: sha256:679f7a72abe7d91274e35ce2b758a44d0dcc759d7367125f9095425342ab6e7e
+    .agents/skills/go-release/SKILL.md: sha256:11dec328adb715de7b93003db75ada6d783bc0cc0f1792095bc165c0f20d07cd
+  content_hash: sha256:deee1ee33a7cf6427a37af4883a49ab5d44fb0882da4d0298079c47e7d6efcc2
+- repo_url: spf13/go-skills
+  name: go-skills
+  host: github.com
+  resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
+  version: unknown
+  virtual_path: go-spec-reviewer
+  is_virtual: true
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/go-spec-reviewer
+  - .agents/skills/go-spec-reviewer/.claude-plugin/plugin.json
+  - .agents/skills/go-spec-reviewer/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/go-spec-reviewer/.claude-plugin/plugin.json: sha256:74469160212a32f1d2587eac56d74f81293262d34c7436d3fc14d03cb78b79a8
+    .agents/skills/go-spec-reviewer/SKILL.md: sha256:26a129c3cb5e80b30aebdb154801244d407370bd2cf80180d87524f64306d02d
+  content_hash: sha256:e7f787b4eafbbe3541ea4c654b1666361325b108ec75d15d27ea3e5673fa049f
+- repo_url: spf13/go-skills
+  name: go-skills
+  host: github.com
+  resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
+  version: unknown
+  virtual_path: wails
+  is_virtual: true
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/wails
+  - .agents/skills/wails/.claude-plugin/plugin.json
+  - .agents/skills/wails/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/wails/.claude-plugin/plugin.json: sha256:0c7f2274f32b38c71b2343ec45926c39b4470cac0064170add40cfdcbdd75312
+    .agents/skills/wails/SKILL.md: sha256:90a6dc2d796c739458751e83a41c2afc5fea1c1b38b2243dee05c8b8c899494d
+  content_hash: sha256:2525c86faaf8aa549e733f5725deaa8afd63e0a4df4a2c8b0a3dfe016f6eb75c
+- repo_url: dhcgn/personal-dev-skills
+  name: gh
+  host: github.com
+  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  version: unknown
+  virtual_path: .apm/skills/gh
+  is_virtual: true
+  depth: 2
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/gh
+  - .agents/skills/gh/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/gh/SKILL.md: sha256:fb77a6b4d05ed8491399f1868a0b280c917116c0a4a3120324b3ea340aeb8c37
+  content_hash: sha256:11b1620bd3cd417f86cb6ae6af940cd13ffdba26ea6163d4ed88bc9a259d2d77
+- repo_url: dhcgn/personal-dev-skills
+  name: go-1-27-features
+  host: github.com
+  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  version: unknown
+  virtual_path: .apm/skills/go-1-27-features
+  is_virtual: true
+  depth: 2
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/go-1-27-features
+  - .agents/skills/go-1-27-features/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/go-1-27-features/SKILL.md: sha256:14c2bae9d227307a464dc199bb578e54ad0192d454f2f366b208e5a549ffd7db
+  content_hash: sha256:0b22e0952f51358613ab9d41ad451d3e0385bde3a41f6e84215febfb0027911b
+- repo_url: dhcgn/personal-dev-skills
+  name: go-linq
+  host: github.com
+  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  version: unknown
+  virtual_path: .apm/skills/go-linq
+  is_virtual: true
+  depth: 2
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/go-linq
+  - .agents/skills/go-linq/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/go-linq/SKILL.md: sha256:dcb7a9f7ba9615fd5b5c91bf0b17ee23d13f026f05c797de49a678a5f160edb9
+  content_hash: sha256:8c8153bea5856b1ce97fb4f97e4f6692efffc4ca7bfa838e080c082f6d0a9190
+- repo_url: dhcgn/personal-dev-skills
+  name: go-newest-version
+  host: github.com
+  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  version: unknown
+  virtual_path: .apm/skills/go-newest-version
+  is_virtual: true
+  depth: 2
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/go-newest-version
+  - .agents/skills/go-newest-version/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/go-newest-version/SKILL.md: sha256:abf073d76b4af9d535c6f27d7271ac2dfb7ac4250ab34392236652757620fd9b
+  content_hash: sha256:f3a3205f195552ad402e0e4d3ed984e991d1c7ef0b5003ab37dbfa0f5c335013
+- repo_url: dhcgn/personal-dev-skills
+  name: markdown-from-website
+  host: github.com
+  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  version: unknown
+  virtual_path: .apm/skills/markdown-from-website
+  is_virtual: true
+  depth: 2
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/markdown-from-website
+  - .agents/skills/markdown-from-website/SKILL.md
+  - .agents/skills/markdown-from-website/scripts/get-markdown.ps1
+  - .agents/skills/markdown-from-website/scripts/get-markdown.sh
+  deployed_file_hashes:
+    .agents/skills/markdown-from-website/SKILL.md: sha256:9cdd8a342b42add7d7ffb09d0954f2d1aa56145c245edef444a8fb2c74de1ed0
+    .agents/skills/markdown-from-website/scripts/get-markdown.ps1: sha256:8f7cd9332537ce47e708b2c89240ac7aa6c3c7ed7946f16ba0535e98c1e9b1fa
+    .agents/skills/markdown-from-website/scripts/get-markdown.sh: sha256:089fa053aa393ace92c89a363829836c759551b4a35f46364a796552f78138e4
+  content_hash: sha256:6d60b92cfbe9fe1c1ee306636822c58175f4250d7c0e12c5e57df10b9197c03c
+- repo_url: dhcgn/personal-dev-skills
+  name: rtk
+  host: github.com
+  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  version: unknown
+  virtual_path: .apm/skills/rtk
+  is_virtual: true
+  depth: 2
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/rtk
+  - .agents/skills/rtk/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/rtk/SKILL.md: sha256:a1250e77a0404e11156ee2709c8e592d70fcfc00df97169791dec7020a9f7141
+  content_hash: sha256:42b00a447aedfbe67e9c40bc2eb2243c23110f36eb03671b48839bc181fae5a8
+- repo_url: dhcgn/personal-dev-skills
+  name: wsl
+  host: github.com
+  resolved_commit: 3ea4775e235644e3c7119fc6f8cee5f04923209e
+  version: unknown
+  virtual_path: .apm/skills/wsl
+  is_virtual: true
+  depth: 2
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/wsl
+  - .agents/skills/wsl/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/wsl/SKILL.md: sha256:37989ad169642b6351cf5ee4d3c37d8fa0ec3949c421ba6ead8a5105cd5151fc
+  content_hash: sha256:6595d187aea0614f99c311415395932a93bef3ef4a88bb7ac5bba1d2d4ba63e2
+- repo_url: dietrichgebert/ponytail
+  materialization_repo_url: DietrichGebert/ponytail
+  name: ponytail
+  host: github.com
+  resolved_commit: 2ed6c52c9d7e5e56942508591085fd45dea277d3
+  version: 2ed6c52
+  depth: 2
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/ponytail
+  - .agents/skills/ponytail-audit
+  - .agents/skills/ponytail-audit/SKILL.md
+  - .agents/skills/ponytail-debt
+  - .agents/skills/ponytail-debt/SKILL.md
+  - .agents/skills/ponytail-gain
+  - .agents/skills/ponytail-gain/SKILL.md
+  - .agents/skills/ponytail-help
+  - .agents/skills/ponytail-help/SKILL.md
+  - .agents/skills/ponytail-review
+  - .agents/skills/ponytail-review/SKILL.md
+  - .agents/skills/ponytail/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/ponytail-audit/SKILL.md: sha256:5560b8e383dbe2ddfddc873a1e2bf2e586e23e0cd7d995537482b2315331f6d1
+    .agents/skills/ponytail-debt/SKILL.md: sha256:c84fba75f0ca12bfe83f9a78ea02fd125c5dd3f1fbb18124105a489937f284e6
+    .agents/skills/ponytail-gain/SKILL.md: sha256:24e01d1c9715cb136ba1c4f1e52a95940c0193558b876828e537736480d6408b
+    .agents/skills/ponytail-help/SKILL.md: sha256:2264d1615117b02b0fd5a69ec84cd2757006471a78e4d6c22eed6d581c1d37a4
+    .agents/skills/ponytail-review/SKILL.md: sha256:40df33b58fc6ef889b93585733feb9566b76e9586efa7f376785c1e995197ac0
+    .agents/skills/ponytail/SKILL.md: sha256:1316a2f3f95741d2300b116fe0c2d81ce4a9568656ed0a62643f54aaf09957f2
+  content_hash: sha256:595855eee726cb344087c38d7a3c29586ce8a0dd9a2e7ad8e8eedc91c8d8c575
+- repo_url: spf13/go-skills
+  name: go-skills
+  host: github.com
+  resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
+  version: e67851c
+  depth: 2
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: marketplace_plugin
+  content_hash: sha256:eb178c0b7b51540bc8224cc5c929dad9326e8bb2d65ee2e125dd2eaab05de2a1
+deployments:
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/fileflow-pathologize
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/fileflow-pathologize
+  active_owner: spf13/go-skills/fileflow-pathologize
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/fileflow-pathologize/.claude-plugin/plugin.json
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/fileflow-pathologize
+  active_owner: spf13/go-skills/fileflow-pathologize
+  content_hash: sha256:9d6354624b959a095e35d1bc877ab32efa1af1b4b35803c4e3ee110169644bae
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/fileflow-pathologize/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/fileflow-pathologize
+  active_owner: spf13/go-skills/fileflow-pathologize
+  content_hash: sha256:46737a2f2bd13e6dccad8d590b84a68d25fd072a1455fce98bb8c1d918a436e3
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/gh
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/gh
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/gh
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/gh/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/gh
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/gh
+  content_hash: sha256:fb77a6b4d05ed8491399f1868a0b280c917116c0a4a3120324b3ea340aeb8c37
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go
+  active_owner: spf13/go-skills/go
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-1-27-features
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/go-1-27-features
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/go-1-27-features
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-1-27-features/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/go-1-27-features
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/go-1-27-features
+  content_hash: sha256:14c2bae9d227307a464dc199bb578e54ad0192d454f2f366b208e5a549ffd7db
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-linq
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/go-linq
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/go-linq
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-linq/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/go-linq
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/go-linq
+  content_hash: sha256:dcb7a9f7ba9615fd5b5c91bf0b17ee23d13f026f05c797de49a678a5f160edb9
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-newest-version
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/go-newest-version
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/go-newest-version
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-newest-version/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/go-newest-version
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/go-newest-version
+  content_hash: sha256:abf073d76b4af9d535c6f27d7271ac2dfb7ac4250ab34392236652757620fd9b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-release
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go-release
+  active_owner: spf13/go-skills/go-release
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-release/.claude-plugin/plugin.json
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go-release
+  active_owner: spf13/go-skills/go-release
+  content_hash: sha256:679f7a72abe7d91274e35ce2b758a44d0dcc759d7367125f9095425342ab6e7e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-release/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go-release
+  active_owner: spf13/go-skills/go-release
+  content_hash: sha256:11dec328adb715de7b93003db75ada6d783bc0cc0f1792095bc165c0f20d07cd
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-spec-reviewer
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go-spec-reviewer
+  active_owner: spf13/go-skills/go-spec-reviewer
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-spec-reviewer/.claude-plugin/plugin.json
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go-spec-reviewer
+  active_owner: spf13/go-skills/go-spec-reviewer
+  content_hash: sha256:74469160212a32f1d2587eac56d74f81293262d34c7436d3fc14d03cb78b79a8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go-spec-reviewer/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go-spec-reviewer
+  active_owner: spf13/go-skills/go-spec-reviewer
+  content_hash: sha256:26a129c3cb5e80b30aebdb154801244d407370bd2cf80180d87524f64306d02d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go/.claude-plugin/plugin.json
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go
+  active_owner: spf13/go-skills/go
+  content_hash: sha256:94ad1407ed6cf8550e107977700c1fe617741ee785424ef82f825d3e989a420e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/go/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/go
+  active_owner: spf13/go-skills/go
+  content_hash: sha256:dbe226cf78b653be1a1a4cbd6a71ecd4637fa59f797a88c42a790b1d9796b77b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/markdown-from-website
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/markdown-from-website
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/markdown-from-website
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/markdown-from-website/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/markdown-from-website
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/markdown-from-website
+  content_hash: sha256:9cdd8a342b42add7d7ffb09d0954f2d1aa56145c245edef444a8fb2c74de1ed0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/markdown-from-website/scripts/get-markdown.ps1
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/markdown-from-website
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/markdown-from-website
+  content_hash: sha256:8f7cd9332537ce47e708b2c89240ac7aa6c3c7ed7946f16ba0535e98c1e9b1fa
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/markdown-from-website/scripts/get-markdown.sh
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/markdown-from-website
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/markdown-from-website
+  content_hash: sha256:089fa053aa393ace92c89a363829836c759551b4a35f46364a796552f78138e4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/ponytail
+  runtime: null
+  scope: project
+  owners:
+  - dietrichgebert/ponytail
+  active_owner: dietrichgebert/ponytail
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/ponytail-audit
+  runtime: null
+  scope: project
+  owners:
+  - dietrichgebert/ponytail
+  active_owner: dietrichgebert/ponytail
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/ponytail-audit/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dietrichgebert/ponytail
+  active_owner: dietrichgebert/ponytail
+  content_hash: sha256:5560b8e383dbe2ddfddc873a1e2bf2e586e23e0cd7d995537482b2315331f6d1
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/ponytail-debt
+  runtime: null
+  scope: project
+  owners:
+  - dietrichgebert/ponytail
+  active_owner: dietrichgebert/ponytail
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/ponytail-debt/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dietrichgebert/ponytail
+  active_owner: dietrichgebert/ponytail
+  content_hash: sha256:c84fba75f0ca12bfe83f9a78ea02fd125c5dd3f1fbb18124105a489937f284e6
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/ponytail-gain
+  runtime: null
+  scope: project
+  owners:
+  - dietrichgebert/ponytail
+  active_owner: dietrichgebert/ponytail
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/ponytail-gain/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dietrichgebert/ponytail
+  active_owner: dietrichgebert/ponytail
+  content_hash: sha256:24e01d1c9715cb136ba1c4f1e52a95940c0193558b876828e537736480d6408b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/ponytail-help
+  runtime: null
+  scope: project
+  owners:
+  - dietrichgebert/ponytail
+  active_owner: dietrichgebert/ponytail
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/ponytail-help/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dietrichgebert/ponytail
+  active_owner: dietrichgebert/ponytail
+  content_hash: sha256:2264d1615117b02b0fd5a69ec84cd2757006471a78e4d6c22eed6d581c1d37a4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/ponytail-review
+  runtime: null
+  scope: project
+  owners:
+  - dietrichgebert/ponytail
+  active_owner: dietrichgebert/ponytail
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/ponytail-review/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dietrichgebert/ponytail
+  active_owner: dietrichgebert/ponytail
+  content_hash: sha256:40df33b58fc6ef889b93585733feb9566b76e9586efa7f376785c1e995197ac0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/ponytail/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dietrichgebert/ponytail
+  active_owner: dietrichgebert/ponytail
+  content_hash: sha256:1316a2f3f95741d2300b116fe0c2d81ce4a9568656ed0a62643f54aaf09957f2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/rtk
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/rtk
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/rtk
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/rtk/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/rtk
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/rtk
+  content_hash: sha256:a1250e77a0404e11156ee2709c8e592d70fcfc00df97169791dec7020a9f7141
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/wails
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/wails
+  active_owner: spf13/go-skills/wails
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/wails/.claude-plugin/plugin.json
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/wails
+  active_owner: spf13/go-skills/wails
+  content_hash: sha256:0c7f2274f32b38c71b2343ec45926c39b4470cac0064170add40cfdcbdd75312
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/wails/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - spf13/go-skills/wails
+  active_owner: spf13/go-skills/wails
+  content_hash: sha256:90a6dc2d796c739458751e83a41c2afc5fea1c1b38b2243dee05c8b8c899494d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/wsl
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/wsl
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/wsl
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/wsl/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/wsl
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/wsl
+  content_hash: sha256:37989ad169642b6351cf5ee4d3c37d8fa0ec3949c421ba6ead8a5105cd5151fc
