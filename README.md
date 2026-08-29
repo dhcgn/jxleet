@@ -6,17 +6,21 @@
 
 [![Release](https://img.shields.io/github/v/release/dhcgn/jxleet?logo=github)](https://github.com/dhcgn/jxleet/releases/latest)
 [![Build](https://github.com/dhcgn/jxleet/actions/workflows/build.yml/badge.svg)](https://github.com/dhcgn/jxleet/actions/workflows/build.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/dhcgn/jxleet)](https://goreportcard.com/report/github.com/dhcgn/jxleet)
-[![Go Reference](https://pkg.go.dev/badge/github.com/dhcgn/jxleet.svg)](https://pkg.go.dev/github.com/dhcgn/jxleet)
 [![Downloads](https://img.shields.io/github/downloads/dhcgn/jxleet/total?logo=github)](https://github.com/dhcgn/jxleet/releases)
 [![License](https://img.shields.io/github/license/dhcgn/jxleet)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4?logo=windows)](#requirements)
 
-*TODO: Screenshot of the main window with a mixed drop, showing the three route counts*
+<img src="docs/screenshots/basic.png" alt="The jxleet main view: drop zone, preset strip, files grouped by type with route badges">
 
 </div>
 
 ---
+
+> [!WARNING]
+> **Beta software.** jxleet is under active development: the interface, presets and
+> config format may change between releases, and there will be bugs. It is careful
+> with your files — nothing is ever hard-deleted, and `replace` verifies before
+> recycling — but keep your originals until you trust it.
 
 > ### jxleet does not encode anything
 >
@@ -33,8 +37,14 @@
 
 ## Why this exists
 
-Most converters ask for a quality slider and a folder. There is a more useful question to
-ask first: **is this conversion reversible?**
+I think JPEG XL is the image format of the future, and I wanted a single tool that gives
+me full control over every aspect of it — the whole `cjxl` flag surface, nothing wrapped
+away — in all three places my images arrive: a **GUI** to drop files into, an
+**Explorer context menu** for the quick right-click, and the **command line**, which is
+how Lightroom hands over its exports.
+
+One question turned out to matter more than any setting: **is this conversion
+reversible?**
 
 Hand `cjxl` a JPEG and it will, by default, repack it losslessly — `djxl` can reconstruct
 the original JPEG byte for byte, and you have saved about 20 %. Pass `--lossless_jpeg=0`
@@ -64,7 +74,9 @@ readable.
   - [The Lightroom workflow (my personal use case)](#the-lightroom-workflow-my-personal-use-case)
   - [Distance, quality and effort](#distance-quality-and-effort)
   - [Output policies](#output-policies)
+    - [Name collisions](#name-collisions)
   - [The managed toolchain](#the-managed-toolchain)
+  - [History](#history)
   - [Supported formats](#supported-formats)
   - [Where things are stored](#where-things-are-stored)
   - [Building from source](#building-from-source)
@@ -88,7 +100,9 @@ the convert button itself, which takes the colour of whichever route dominates y
 Change the rule that governs JPEG and the counts, badges and size estimates all move at
 once.
 
-*TODO: Screenshot of the file list with mixed route badges*
+<p align="center">
+  <img src="docs/screenshots/basic.png" alt="The Main view: the file list with mixed route badges and per-type settings">
+</p>
 
 ## Install
 
@@ -110,8 +124,6 @@ choose, once, per entry point. A tool that can replace files should never guess 
 intent. On first start the read-only `default-gui`, `default-cli`, and
 `default-explorer-context` presets are bound to their respective entry points;
 jxleet refuses to run only when a binding is missing or invalid.
-
-*TODO: Screenshot of the preset bindings panel with the three entry points*
 
 ### 1. The window
 
@@ -139,7 +151,9 @@ pause/cancel and live per-file status keeps the queue visible without leaving th
 finished files show their output size and saving ratio in place - the convert bar totals the
 whole batch.
 
-*TODO: Screenshot of the expert view with the effort ladder*
+<p align="center">
+  <img src="docs/screenshots/expert.png" alt="The Expert view: every generated cjxl flag with help tooltips, effort ladder, live command preview">
+</p>
 
 After a conversion, click a finished file to run `jxlinfo -v` for its JXL output and show the
 detailed metadata. Failed or skipped results without a JXL output report why metadata is
@@ -170,9 +184,9 @@ once with a hundred paths; it launches several processes in parallel, each carry
 handful. jxleet is built for that: the first process to arrive takes ownership, every
 subsequent one hands over its paths through a named pipe and exits within milliseconds, and
 the arriving batches are coalesced into a single run. You get **one window and one progress
-bar**, not twenty — and the calling application is never left waiting.
-
-*TODO: Screenshot of the progress view showing a run coalesced from 20 invocations*
+bar**, not twenty — and the calling application is never left waiting. A batch that
+arrives after the previous run has finished starts a new run on its own, and while a
+run is in progress each completed row shows the output size and its saving ratio.
 
 ### 3. The Explorer context menu
 
@@ -291,16 +305,24 @@ starts. An unknown flag stops the run with a non-zero exit code rather than pass
 Presets are plain files. Copy them, commit them, send them. Importing one through the
 interface or by dropping it into `%APPDATA%\jxleet\presets\` makes it available immediately.
 
-*TODO: Screenshot of the preset library with the YAML editor*
+<p align="center">
+  <img src="docs/screenshots/presets.png" alt="The Preset library: rule summaries per preset, output-policy editor, entry-point bindings">
+</p>
 
 ## The Lightroom workflow (my personal use case)
 
 Export from Lightroom losslessly to JPEG XL, then hand the result to jxleet to apply my
-own compression settings. The motivation of this re-encoding step, is that I want develop with lightroom the photos and export them lossless via jxl to re-encode them in a second step with full control over the compression settings.
+own compression settings: I develop the photos in Lightroom, export them losslessly as
+JXL, and re-encode them in this second step with full control over the compression
+settings.
 
 1. In the Export dialog, set **After Export → Open in Other Application** and select
    `jxleet.exe`.
 2. In jxleet, bind the preset you want under **Presets → Command line**.
+
+<p align="center">
+  <img src="docs/screenshots/lightroom-integration.png" alt="The Lightroom integration: the Export dialog hands the lossless exports over to jxleet">
+</p>
 
 The parallelism is handled for you, as described above. Remaining time is estimated from
 measured throughput over recent files rather than a fixed guess, so it adapts when file
@@ -334,8 +356,6 @@ view shows an **effort ladder**: a grid of coding tools against the ten levels, 
 as you drag. Tools that do not apply to the mode you are in stay visible but struck through,
 so you can see what the other mode would buy you.
 
-*TODO: Screenshot of the effort ladder at level 3 and at level 9 side by side*
-
 ## Output policies
 
 | Policy | Behaviour |
@@ -365,10 +385,29 @@ configured for `number` or `overwrite` never prompt.
 
 jxleet does not bundle libjxl. It manages it.
 
-*TODO: Screenshot of the tools panel showing a version mismatch*
+<p align="center">
+  <img src="docs/screenshots/tools.png" alt="The Tools view: installed cjxl, djxl and jxlinfo versions compared against the latest libjxl release">
+</p>
 
 Installed versions of `cjxl`, `djxl` and `jxlinfo` are shown on every start and compared
 against the latest libjxl release. The binaries are downloaded and saved under `%LOCALAPPDATA%\jxleet\bin\`. 
+
+## History
+
+Every successful conversion is recorded in `%APPDATA%\jxleet\history.jsonl` — one JSON
+line per file, append-only, and tolerant of a torn last line, so a crash mid-write costs
+at most the last entry, never the whole file. The History view lists the entries newest
+first with input and output paths, both sizes, the saving, the route, the preset and the
+timestamp.
+
+Click an entry to run `jxlinfo -v` on the stored output and inspect what ended up in the
+file; if the output has since been moved or deleted, the entry says so instead of failing
+silently. A Reload action picks up new entries, and Clear — behind a confirmation —
+empties the history.
+
+<p align="center">
+  <img src="docs/screenshots/history.png" alt="The History view: past conversions with sizes, savings, routes and presets">
+</p>
 
 ## Supported formats
 
