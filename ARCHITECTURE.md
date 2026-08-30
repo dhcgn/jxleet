@@ -192,7 +192,8 @@ it. Dark by default, operable from 420 px.
   fixtures at runtime — no binaries in the repository
 - `task check` = build, vet, lint, race tests
 - CI: `.github/workflows/build.yml` — `windows-latest`, Go 1.27 + Node,
-  `task check`
+  `task check`; every run uploads `bin/jxleet.exe` as a workflow artifact
+  (also when later steps fail)
 - Releases: `.github/workflows/release.yml` — on `v*` tags (a `-rc.N`/`-beta.N`
   suffix marks a pre-release) and on every `dev` push (`vX.Y.Z-beta.N`
   pre-releases). Publishes a zip with `jxleet.exe` and a `SHA256SUMS` file to
