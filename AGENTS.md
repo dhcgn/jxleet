@@ -84,4 +84,8 @@ task check      # build, vet, lint, race tests  (the CI gate)
 
 ## Conventions
 - Windows paths use backslashes. This machine has WSL, Docker, and `gh` available.
+- Prefix shell commands covered by the **rtk** skill (`.agents/skills/rtk/SKILL.md`) with
+  `rtk` — e.g. `rtk git status`, `rtk go test`, `rtk gh pr view` — so output is
+  filtered before it reaches the agent's context. If `rtk --version` fails, run the raw
+  command instead.
 - No commit trailer.
