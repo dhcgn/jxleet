@@ -20,209 +20,21 @@
     ToolchainStatus,
     Update,
   } from '../bindings/github.com/dhcgn/jxleet/internal/app';
+  import type { FileGroup, RouteMode, View } from './lib/types';
+  import { effortNames, effortTools, stageIndexAt } from './lib/effort';
+  import {
+    distanceFromQuality,
+    distanceZoneStyle,
+    formatDistance,
+    qualityFromDistance,
+    qualityStatusText,
+    qualityZoneStyle,
+    SLIDER_QUALITY_MIN,
+  } from './lib/quality';
+  import { compactPath, formatBytes, formatDelta, formatEta, formatRate, savedPct } from './lib/format';
+  import { routeClass, routeTitle } from './lib/routes';
+  import { flagLabel, hiddenExpertFlags, isLinkedFlagKey, sameFlags } from './lib/flags';
 
-  type View = 'main' | 'expert' | 'presets' | 'tools' | 'automatic' | 'history';
-  interface FileGroup {
-    key: string;
-    format: string;
-    route: string;
-    skip: boolean;
-    reason: string;
-    settings: string;
-    flagsSet: boolean;
-    files: FilePreview[];
-    sizeIn: number;
-    sizeOut: number;
-    sizeDoneIn: number;
-    hasResults: boolean;
-  }
-  type RouteMode = 'lossy' | 'lossless';
-
-  const effortNames = [
-    'lightning',
-    'thunder',
-    'falcon',
-    'cheetah',
-    'hare',
-    'wombat',
-    'squirrel',
-    'kitten',
-    'tortoise',
-    'glacier',
-  ];
-
-  interface EffortStage {
-    from: number;
-    to?: number;
-    label: string;
-  }
-  interface EffortTool {
-    name: string;
-    tip: string;
-    lossy: boolean;
-    lossless: boolean;
-    stages?: EffortStage[];
-    stagesLossy?: EffortStage[];
-    stagesLossless?: EffortStage[];
-    alwaysYellow?: boolean;
-  }
-
-  // Transcribed from libjxl doc/encode_effort.md; splines verified in the source.
-  const effortTools: EffortTool[] = [
-    {
-      name: 'Fast-lossless path',
-      tip: 'e1 runs a dedicated fast-lossless encoder; the general modular pipeline starts at e2',
-      lossy: false,
-      lossless: true,
-      stages: [{ from: 1, to: 1, label: 'dedicated fast-lossless encoder' }],
-      alwaysYellow: true,
-    },
-    {
-      name: 'MA tree',
-      tip: 'meta-adaptive tree, the context model of the modular entropy coder',
-      lossy: false,
-      lossless: true,
-      stages: [
-        { from: 2, label: 'fixed tree, context from Gradient error' },
-        { from: 3, label: 'fixed tree, context from WP error' },
-        { from: 4, label: 'learned tree (more properties from e6)' },
-        { from: 10, label: 'global tree' },
-      ],
-    },
-    {
-      name: 'Predictors',
-      tip: 'modular-mode pixel predictors',
-      lossy: false,
-      lossless: true,
-      stages: [
-        { from: 1, label: 'fixed ClampedGradient predictor' },
-        { from: 3, label: 'fixed Weighted predictor added' },
-        { from: 4, label: 'ClampedGradient and Weighted both tried' },
-        { from: 8, label: 'tuned Weighted parameters; all predictors tried at e10' },
-      ],
-    },
-    {
-      name: 'RCTs',
-      tip: 'reversible colour transforms applied before prediction',
-      lossy: false,
-      lossless: true,
-      stages: [
-        { from: 1, label: 'fixed YCoCg' },
-        { from: 5, label: 'different local RCTs' },
-        { from: 6, label: 'more RCT variants, added through e9' },
-      ],
-    },
-    {
-      name: 'Palette',
-      tip: 'indexed-colour content encoded as a palette',
-      lossy: false,
-      lossless: true,
-      stages: [
-        { from: 1, label: 'simple palette detection' },
-        { from: 2, label: 'global channel palette' },
-        { from: 5, label: 'local palette / local channel palette' },
-      ],
-    },
-    {
-      name: 'Patches / reference frames',
-      tip: 'repeating content stored once and referenced elsewhere',
-      lossy: true,
-      lossless: true,
-      stages: [{ from: 5, label: 'patches and reference frames' }],
-      stagesLossy: [{ from: 7, label: 'patches including dots' }],
-    },
-    {
-      name: 'Entropy coding',
-      tip: 'Huffman vs ANS, and how exhaustive the entropy search is',
-      lossy: true,
-      lossless: true,
-      stagesLossless: [
-        { from: 1, label: 'Huffman, RLE-only LZ77' },
-        { from: 2, label: 'ANS' },
-        { from: 9, label: 'exhaustive entropy search' },
-      ],
-      stagesLossy: [
-        { from: 1, label: 'ANS, basic context clustering' },
-        { from: 3, label: 'better ANS' },
-        { from: 9, label: 'best context clustering' },
-      ],
-    },
-    {
-      name: '8×8 blocks only',
-      tip: 'VarDCT limited to 8×8 DCT blocks; variable block sizes start at e5',
-      lossy: true,
-      lossless: false,
-      stages: [{ from: 1, to: 4, label: 'only 8×8 DCT blocks' }],
-      alwaysYellow: true,
-    },
-    {
-      name: 'Variable block sizes',
-      tip: 'VarDCT blocks larger than 8×8, chosen by heuristics',
-      lossy: true,
-      lossless: false,
-      stages: [
-        { from: 5, label: 'simple heuristics' },
-        { from: 6, label: 'full heuristics' },
-      ],
-    },
-    {
-      name: 'Coefficient reordering',
-      tip: 'reordering of DCT coefficients before entropy coding',
-      lossy: true,
-      lossless: false,
-      stages: [{ from: 4, label: 'coefficient reordering' }],
-    },
-    {
-      name: 'Adaptive quantisation',
-      tip: 'per-block quantisation driven by the psychovisual model',
-      lossy: true,
-      lossless: false,
-      stages: [
-        { from: 5, label: 'adaptive quantisation' },
-        { from: 8, label: 'Butteraugli iterations' },
-        { from: 9, label: 'more Butteraugli iterations' },
-        { from: 10, label: 'more thorough quantisation' },
-      ],
-    },
-    {
-      name: 'Gabor-like transform',
-      tip: 'blur-like filtering of the XYB channels before the DCT',
-      lossy: true,
-      lossless: false,
-      stages: [{ from: 5, label: 'gabor-like transform' }],
-    },
-    {
-      name: 'Chroma from luma',
-      tip: 'correlates chroma DCT coefficients with the luma channel',
-      lossy: true,
-      lossless: false,
-      stages: [{ from: 5, label: 'chroma from luma' }],
-    },
-    {
-      name: 'Error diffusion',
-      tip: 'spreads quantisation error across neighbouring pixels',
-      lossy: true,
-      lossless: false,
-      stages: [{ from: 6, label: 'error diffusion' }],
-    },
-    {
-      name: 'Splines',
-      tip: 'thin curve-like features (verified in the libjxl source; not in encode_effort.md)',
-      lossy: true,
-      lossless: false,
-      stages: [{ from: 7, label: 'spline detection' }],
-    },
-  ];
-
-  function stageIndexAt(stages: EffortStage[], level: number): number {
-    let index = -1;
-    for (let i = 0; i < stages.length; i++) {
-      if (stages[i].from <= level && (stages[i].to ?? 10) >= level) index = i;
-    }
-    return index;
-  }
-
-  const hiddenExpertFlags = new Set(['--verbose', '--help', '--version', '--quiet']);
 
   let view = $state<View>('main');
   let routeMode = $state<RouteMode>('lossy');
@@ -368,14 +180,6 @@
   });
   let visibleFlagCount = $derived(flagSections.reduce((count, section) => count + section.flags.length, 0));
   let activePresetSummary = $derived(presets.find((preset) => preset.name === presetName) ?? null);
-
-  function sameFlags(a: FlagOverride[], b: FlagOverride[]): boolean {
-    if (a.length !== b.length) return false;
-    const key = (flag: FlagOverride) => `${flag.key}${flag.value}${flag.valueless}`;
-    const left = a.map(key).sort();
-    const right = b.map(key).sort();
-    return left.every((value, index) => value === right[index]);
-  }
 
   let presetChanged = $derived.by(() => {
     if (!coreSnapshot || presetName === '') return false;
@@ -1011,62 +815,8 @@
     saveTimer = setTimeout(() => void refreshPreview(), 300);
   }
 
-  function routeClass(route: string): string {
-    if (route === 'Transcode') return 'b-transcode';
-    if (route === 'Reencode') return 'b-reencode';
-    if (route === 'Encode') return 'b-encode';
-    return 'b-skip';
-  }
-
-  function routeTitle(route: string): string {
-    if (route === 'Transcode') return 'JPEG transcode';
-    if (route === 'Reencode') return 'JXL reencode';
-    if (route === 'Encode') return 'Pixel encode';
-    return 'Skipped';
-  }
-
-  function compactPath(path: string, maxLength = 80): string {
-    if (path.length <= maxLength) return path;
-    const tail = Math.max(16, Math.floor(maxLength * 0.35));
-    const head = Math.max(3, maxLength - tail - 3);
-    return `${path.slice(0, head)}...${path.slice(-tail)}`;
-  }
-
   function fileStatus(file: FilePreview): string {
     return fileStatuses.get(file.path) ?? '';
-  }
-
-  function formatBytes(value: number): string {
-    if (value < 1024) return `${value} B`;
-    const units = ['KB', 'MB', 'GB', 'TB'];
-    let size = value;
-    let unit = -1;
-    do {
-      size /= 1024;
-      unit += 1;
-    } while (size >= 1024 && unit < units.length - 1);
-    return `${size.toFixed(size >= 100 ? 0 : 1)} ${units[unit]}`;
-  }
-
-  function formatEta(seconds: number): string {
-    if (!seconds || seconds < 1) return '--:--';
-    const minutes = Math.floor(seconds / 60);
-    const remainder = Math.floor(seconds % 60);
-    return `${minutes}:${remainder.toString().padStart(2, '0')}`;
-  }
-
-  function formatRate(value: number): string {
-    return value > 0 ? `${formatBytes(value)}/s` : '--';
-  }
-
-  function savedPct(before: number, after: number): number {
-    if (before <= 0) return 0;
-    return Math.round((1 - after / before) * 100);
-  }
-
-  function formatDelta(before: number, after: number): string {
-    const pct = savedPct(before, after);
-    return pct >= 0 ? `-${pct}%` : `+${-pct}%`;
   }
 
   function toggleGroup(key: string): void {
@@ -1078,35 +828,6 @@
     }
     collapsedGroups = next;
   }
-
-  // Port of libjxl JxlEncoderDistanceFromQuality (lib/jxl/encode.cc) — the
-  // authority for how -q maps to -d.
-  function distanceFromQuality(quality: number): number {
-    return quality >= 100 ? 0 : quality >= 30 ? 0.1 + (100 - quality) * 0.09 : (53 / 3000) * quality * quality - (23 / 20) * quality + 25;
-  }
-
-  function qualityFromDistance(value: number): number {
-    if (value <= 0) return 100;
-    if (value <= 6.4) return Math.max(0, Math.min(100, 100 - (value - 0.1) / 0.09));
-    const a = 53 / 3000;
-    const b = -23 / 20;
-    const discriminant = b * b - 4 * a * (25 - value);
-    return Math.max(0, Math.min(100, (-b - Math.sqrt(Math.max(0, discriminant))) / (2 * a)));
-  }
-
-  // Shared slider-track bands, in distance units: purple below 0.5, dark green
-  // up to 1.0, green to 1.5, yellow to 2.0, orange to 3.0, red beyond.
-  // The sliders stop at distance 5 (quality 46); heavier compression means cjxl directly.
-  const SLIDER_BANDS = [0.5, 1, 1.5, 2, 3] as const;
-  const SLIDER_DISTANCE_MAX = 5;
-  const SLIDER_QUALITY_MIN = Math.ceil(qualityFromDistance(SLIDER_DISTANCE_MAX));
-  // step 0.025, always displayed with three decimals: 0.000
-  const formatDistance = (d: number): string => d.toFixed(3);
-  const zoneStyle = (toSliderPercent: (band: number) => number): string =>
-    SLIDER_BANDS.map((band, index) => `--zone-${'abcde'[index]}:${toSliderPercent(band).toFixed(2)}%`).join(';');
-  const distanceZoneStyle = zoneStyle((band) => (band / SLIDER_DISTANCE_MAX) * 100);
-  // The quality slider is inverted (position = 100 - quality) and spans 46..100.
-  const qualityZoneStyle = zoneStyle((band) => ((100 - qualityFromDistance(band)) / (100 - SLIDER_QUALITY_MIN)) * 100);
 
   function setDistance(event: Event): void {
     distance = Number((event.currentTarget as HTMLInputElement).value);
@@ -1153,10 +874,6 @@
     onSettingsChanged();
   }
 
-  function isLinkedFlagKey(key: string): boolean {
-    return ['--distance', '--quality', '--effort', '--lossless_jpeg', '--num_threads'].includes(key);
-  }
-
   function isLinkedFlag(flag: FlagInfo): boolean {
     return isLinkedFlagKey(flag.key);
   }
@@ -1178,12 +895,6 @@
     }
   }
 
-  function flagLabel(flag: FlagInfo): string {
-    const short = flag.short ? `-${flag.short}` : '';
-    const long = flag.long ? `--${flag.long}` : '';
-    return short && long ? `${short}, ${long}` : short || long;
-  }
-
   function resetExpertFlags(): void {
     expertOverrides = [];
     onSettingsChanged();
@@ -1199,13 +910,6 @@
     }
     routeMode = next;
     onSettingsChanged();
-  }
-
-  function qualityStatusText(): string {
-    if (routeMode === 'lossless') return 'Lossless: distance fixed at 0';
-    if (distance <= 1.0) return 'visually lossless';
-    if (distance >= distanceFromQuality(SLIDER_QUALITY_MIN)) return 'slider limit — for more range use the cjxl command line';
-    return outOfRange ? 'Out of recommended range (too high or too low)' : 'Inside recommended range';
   }
 
   async function selectResult(result: FileUpdate): Promise<void> {
@@ -1465,7 +1169,7 @@
               <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
                 <span class="k">Distance</span>
                 <span class="qnum" class:out-of-range={outOfRange}>{formatDistance(distance)}</span>
-                <span class="mini range-status" class:out-of-range={outOfRange} style="margin-left:auto">{qualityStatusText()}</span>
+                <span class="mini range-status" class:out-of-range={outOfRange} style="margin-left:auto">{qualityStatusText(routeMode, distance, outOfRange)}</span>
               </div>
               <div class="quality-range" style={distanceZoneStyle}>
                 <input type="range" min="0" max="5" step="0.025" value={distance} oninput={setDistance} aria-label="Distance" />
@@ -1654,7 +1358,7 @@
               <div style="display:flex;align-items:baseline;gap:8px">
                 <span class="k">Distance</span>
                 <span class="qnum" class:out-of-range={outOfRange}>{formatDistance(distance)}</span>
-                <span class="mini range-status" class:out-of-range={outOfRange} style="margin-left:auto">{qualityStatusText()}</span>
+                <span class="mini range-status" class:out-of-range={outOfRange} style="margin-left:auto">{qualityStatusText(routeMode, distance, outOfRange)}</span>
               </div>
               <div class="quality-range" class:locked={routeMode === 'lossless'} style={distanceZoneStyle}>
                 <input type="range" min="0" max="5" step="0.025" value={distance} oninput={setDistance} disabled={routeMode === 'lossless'} aria-label="Distance" />
