@@ -1,6 +1,6 @@
-name: jpegxl-expert-encoding-tool
+name: jxleet
 version: 1.0.0
-description: APM project for jpegxl-expert-encoding-tool
+description: APM project for jxleet
 author: Daniel
 # Which agent platforms to deploy to.
 # Resolution order: --target flag > this field > auto-detect from filesystem.

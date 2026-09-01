@@ -18,6 +18,7 @@
     Status,
     ToolchainProgress,
     ToolchainStatus,
+    Update,
   } from '../bindings/github.com/dhcgn/jxleet/internal/app';
 
   type View = 'main' | 'expert' | 'presets' | 'tools' | 'automatic' | 'history';
@@ -35,7 +36,6 @@
     sizeDoneIn: number;
     hasResults: boolean;
   }
-  type QualityUnit = 'distance' | 'quality';
   type RouteMode = 'lossy' | 'lossless';
 
   const effortNames = [
@@ -71,7 +71,6 @@
 
   let view = $state<View>('main');
   let routeMode = $state<RouteMode>('lossy');
-  let qualityUnit = $state<QualityUnit>('distance');
   let presetName = $state('');
   let selectedPreset = $state('');
   let presets = $state<PresetSummary[]>([]);
@@ -107,6 +106,7 @@
     percent: 0,
   });
   let appStatus = $state<Status | null>(null);
+  let appUpdate = $state<Update | null>(null);
   let toolchain = $state<ToolchainStatus | null>(null);
   let toolchainError = $state('');
   let contextMenuRegistered = $state(false);
@@ -159,10 +159,7 @@
         : 'Transcode',
   );
   let quality = $derived(Math.round(qualityFromDistance(distance)));
-  let outOfRange = $derived(
-    routeMode !== 'lossless' &&
-      (qualityUnit === 'distance' ? distance < 0.5 || distance > 3 : quality < 68 || quality > 96),
-  );
+  let outOfRange = $derived(routeMode !== 'lossless' && (distance < 0.5 || distance > 3));
   let canConvert = $derived(inputPaths.length > 0 && files.length > 0 && presetName !== '' && !busy && !installing);
   let selectedResult = $derived(results.find((result) => result.input === selectedResultInput) ?? null);
   let processing = $derived(busy && (view === 'main' || view === 'expert'));
@@ -231,7 +228,6 @@
     return (
       distance !== snapshot.distance ||
       effort !== snapshot.effort ||
-      qualityUnit === 'quality' !== snapshot.useQuality ||
       jpegLossless !== snapshot.jpegLossless ||
       outputPolicy !== snapshot.policy ||
       !sameFlags(expertOverrides, snapshot.flags)
@@ -392,6 +388,10 @@
       }
       // Recover an output-exists prompt that fired before the subscription.
       collisionPrompt = await Service.GetPendingCollision();
+      // Non-blocking: GitHub rate limits/offline just mean no banner.
+      void Service.GetAppUpdate()
+        .then((update) => { appUpdate = update; })
+        .catch(() => {});
       void refreshCommandPreview();
     } catch (error) {
       errorMessage = errorText(error);
@@ -408,7 +408,7 @@
       jpegMode: jpegLossless ? 'transcode' : 'reencode',
       distance,
       useDistance: true,
-      useQuality: qualityUnit === 'quality',
+      useQuality: false, // distance is the stored value; -q is a display transform only
       effort,
       useEffort: true,
       outputPolicy,
@@ -792,7 +792,6 @@
   // the snapshot; persisting happens by editing the YAML (Presets view).
   interface CoreSnapshot {
     distance: number;
-    useQuality: boolean;
     effort: number;
     jpegLossless: boolean;
     policy: string;
@@ -803,7 +802,6 @@
 
   function applyCore(core: {
     distance: number;
-    useQuality: boolean;
     effort: number;
     jpegMode: string;
     policy: string;
@@ -812,7 +810,6 @@
     const flags = core.flags ?? [];
     distance = core.distance;
     effort = core.effort;
-    qualityUnit = core.useQuality ? 'quality' : 'distance';
     routeMode = core.distance === 0 ? 'lossless' : 'lossy';
     if (core.distance > 0) lossyDistance = core.distance;
     jpegLossless = core.jpegMode !== 'reencode';
@@ -820,7 +817,6 @@
     expertOverrides = flags.map((flag) => ({ ...flag }));
     return {
       distance: core.distance,
-      useQuality: core.useQuality,
       effort: core.effort,
       jpegLossless,
       policy: outputPolicy,
@@ -845,7 +841,6 @@
     if (!coreSnapshot) return;
     applyCore({
       distance: coreSnapshot.distance,
-      useQuality: coreSnapshot.useQuality,
       effort: coreSnapshot.effort,
       jpegMode: coreSnapshot.jpegLossless ? 'transcode' : 'reencode',
       policy: coreSnapshot.policy,
@@ -929,6 +924,12 @@
     collapsedGroups = next;
   }
 
+  // Port of libjxl JxlEncoderDistanceFromQuality (lib/jxl/encode.cc) — the
+  // authority for how -q maps to -d.
+  function distanceFromQuality(quality: number): number {
+    return quality >= 100 ? 0 : quality >= 30 ? 0.1 + (100 - quality) * 0.09 : (53 / 3000) * quality * quality - (23 / 20) * quality + 25;
+  }
+
   function qualityFromDistance(value: number): number {
     if (value <= 0) return 100;
     if (value <= 6.4) return Math.max(0, Math.min(100, 100 - (value - 0.1) / 0.09));
@@ -937,6 +938,20 @@
     const discriminant = b * b - 4 * a * (25 - value);
     return Math.max(0, Math.min(100, (-b - Math.sqrt(Math.max(0, discriminant))) / (2 * a)));
   }
+
+  // Shared slider-track bands, in distance units: purple below 0.5, dark green
+  // up to 1.0, green to 1.5, yellow to 2.0, orange to 3.0, red beyond.
+  // The sliders stop at distance 5 (quality 46); heavier compression means cjxl directly.
+  const SLIDER_BANDS = [0.5, 1, 1.5, 2, 3] as const;
+  const SLIDER_DISTANCE_MAX = 5;
+  const SLIDER_QUALITY_MIN = Math.ceil(qualityFromDistance(SLIDER_DISTANCE_MAX));
+  // step 0.025, always displayed with three decimals: 0.000
+  const formatDistance = (d: number): string => d.toFixed(3);
+  const zoneStyle = (toSliderPercent: (band: number) => number): string =>
+    SLIDER_BANDS.map((band, index) => `--zone-${'abcde'[index]}:${toSliderPercent(band).toFixed(2)}%`).join(';');
+  const distanceZoneStyle = zoneStyle((band) => (band / SLIDER_DISTANCE_MAX) * 100);
+  // The quality slider is inverted (position = 100 - quality) and spans 46..100.
+  const qualityZoneStyle = zoneStyle((band) => ((100 - qualityFromDistance(band)) / (100 - SLIDER_QUALITY_MIN)) * 100);
 
   function setDistance(event: Event): void {
     distance = Number((event.currentTarget as HTMLInputElement).value);
@@ -947,7 +962,7 @@
   function setQuality(event: Event): void {
     const position = Number((event.currentTarget as HTMLInputElement).value);
     const value = 100 - position; // slider is inverted so best quality (100) sits on the left, matching distance 0
-    distance = value >= 100 ? 0 : 0.1 + (100 - value) * 0.09;
+    distance = distanceFromQuality(value);
     if (routeMode === 'lossy') lossyDistance = distance;
     onSettingsChanged();
   }
@@ -994,7 +1009,7 @@
   function linkedFlagValue(flag: FlagInfo): string {
     switch (flag.key) {
       case '--distance':
-        return distance.toFixed(1);
+        return formatDistance(distance);
       case '--quality':
         return quality.toString();
       case '--effort':
@@ -1033,6 +1048,8 @@
 
   function qualityStatusText(): string {
     if (routeMode === 'lossless') return 'Lossless: distance fixed at 0';
+    if (distance <= 1.0) return 'visually lossless';
+    if (distance >= distanceFromQuality(SLIDER_QUALITY_MIN)) return 'slider limit — for more range use the cjxl command line';
     return outOfRange ? 'Out of recommended range (too high or too low)' : 'Inside recommended range';
   }
 
@@ -1128,6 +1145,15 @@
     <div class="banner warn" role="alert">
       <span class="ic">!</span><span>{errorMessage}</span>
       <button class="alert-close" aria-label="Dismiss message" title="Dismiss" onclick={dismissMessage}>x</button>
+    </div>
+  {/if}
+
+  {#if appUpdate?.available}
+    <div class="banner warn" role="status" data-testid="app-update">
+      <span class="ic">!</span>
+      <span>jxleet {appUpdate.latest} is available on GitHub — you are running {appUpdate.current}.</span>
+      <button class="btn" style="margin-left:auto" onclick={() => void Service.OpenURL(appUpdate?.url ?? '')}>Open release page</button>
+      <button class="alert-close" aria-label="Dismiss update notice" title="Dismiss" onclick={() => { appUpdate = null; }}>x</button>
     </div>
   {/if}
 
@@ -1281,25 +1307,23 @@
           <div class="card">
             <h3>Compression <span class="r">stored in the preset</span></h3>
             <div class="in">
-              <div class="seg" style="width:100%;margin-bottom:9px">
-                <button aria-pressed={qualityUnit === 'distance'} style="flex:1" onclick={() => { qualityUnit = 'distance'; onSettingsChanged(); }}>Distance</button>
-                <button aria-pressed={qualityUnit === 'quality'} style="flex:1" onclick={() => { qualityUnit = 'quality'; onSettingsChanged(); }}>Quality</button>
-              </div>
               <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
-                <span class="qnum" class:out-of-range={outOfRange}>{qualityUnit === 'distance' ? distance.toFixed(1) : quality}</span>
+                <span class="k">Distance</span>
+                <span class="qnum" class:out-of-range={outOfRange}>{formatDistance(distance)}</span>
                 <span class="mini range-status" class:out-of-range={outOfRange} style="margin-left:auto">{qualityStatusText()}</span>
               </div>
-              {#if qualityUnit === 'distance'}
-                <div class="quality-range" class:out-of-range={outOfRange} style="--zone-a:2%;--zone-b:4%;--zone-c:8%;--zone-d:12%">
-                  <input type="range" min="0" max="25" step="0.1" value={distance} oninput={setDistance} aria-label="Distance" />
-                </div>
-                <div class="quality-guidance"><span>Recommended: 0.5 .. 3.0</span><span>1.0 = visually lossless</span></div>
-              {:else}
-                <div class="quality-range" class:out-of-range={outOfRange} style="--zone-a:4%;--zone-b:14%;--zone-c:22%;--zone-d:32%">
-                  <input type="range" min="0" max="100" step="1" value={100 - quality} oninput={(event) => setQuality(event)} aria-label="Quality" />
-                </div>
-                <div class="quality-guidance"><span>Recommended: 68 .. 96</span><span>90 = visually lossless</span></div>
-              {/if}
+              <div class="quality-range" style={distanceZoneStyle}>
+                <input type="range" min="0" max="5" step="0.025" value={distance} oninput={setDistance} aria-label="Distance" />
+              </div>
+              <div class="quality-guidance"><span>Recommended: 0.5 .. 3.0</span><span>1.0 = visually lossless</span></div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-top:10px;margin-bottom:2px">
+                <span class="k">Quality</span>
+                <span class="qnum">{quality}</span>
+              </div>
+              <div class="quality-range" style={qualityZoneStyle}>
+                <input type="range" min="0" max={100 - SLIDER_QUALITY_MIN} step="1" value={100 - quality} oninput={setQuality} aria-label="Quality" />
+              </div>
+              <div class="quality-guidance"><span>Recommended: 68 .. 96</span><span>90 = visually lossless</span></div>
               <div class="effort-basic" style="border-top:1px solid var(--line-soft);margin-top:8px;padding-top:8px">
                 <div style="display:flex;align-items:baseline;gap:8px">
                   <span class="k">Effort</span>
@@ -1465,31 +1489,24 @@
           <div class="card">
             <h3>Quality</h3>
             <div class="in">
-              <div class="seg" style="width:100%;margin-bottom:9px">
-                <button aria-pressed={qualityUnit === 'distance'} style="flex:1" data-testid="unit-distance" onclick={() => { qualityUnit = 'distance'; onSettingsChanged(); }}>Distance</button>
-                <button aria-pressed={qualityUnit === 'quality'} style="flex:1" data-testid="unit-quality" onclick={() => { qualityUnit = 'quality'; onSettingsChanged(); }}>Quality</button>
-              </div>
               <div style="display:flex;align-items:baseline;gap:8px">
-                <span class="qnum" class:out-of-range={outOfRange}>{qualityUnit === 'distance' ? distance.toFixed(1) : quality}</span>
-                <span class="mini range-status" class:out-of-range={outOfRange}>{qualityStatusText()}</span>
+                <span class="k">Distance</span>
+                <span class="qnum" class:out-of-range={outOfRange}>{formatDistance(distance)}</span>
+                <span class="mini range-status" class:out-of-range={outOfRange} style="margin-left:auto">{qualityStatusText()}</span>
               </div>
-              {#if routeMode === 'lossless'}
-                <div class="quality-range locked">
-                  <input type="range" min="0" max="25" step="0.1" value="0" disabled aria-label="Distance fixed at zero in lossless mode" />
-                </div>
-                <div class="quality-guidance"><span>Lossless: distance is fixed at 0</span></div>
-              {:else if qualityUnit === 'distance'}
-                <div class="quality-range" class:out-of-range={outOfRange} style="--zone-a:2%;--zone-b:4%;--zone-c:8%;--zone-d:12%">
-                  <input type="range" min="0" max="25" step="0.1" value={distance} oninput={setDistance} aria-label="Distance" />
-                </div>
-                <div class="quality-guidance"><span>Recommended: 0.5 .. 3.0</span><span>1.0 = visually lossless</span></div>
-              {:else}
-                <div class="quality-range" class:out-of-range={outOfRange} style="--zone-a:4%;--zone-b:14%;--zone-c:22%;--zone-d:32%">
-                  <input type="range" min="0" max="100" step="1" value={100 - quality} oninput={setQuality} aria-label="Quality" />
-                </div>
-                <div class="quality-guidance"><span>Recommended: 68 .. 96</span><span>90 = visually lossless</span></div>
-              {/if}
-              <div class="banner info" style="margin:10px 0 0"><span class="ic">i</span><span>Distance and quality control the same quantity. The marker shows the visually-lossless reference point.</span></div>
+              <div class="quality-range" class:locked={routeMode === 'lossless'} style={distanceZoneStyle}>
+                <input type="range" min="0" max="5" step="0.025" value={distance} oninput={setDistance} disabled={routeMode === 'lossless'} aria-label="Distance" />
+              </div>
+              <div class="quality-guidance"><span>Recommended: 0.5 .. 3.0</span><span>1.0 = visually lossless</span></div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-top:10px">
+                <span class="k">Quality</span>
+                <span class="qnum">{quality}</span>
+              </div>
+              <div class="quality-range" class:locked={routeMode === 'lossless'} style={qualityZoneStyle}>
+                <input type="range" min="0" max={100 - SLIDER_QUALITY_MIN} step="1" value={100 - quality} oninput={setQuality} disabled={routeMode === 'lossless'} aria-label="Quality" />
+              </div>
+              <div class="quality-guidance"><span>Recommended: 68 .. 96</span><span>90 = visually lossless</span></div>
+              <div class="banner info" style="margin:10px 0 0"><span class="ic">i</span><span>Distance and quality control the same quantity; moving either slider moves the other. The run always uses -d.</span></div>
             </div>
           </div>
           <div class="card">

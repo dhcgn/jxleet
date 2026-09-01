@@ -1,5 +1,5 @@
 JPEG XL decoder v0.12.0 4128790 [_AVX2_,SSE4,SSE2] {Clang 22.1.3}
-Usage: D:\jpegxl-expert-encoding-tool\test-bins\djxl.exe INPUT OUTPUT [OPTIONS...]
+Usage: D:\jxleet\test-bins\djxl.exe INPUT OUTPUT [OPTIONS...]
  INPUT
     The compressed input file (JXL). Use '-' for input from stdin.
  OUTPUT

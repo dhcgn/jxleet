@@ -220,3 +220,14 @@ export interface ToolchainStatus {
     "addedFlags": string[] | null;
     "removedFlags": string[] | null;
 }
+
+/**
+ * Update is the app-release banner state. Available is true only when the
+ * latest stable GitHub release is newer than the running build.
+ */
+export interface Update {
+    "current": string;
+    "latest": string;
+    "url": string;
+    "available": boolean;
+}

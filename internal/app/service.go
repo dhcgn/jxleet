@@ -40,10 +40,11 @@ type Callbacks struct {
 
 // Service is the root object bound to the frontend.
 type Service struct {
-	paths config.Paths
-	cfg   config.Config
-	tools *toolchain.Manager
-	cb    Callbacks
+	paths      config.Paths
+	cfg        config.Config
+	tools      *toolchain.Manager
+	cb         Callbacks
+	appVersion string // ldflags-stamped at release; "dev" in local builds
 
 	mu            sync.Mutex
 	pending       []string
@@ -63,10 +64,10 @@ type collisionQuestion struct {
 	reply  chan string
 }
 
-// New constructs the root service with resolved paths, loaded config, and
-// native callbacks.
-func New(paths config.Paths, cfg config.Config, tools *toolchain.Manager, cb Callbacks) *Service {
-	return &Service{paths: paths, cfg: cfg, tools: tools, cb: cb}
+// New constructs the root service with resolved paths, loaded config, the
+// application version (for the update check), and native callbacks.
+func New(paths config.Paths, cfg config.Config, tools *toolchain.Manager, appVersion string, cb Callbacks) *Service {
+	return &Service{paths: paths, cfg: cfg, tools: tools, cb: cb, appVersion: appVersion}
 }
 
 // Status is a small snapshot the frontend can render on start.

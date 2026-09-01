@@ -1,4 +1,4 @@
-Usage: D:\jpegxl-expert-encoding-tool\test-bins\jxlinfo.exe [-v] [-h] INPUT
+Usage: D:\jxleet\test-bins\jxlinfo.exe [-v] [-h] INPUT
   INPUT                  input JPEG XL image filename(s)
   -v (or --verbose)      more verbose output
   -h (or --help or -?)   this help)

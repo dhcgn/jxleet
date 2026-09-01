@@ -23,5 +23,6 @@ export type {
     ProgressUpdate,
     Status,
     ToolchainProgress,
-    ToolchainStatus
+    ToolchainStatus,
+    Update
 } from "./models.js";

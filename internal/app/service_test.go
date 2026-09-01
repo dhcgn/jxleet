@@ -25,7 +25,7 @@ func testService(t *testing.T) *Service {
 	if err := paths.EnsureDirs(); err != nil {
 		t.Fatal(err)
 	}
-	return New(paths, config.Default(), nil, Callbacks{})
+	return New(paths, config.Default(), nil, "dev", Callbacks{})
 }
 
 func saveTestPreset(t *testing.T, service *Service) {

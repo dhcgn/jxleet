@@ -129,7 +129,7 @@ func main() {
 	}
 
 	var wailsApp *application.App
-	svc := app.New(paths, cfg, toolchain.NewManager(paths.BinDir), app.Callbacks{
+	svc := app.New(paths, cfg, toolchain.NewManager(paths.BinDir), version, app.Callbacks{
 		Emit: func(name string, data any) {
 			if wailsApp != nil {
 				wailsApp.Event.Emit(name, data)
@@ -172,7 +172,7 @@ func main() {
 	})
 
 	window := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: "jxleet",
+		Title: "jxleet " + version,
 		// Window sized to the golden ratio (1000 / 618 ≈ 1.618).
 		Width:            1000,
 		Height:           618,

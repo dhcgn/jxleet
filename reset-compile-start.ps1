@@ -8,6 +8,7 @@ $local = Join-Path $env:LOCALAPPDATA "jxleet"
 Remove-Item -Recurse -Force $local
 
 # remove old binaries, rebuild, and run the new binary
-remove-item bin\jxleet.exe
-task build
-bin\jxleet.exe
+remove-item bin\jxleet.exe; 
+task build; 
+Start-Sleep -Milliseconds 500;
+bin\jxleet.exe; 

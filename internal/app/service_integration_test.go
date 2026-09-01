@@ -77,7 +77,7 @@ func TestStartConversionWithRealToolchain(t *testing.T) {
 	}
 
 	done := make(chan ConversionSummary, 1)
-	service := New(paths, config.Default(), manager, Callbacks{
+	service := New(paths, config.Default(), manager, "dev", Callbacks{
 		Emit: func(name string, data any) {
 			if name == "conversion-done" {
 				done <- data.(ConversionSummary)
