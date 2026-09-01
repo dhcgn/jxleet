@@ -27,6 +27,8 @@ export interface EffortTool {
   alwaysYellow?: boolean;
 }
 
+// Reference data for the Expert-view effort ladder. Documented, including
+// provenance and update procedure, in effort.md next to this file.
 // Transcribed from libjxl doc/encode_effort.md; splines verified in the source.
 export const effortTools: EffortTool[] = [
   {
@@ -99,7 +101,7 @@ export const effortTools: EffortTool[] = [
     stagesLossless: [
       { from: 1, label: 'Huffman, RLE-only LZ77' },
       { from: 2, label: 'ANS' },
-      { from: 9, label: 'exhaustive entropy search' },
+      { from: 8, label: 'exhaustive entropy search' },
     ],
     stagesLossy: [
       { from: 1, label: 'ANS, basic context clustering' },
@@ -140,8 +142,7 @@ export const effortTools: EffortTool[] = [
     stages: [
       { from: 5, label: 'adaptive quantisation' },
       { from: 8, label: 'Butteraugli iterations' },
-      { from: 9, label: 'more Butteraugli iterations' },
-      { from: 10, label: 'more thorough quantisation' },
+      { from: 9, label: 'more Butteraugli iterations (e9 and e10 are identical)' },
     ],
   },
   {
@@ -163,7 +164,7 @@ export const effortTools: EffortTool[] = [
     tip: 'spreads quantisation error across neighbouring pixels',
     lossy: true,
     lossless: false,
-    stages: [{ from: 6, label: 'error diffusion' }],
+    stages: [{ from: 7, label: 'error diffusion' }],
   },
   {
     name: 'Splines',
