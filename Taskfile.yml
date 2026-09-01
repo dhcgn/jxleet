@@ -36,9 +36,11 @@ tasks:
       - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
 
   check:
-    summary: Build, vet and test — the CI gate
+    summary: Build, vet, lint and test — the CI gate
     cmds:
       - cmd: powershell -NoProfile -ExecutionPolicy Bypass -File build/gofmt-check.ps1
+        platforms: [windows]
+      - cmd: powershell -NoProfile -ExecutionPolicy Bypass -File build/golangci-lint-check.ps1
         platforms: [windows]
       - task: build
       - go vet ./...
