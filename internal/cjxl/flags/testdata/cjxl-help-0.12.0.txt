@@ -1,4 +1,4 @@
-Usage: D:\jpegxl-expert-encoding-tool\develop-time\cjxl\x64-windows-static\bin\cjxl.exe INPUT OUTPUT [OPTIONS...]
+Usage: D:\jxleet\develop-time\cjxl\x64-windows-static\bin\cjxl.exe INPUT OUTPUT [OPTIONS...]
  INPUT
     the input can be JXL, PPM, PNM, PFM, PAM, PGX, PNG, APNG, GIF, JPEG
  OUTPUT

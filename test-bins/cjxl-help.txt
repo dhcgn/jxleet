@@ -1,4 +1,4 @@
-Usage: D:\jpegxl-expert-encoding-tool\test-bins\cjxl.exe INPUT OUTPUT [OPTIONS...]
+Usage: D:\jxleet\test-bins\cjxl.exe INPUT OUTPUT [OPTIONS...]
 JPEG XL encoder v0.12.0 4128790 [_AVX2_,SSE4,SSE2] {Clang 22.1.3}
  INPUT
     the input can be JXL, PPM, PNM, PFM, PAM, PGX, PNG, APNG, GIF, JPEG
