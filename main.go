@@ -172,7 +172,7 @@ func main() {
 	})
 
 	window := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: "jxleet",
+		Title: "jxleet " + version,
 		// Window sized to the golden ratio (1000 / 618 ≈ 1.618).
 		Width:            1000,
 		Height:           618,

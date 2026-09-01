@@ -827,18 +827,17 @@ input[type="range"] {
   position: relative;
   padding: 12px 7px 6px;
   --slider-color: var(--p-encode);
-  --track-bg: #2a2f38;
-  --zone-good: #55c97a;
+  --zone-purple: #9d7cd8;
   --zone-dark: #258b54;
+  --zone-good: #55c97a;
   --zone-yellow: #d8b64f;
+  --zone-orange: #d9863c;
+  --zone-red: #d95555;
   --zone-a: 0%;
   --zone-b: 0%;
   --zone-c: 0%;
   --zone-d: 0%;
-}
-
-.quality-range.out-of-range {
-  --slider-color: #69727c;
+  --zone-e: 0%;
 }
 
 .quality-range input[type="range"] {
@@ -861,11 +860,12 @@ input[type="range"] {
   background:
     linear-gradient(
       to right,
-      var(--track-bg) 0 var(--zone-a),
-      var(--zone-good) var(--zone-a) var(--zone-b),
-      var(--zone-dark) var(--zone-b) var(--zone-c),
+      var(--zone-purple) 0 var(--zone-a),
+      var(--zone-dark) var(--zone-a) var(--zone-b),
+      var(--zone-good) var(--zone-b) var(--zone-c),
       var(--zone-yellow) var(--zone-c) var(--zone-d),
-      var(--track-bg) var(--zone-d) 100%
+      var(--zone-orange) var(--zone-d) var(--zone-e),
+      var(--zone-red) var(--zone-e) 100%
     );
 }
 
@@ -875,11 +875,12 @@ input[type="range"] {
   background:
     linear-gradient(
       to right,
-      var(--track-bg) 0 var(--zone-a),
-      var(--zone-good) var(--zone-a) var(--zone-b),
-      var(--zone-dark) var(--zone-b) var(--zone-c),
+      var(--zone-purple) 0 var(--zone-a),
+      var(--zone-dark) var(--zone-a) var(--zone-b),
+      var(--zone-good) var(--zone-b) var(--zone-c),
       var(--zone-yellow) var(--zone-c) var(--zone-d),
-      var(--track-bg) var(--zone-d) 100%
+      var(--zone-orange) var(--zone-d) var(--zone-e),
+      var(--zone-red) var(--zone-e) 100%
     );
 }
 

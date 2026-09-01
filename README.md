@@ -341,14 +341,17 @@ follows is a summary, and `cjxl -v -v -v -v --help` remains the authority.
 `0` is mathematically lossless. Useful lossy values sit between `0.5` and `3.0`, with
 `1.0` visually indistinguishable for most photographic material.
 
-**Quality** (`-q`) on a 0–100 scale is the same quantity in different clothing. In the
-interface a toggle switches the display between the two; it never changes the stored value,
-so you cannot end up with two settings that disagree. `90` is visually lossless; the
-recommended range is `68` to `96`.
+**Quality** (`-q`) on a 0–100 scale is the same quantity in different clothing. Both sliders
+are always shown side by side and linked: moving one moves the other. The stored value is
+always the distance — a run always uses `-d` — so you cannot end up with two settings that
+disagree. `90` is visually lossless; the recommended range is `68` to `96`.
 
-The Expert slider colors the recommended bands: Distance `0.5..1.0` green, `1.0..2.0`
-dark green, `2.0..3.0` yellow; Quality `86..96` green, `78..86` dark green, and
-`68..78` yellow. Values outside those bands remain neutral.
+The sliders cover distance `0.0..5.0` (quality `100..46`). At the limit the status hints
+that anything beyond that range means using the `cjxl` command line directly.
+
+The sliders color their bands by distance: below `0.5` purple, `0.5..1.0` dark green,
+`1.0..1.5` green, `1.5..2.0` yellow, `2.0..3.0` orange, beyond `3.0` red. At a distance of
+`1.0` or lower the status hint reads *visually lossless*.
 
 **Effort** (`-e`) trades encoding time for file size, from `1` (lightning) to `10`
 (glacier), default `7` (squirrel). The number alone tells you nothing useful, so the expert
