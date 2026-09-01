@@ -48,17 +48,40 @@
   let inputPaths = $state<string[]>([]);
   let files = $state<FilePreview[]>([]);
   let results = $state<FileUpdate[]>([]);
-  let selectedResultInput = $state('');
-  let metadataOutput = $state('');
-  let metadataError = $state('');
-  let metadataLoading = $state(false);
+
+  // Grouped state: each object is one prop for a view component.
+  let meta = $state({ selection: '', output: '', error: '', loading: false });
+  let cmdPreview = $state<{ previews: CommandPreview[]; error: string }>({ previews: [], error: '' });
+  let run = $state<{ busy: boolean; summary: ConversionSummary | null }>({ busy: false, summary: null });
+  let tools = $state<{
+    status: ToolchainStatus | null;
+    error: string;
+    installing: boolean;
+    progress: ToolchainProgress | null;
+    contextMenu: boolean;
+  }>({ status: null, error: '', installing: false, progress: null, contextMenu: false });
+  let history = $state<{
+    entries: HistoryEntry[];
+    loaded: boolean;
+    meta: { entry: HistoryEntry | null; output: string; error: string; loading: boolean };
+  }>({ entries: [], loaded: false, meta: { entry: null, output: '', error: '', loading: false } });
+  let settings = $state({
+    distance: 1.0,
+    effort: 7,
+    jpegLossless: true,
+    outputPolicy: 'alongside',
+    processes: 2,
+    threads: 8,
+    lossyDistance: 1.0,
+  });
+
+  // Request counters and timers are not reactive state.
   let metadataRequest = 0;
   let previewRequest = 0;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
-  let commandPreviews = $state<CommandPreview[]>([]);
-  let commandPreviewError = $state('');
   let commandPreviewRequest = 0;
-  let summary = $state<ConversionSummary | null>(null);
+  let historyMetaRequest = 0;
+
   let progress = $state<ProgressUpdate>({
     total: 0,
     completed: 0,
@@ -75,35 +98,13 @@
   });
   let appStatus = $state<Status | null>(null);
   let appUpdate = $state<Update | null>(null);
-  let toolchain = $state<ToolchainStatus | null>(null);
-  let toolchainError = $state('');
-  let contextMenuRegistered = $state(false);
   let errorMessage = $state('');
   let collapsedGroups = $state(new Set<string>());
   let loaded = $state(false);
-  let busy = $state(false);
-  let installing = $state(false);
-  let installProgress = $state<ToolchainProgress | null>(null);
   let sessionStats = $state({ count: 0, saved: 0 });
-  let historyEntries = $state<HistoryEntry[]>([]);
-  let historyLoaded = $state(false);
-  let historyMeta = $state<{ entry: HistoryEntry | null; output: string; error: string; loading: boolean }>({
-    entry: null,
-    output: '',
-    error: '',
-    loading: false,
-  });
-  let historyMetaRequest = 0;
   let collisionPrompt = $state<CollisionPrompt | null>(null);
-  let distance = $state(1.0);
-  let effort = $state(7);
-  let jpegLossless = $state(true);
-  let outputPolicy = $state('alongside');
-  let processes = $state(2);
-  let threads = $state(8);
   let presetPolicyDraft = $state('');
   let presetCollisionDraft = $state('skip');
-  let lossyDistance = $state(1.0);
 
   let routeCounts = $derived.by(() => ({
     Transcode: files.filter((file) => file.route === 'Transcode').length,
@@ -126,11 +127,11 @@
         ? 'Encode'
         : 'Transcode',
   );
-  let quality = $derived(Math.round(qualityFromDistance(distance)));
-  let outOfRange = $derived(routeMode !== 'lossless' && (distance < 0.5 || distance > 3));
-  let canConvert = $derived(inputPaths.length > 0 && files.length > 0 && presetName !== '' && !busy && !installing);
-  let selectedResult = $derived(results.find((result) => result.input === selectedResultInput) ?? null);
-  let processing = $derived(busy && (view === 'main' || view === 'expert'));
+  let quality = $derived(Math.round(qualityFromDistance(settings.distance)));
+  let outOfRange = $derived(routeMode !== 'lossless' && (settings.distance < 0.5 || settings.distance > 3));
+  let canConvert = $derived(inputPaths.length > 0 && files.length > 0 && presetName !== '' && !run.busy && !tools.installing);
+  let selectedResult = $derived(results.find((result) => result.input === meta.selection) ?? null);
+  let processing = $derived(run.busy && (view === 'main' || view === 'expert'));
   let resultByInput = $derived.by(() => {
     const map = new Map<string, FileUpdate>();
     for (const result of results) map.set(result.input, result);
@@ -186,10 +187,10 @@
     if (!coreSnapshot || presetName === '') return false;
     const snapshot: CoreSnapshot = coreSnapshot;
     return (
-      distance !== snapshot.distance ||
-      effort !== snapshot.effort ||
-      jpegLossless !== snapshot.jpegLossless ||
-      outputPolicy !== snapshot.policy ||
+      settings.distance !== snapshot.distance ||
+      settings.effort !== snapshot.effort ||
+      settings.jpegLossless !== snapshot.jpegLossless ||
+      settings.outputPolicy !== snapshot.policy ||
       !sameFlags(expertOverrides, snapshot.flags)
     );
   });
@@ -258,7 +259,7 @@
     const offProgress = Events.On('progress', (event: any) => {
       if (event?.data) {
         progress = event.data as ProgressUpdate;
-        busy = true;
+        run.busy = true;
         // The queue is shown inline in the Main/Expert views; only coalesced
         // external invocations use the compact window.
         if (progress.coalesced > 1) {
@@ -282,15 +283,15 @@
     });
     const offToolchainProgress = Events.On('toolchain-progress', (event: any) => {
       if (event?.data) {
-        installProgress = event.data as ToolchainProgress;
+        tools.progress = event.data as ToolchainProgress;
       }
     });
     const offDone = Events.On('conversion-done', (event: any) => {
-      summary = event?.data as ConversionSummary;
+      run.summary = event?.data as ConversionSummary;
       progress = { ...progress, paused: false, percent: 100 };
-      busy = false;
+      run.busy = false;
       collisionPrompt = null; // a cancelled run resolves outstanding prompts itself
-      if (summary?.cancelled) {
+      if (run.summary?.cancelled) {
         errorMessage = '! cancelled by user';
       }
     });
@@ -322,12 +323,12 @@
       flagDefinitions = (await Service.ListCJXLFlags()) ?? [];
       presetName = bindings.gui;
       try {
-        toolchain = await Service.GetToolchainStatus();
+        tools.status = await Service.GetToolchainStatus();
       } catch (error) {
-        toolchainError = errorText(error);
+        tools.error = errorText(error);
       }
       try {
-        contextMenuRegistered = await Service.ContextMenuRegistered();
+        tools.contextMenu = await Service.ContextMenuRegistered();
       } catch (error) {
         errorMessage = errorText(error);
       }
@@ -344,7 +345,7 @@
       if (runningProgress.total > 0) {
         progress = runningProgress;
         view = runningProgress.coalesced > 1 ? 'automatic' : 'main';
-        busy = true;
+        run.busy = true;
       }
       // Recover an output-exists prompt that fired before the subscription.
       collisionPrompt = await Service.GetPendingCollision();
@@ -363,15 +364,15 @@
   function currentOptions(): ConversionOptions {
     return {
       preset: presetName,
-      processes,
-      threads,
-      jpegMode: jpegLossless ? 'transcode' : 'reencode',
-      distance,
+      processes: settings.processes,
+      threads: settings.threads,
+      jpegMode: settings.jpegLossless ? 'transcode' : 'reencode',
+      distance: settings.distance,
       useDistance: true,
       useQuality: false, // distance is the stored value; -q is a display transform only
-      effort,
+      effort: settings.effort,
       useEffort: true,
-      outputPolicy,
+      outputPolicy: settings.outputPolicy,
       expertFlags: expertOverrides,
       resetExpert: false, // flags live in the preset; Expert edits persist there
     };
@@ -403,33 +404,33 @@
   async function refreshCommandPreview(): Promise<void> {
     const request = ++commandPreviewRequest;
     if (presetName === '') {
-      commandPreviews = [];
-      commandPreviewError = '';
+      cmdPreview.previews = [];
+      cmdPreview.error = '';
       return;
     }
     try {
       const previews = (await Service.PreviewCommands(currentOptions())) ?? [];
       if (request !== commandPreviewRequest) return;
-      commandPreviews = previews;
-      commandPreviewError = '';
+      cmdPreview.previews = previews;
+      cmdPreview.error = '';
     } catch (error) {
       if (request !== commandPreviewRequest) return;
-      commandPreviews = [];
-      commandPreviewError = errorText(error);
+      cmdPreview.previews = [];
+      cmdPreview.error = errorText(error);
     }
   }
 
   function acceptPaths(paths: string[]): void {
     const incoming = paths.filter((path) => path.trim() !== '');
     if (incoming.length === 0) return;
-    if (!busy) {
+    if (!run.busy) {
       // Adding files after a finished run keeps existing results; only the
       // pending files (no result, or failed/cancelled) are converted next.
-      summary = null;
-      selectedResultInput = '';
-      metadataOutput = '';
-      metadataError = '';
-      metadataLoading = false;
+      run.summary = null;
+      meta.selection = '';
+      meta.output = '';
+      meta.error = '';
+      meta.loading = false;
       metadataRequest += 1;
     }
     const next = [...inputPaths, ...incoming];
@@ -473,27 +474,27 @@
       errorMessage = 'Select a preset in the toolbar before converting.';
       return;
     }
-    if (outputPolicy === 'replace') {
+    if (settings.outputPolicy === 'replace') {
       const preview = await refreshPreview();
       if (preview === null) return;
-      const irreversible = preview.filter((file) => file.route === 'Reencode' || (file.route === 'Encode' && distance > 0)).length;
+      const irreversible = preview.filter((file) => file.route === 'Reencode' || (file.route === 'Encode' && settings.distance > 0)).length;
       if (irreversible > 0 && !window.confirm(`Replace the originals for ${irreversible} irreversible file${irreversible === 1 ? '' : 's'}? They will be sent to the recycle bin after verification.`)) {
         return;
       }
     }
-    busy = true;
+    run.busy = true;
     errorMessage = '';
-    selectedResultInput = '';
-    metadataOutput = '';
-    metadataError = '';
-    metadataLoading = false;
+    meta.selection = '';
+    meta.output = '';
+    meta.error = '';
+    meta.loading = false;
     metadataRequest += 1;
-    summary = null;
+    run.summary = null;
     progress = { ...progress, total: runPaths.length, completed: 0, failed: 0, skipped: 0, inFlight: 0, percent: 0, paused: false };
     try {
       await Service.StartConversion(runPaths, currentOptions());
     } catch (error) {
-      busy = false;
+      run.busy = false;
       errorMessage = errorText(error);
     }
   }
@@ -519,26 +520,26 @@
   }
 
   async function refreshToolchain(): Promise<void> {
-    toolchainError = '';
+    tools.error = '';
     try {
-      toolchain = await Service.GetToolchainStatus();
+      tools.status = await Service.GetToolchainStatus();
     } catch (error) {
-      toolchainError = errorText(error);
+      tools.error = errorText(error);
     }
   }
 
   async function installToolchain(): Promise<void> {
-    installing = true;
-    installProgress = null;
-    toolchainError = '';
+    tools.installing = true;
+    tools.progress = null;
+    tools.error = '';
     try {
       await Service.InstallLatestToolchain();
       await refreshToolchain();
     } catch (error) {
-      toolchainError = errorText(error);
+      tools.error = errorText(error);
     } finally {
-      installing = false;
-      installProgress = null;
+      tools.installing = false;
+      tools.progress = null;
     }
   }
 
@@ -642,7 +643,7 @@
       }
       appStatus = await Service.GetStatus();
       if (entryPoint === 'contextmenu') {
-        contextMenuRegistered = await Service.ContextMenuRegistered();
+        tools.contextMenu = await Service.ContextMenuRegistered();
       }
     } catch (error) {
       errorMessage = errorText(error);
@@ -652,7 +653,7 @@
   async function registerContextMenu(): Promise<void> {
     try {
       await Service.RegisterContextMenu();
-      contextMenuRegistered = await Service.ContextMenuRegistered();
+      tools.contextMenu = await Service.ContextMenuRegistered();
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -661,7 +662,7 @@
   async function unregisterContextMenu(): Promise<void> {
     try {
       await Service.UnregisterContextMenu();
-      contextMenuRegistered = false;
+      tools.contextMenu = false;
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -685,24 +686,24 @@
     inputPaths = [];
     files = [];
     previewRequest += 1;
-    commandPreviews = [];
-    commandPreviewError = '';
+    cmdPreview.previews = [];
+    cmdPreview.error = '';
     commandPreviewRequest += 1;
     results = [];
-    selectedResultInput = '';
-    metadataOutput = '';
-    metadataError = '';
-    metadataLoading = false;
+    meta.selection = '';
+    meta.output = '';
+    meta.error = '';
+    meta.loading = false;
     metadataRequest += 1;
-    summary = null;
+    run.summary = null;
     progress = { ...progress, total: 0, completed: 0, failed: 0, skipped: 0, percent: 0 };
     view = 'main';
   }
 
   async function loadHistory(): Promise<void> {
     try {
-      historyEntries = (await Service.GetHistoryEntries()) ?? [];
-      historyLoaded = true;
+      history.entries = (await Service.GetHistoryEntries()) ?? [];
+      history.loaded = true;
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -710,17 +711,17 @@
 
   function openHistory(): void {
     view = 'history';
-    historyLoaded = false;
-    historyMeta = { entry: null, output: '', error: '', loading: false };
+    history.loaded = false;
+    history.meta = { entry: null, output: '', error: '', loading: false };
     void loadHistory();
   }
 
   async function clearHistoryAll(): Promise<void> {
-    if (!window.confirm(`Remove all ${historyEntries.length} history entries? The converted files are not touched.`)) return;
+    if (!window.confirm(`Remove all ${history.entries.length} history entries? The converted files are not touched.`)) return;
     try {
       await Service.ClearHistory();
-      historyEntries = [];
-      historyMeta = { entry: null, output: '', error: '', loading: false };
+      history.entries = [];
+      history.meta = { entry: null, output: '', error: '', loading: false };
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -728,14 +729,14 @@
 
   async function inspectHistoryEntry(entry: HistoryEntry): Promise<void> {
     const request = ++historyMetaRequest;
-    historyMeta = { entry, output: '', error: '', loading: true };
+    history.meta = { entry, output: '', error: '', loading: true };
     try {
       const output = await Service.InspectJXL(entry.output);
       if (request !== historyMetaRequest) return;
-      historyMeta = { entry, output, error: '', loading: false };
+      history.meta = { entry, output, error: '', loading: false };
     } catch (error) {
       if (request !== historyMetaRequest) return;
-      historyMeta = { entry, output: '', error: errorText(error), loading: false };
+      history.meta = { entry, output: '', error: errorText(error), loading: false };
     }
   }
 
@@ -768,18 +769,18 @@
     flags: FlagOverride[] | null;
   }): CoreSnapshot {
     const flags = core.flags ?? [];
-    distance = core.distance;
-    effort = core.effort;
+    settings.distance = core.distance;
+    settings.effort = core.effort;
     routeMode = core.distance === 0 ? 'lossless' : 'lossy';
-    if (core.distance > 0) lossyDistance = core.distance;
-    jpegLossless = core.jpegMode !== 'reencode';
-    outputPolicy = core.policy || 'alongside';
+    if (core.distance > 0) settings.lossyDistance = core.distance;
+    settings.jpegLossless = core.jpegMode !== 'reencode';
+    settings.outputPolicy = core.policy || 'alongside';
     expertOverrides = flags.map((flag) => ({ ...flag }));
     return {
       distance: core.distance,
       effort: core.effort,
-      jpegLossless,
-      policy: outputPolicy,
+      jpegLossless: settings.jpegLossless,
+      policy: settings.outputPolicy,
       flags,
     };
   }
@@ -794,7 +795,7 @@
     } catch (error) {
       errorMessage = errorText(error);
     }
-    if (!busy) void refreshPreview();
+    if (!run.busy) void refreshPreview();
   }
 
   function revertToPreset(): void {
@@ -811,7 +812,7 @@
 
   function onSettingsChanged(): void {
     void refreshCommandPreview();
-    if (busy) return; // running engine keeps its start-time snapshot; don't relabel files
+    if (run.busy) return; // running engine keeps its start-time snapshot; don't relabel files
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => void refreshPreview(), 300);
   }
@@ -831,19 +832,19 @@
   }
 
   function setDistanceValue(value: number): void {
-    distance = value;
-    if (routeMode === 'lossy') lossyDistance = distance;
+    settings.distance = value;
+    if (routeMode === 'lossy') settings.lossyDistance = settings.distance;
     onSettingsChanged();
   }
 
   function setQualityValue(value: number): void {
-    distance = distanceFromQuality(value);
-    if (routeMode === 'lossy') lossyDistance = distance;
+    settings.distance = distanceFromQuality(value);
+    if (routeMode === 'lossy') settings.lossyDistance = settings.distance;
     onSettingsChanged();
   }
 
   function setEffortValue(value: number): void {
-    effort = value;
+    settings.effort = value;
     onSettingsChanged();
   }
 
@@ -884,15 +885,15 @@
   function linkedFlagValue(flag: FlagInfo): string {
     switch (flag.key) {
       case '--distance':
-        return formatDistance(distance);
+        return formatDistance(settings.distance);
       case '--quality':
         return quality.toString();
       case '--effort':
-        return effort.toString();
+        return settings.effort.toString();
       case '--lossless_jpeg':
-        return jpegLossless ? '1' : '0';
+        return settings.jpegLossless ? '1' : '0';
       case '--num_threads':
-        return threads.toString();
+        return settings.threads.toString();
       default:
         return '';
     }
@@ -906,35 +907,35 @@
   function setRouteMode(next: RouteMode): void {
     if (next === routeMode) return;
     if (next === 'lossless') {
-      lossyDistance = distance > 0 ? distance : lossyDistance;
-      distance = 0;
+      settings.lossyDistance = settings.distance > 0 ? settings.distance : settings.lossyDistance;
+      settings.distance = 0;
     } else {
-      distance = lossyDistance > 0 ? lossyDistance : 1.0;
+      settings.distance = settings.lossyDistance > 0 ? settings.lossyDistance : 1.0;
     }
     routeMode = next;
     onSettingsChanged();
   }
 
   async function selectResult(result: FileUpdate): Promise<void> {
-    selectedResultInput = result.input;
-    metadataOutput = '';
-    metadataError = '';
-    metadataLoading = true;
+    meta.selection = result.input;
+    meta.output = '';
+    meta.error = '';
+    meta.loading = true;
     const request = ++metadataRequest;
     if (result.error || result.skipped || result.cancelled || !result.output) {
-      metadataError = result.error || result.skipReason || (result.cancelled ? 'Conversion was cancelled.' : 'No JXL output was produced for this result.');
-      metadataLoading = false;
+      meta.error = result.error || result.skipReason || (result.cancelled ? 'Conversion was cancelled.' : 'No JXL output was produced for this result.');
+      meta.loading = false;
       return;
     }
     try {
       const output = await Service.InspectJXL(result.output);
       if (request !== metadataRequest) return;
-      metadataOutput = output;
+      meta.output = output;
     } catch (error) {
       if (request !== metadataRequest) return;
-      metadataError = errorText(error);
+      meta.error = errorText(error);
     } finally {
-      if (request === metadataRequest) metadataLoading = false;
+      if (request === metadataRequest) meta.loading = false;
     }
   }
 
@@ -994,7 +995,7 @@
       {#each stripRules as rule}
         <code class="rule-chip">{rule}</code>
       {/each}
-      <span class="mini">output: {outputPolicy}</span>
+      <span class="mini">output: {settings.outputPolicy}</span>
       {#if presetChanged}
         <span class="spacer"></span>
         <span class="strip-warning" role="status">! settings differ — preset “{presetName}” is not in effect</span>
@@ -1039,24 +1040,24 @@
     <div class="body"><div class="empty">Loading jxleet...</div></div>
   {:else if view === 'main'}
     <div class="body">
-      {#if installing}
+      {#if tools.installing}
         <div class="run-strip" data-testid="install-strip">
           <div class="run-head">
             <span class="badge b-encode">Installing</span>
-            <span class="run-count">{installProgress?.phase === 'downloading' ? 'Downloading libjxl' : 'Verifying & installing'}</span>
-            {#if installProgress?.phase === 'downloading'}
-              <span class="mini">{formatBytes(installProgress.downloaded)} of {installProgress.total > 0 ? formatBytes(installProgress.total) : '?'}</span>
+            <span class="run-count">{tools.progress?.phase === 'downloading' ? 'Downloading libjxl' : 'Verifying & tools.installing'}</span>
+            {#if tools.progress?.phase === 'downloading'}
+              <span class="mini">{formatBytes(tools.progress.downloaded)} of {tools.progress.total > 0 ? formatBytes(tools.progress.total) : '?'}</span>
             {/if}
           </div>
-          {#if installProgress?.phase === 'downloading' && installProgress.total > 0}
-            <div class="bar"><i style={`width:${Math.min(100, (installProgress.downloaded / installProgress.total) * 100)}%`}></i></div>
+          {#if tools.progress?.phase === 'downloading' && tools.progress.total > 0}
+            <div class="bar"><i style={`width:${Math.min(100, (tools.progress.downloaded / tools.progress.total) * 100)}%`}></i></div>
           {/if}
         </div>
-      {:else if toolchain?.needsInstall}
+      {:else if tools.status?.needsInstall}
         <div class="banner warn">
           <span class="ic">!</span>
           <span><b>libjxl is not installed.</b> Install the managed cjxl/djxl/jxlinfo toolchain before converting.</span>
-          <button class="btn primary" style="margin-left:auto;background:var(--p-encode)" onclick={() => void installToolchain()} disabled={installing}>Install</button>
+          <button class="btn primary" style="margin-left:auto;background:var(--p-encode)" onclick={() => void installToolchain()} disabled={tools.installing}>Install</button>
         </div>
       {/if}
       {#if appStatus && !appStatus.ready}
@@ -1066,7 +1067,7 @@
           <button class="btn ghost" style="margin-left:auto" onclick={() => { view = 'presets'; }}>Set bindings</button>
         </div>
       {/if}
-      {#if files.length === 0 && !busy}
+      {#if files.length === 0 && !run.busy}
         <div
           class="drop"
           aria-label="Drop files or folders"
@@ -1137,9 +1138,9 @@
                     {#each group.files as file (file.path)}
                       {@const result = resultByInput.get(file.path)}
                       {@const failed = result != null && result.error !== ''}
-                      {@const inspectable = summary != null && !busy && result != null && !failed && !result.skipped && !result.cancelled}
+                      {@const inspectable = run.summary != null && !run.busy && result != null && !failed && !result.skipped && !result.cancelled}
                       <tr
-                        class:selected={result != null && selectedResultInput === result.input}
+                        class:selected={result != null && meta.selection === result.input}
                         class:clickable={inspectable}
                         onclick={() => { if (inspectable && result) void selectResult(result); }}
                       >
@@ -1151,7 +1152,7 @@
                             {failed ? (result.error || 'failed') : result.skipped ? (result.skipReason || 'skipped') : result.cancelled ? 'cancelled' : formatDelta(result.inputSize, result.outputSize)}
                           {:else if group.skip}
                             {file.reason || 'skipped'}
-                          {:else if busy}
+                          {:else if run.busy}
                             {fileStatus(file)}
                           {/if}
                         </td>
@@ -1169,19 +1170,19 @@
           <div class="card">
             <h3>Compression <span class="r">stored in the preset</span></h3>
             <div class="in">
-              <QualitySliders distance={distance} quality={quality} outOfRange={outOfRange} routeMode={routeMode} onDistance={setDistanceValue} onQuality={setQualityValue} />
+              <QualitySliders distance={settings.distance} quality={quality} outOfRange={outOfRange} routeMode={routeMode} onDistance={setDistanceValue} onQuality={setQualityValue} />
               <div class="effort-basic" style="border-top:1px solid var(--line-soft);margin-top:8px;padding-top:8px">
                 <div style="display:flex;align-items:baseline;gap:8px">
                   <span class="k">Effort</span>
-                  <span class="v">{effort} - {effortNames[effort - 1]}</span>
-                  <span class="mini" style="margin-left:auto">{effort === 7 ? 'default' : effort >= 9 ? 'slow' : effort <= 3 ? 'fast' : ''}</span>
+                  <span class="v">{settings.effort} - {effortNames[settings.effort - 1]}</span>
+                  <span class="mini" style="margin-left:auto">{settings.effort === 7 ? 'default' : settings.effort >= 9 ? 'slow' : settings.effort <= 3 ? 'fast' : ''}</span>
                 </div>
-                <input type="range" min="1" max="10" step="1" value={effort} oninput={setEffort} data-testid="effort-range-basic" aria-label="Effort" />
+                <input type="range" min="1" max="10" step="1" value={settings.effort} oninput={setEffort} data-testid="effort-range-basic" aria-label="Effort" />
                 <div class="quality-guidance"><span>1 = fastest</span><span>10 = smallest</span></div>
               </div>
               <div class="banner info" style="margin:9px 0 0">
                 <span class="ic">i</span>
-                <span>{jpegLossless ? 'JPEG files use lossless transcode and ignore compression settings.' : 'JPEG files are included in the lossy reencode route.'}</span>
+                <span>{settings.jpegLossless ? 'JPEG files use lossless transcode and ignore compression settings.' : 'JPEG files are included in the lossy reencode route.'}</span>
               </div>
             </div>
           </div>
@@ -1189,52 +1190,52 @@
           <div class="card">
             <h3>JPEG handling <span class="r">{routeCounts.Transcode + routeCounts.Reencode} files</span></h3>
             <div class="in policy" data-testid="jpeg-mode">
-              <label class="opt" data-sel={jpegLossless}>
-                <input type="radio" name="jpeg-mode" checked={jpegLossless} onchange={() => { jpegLossless = true; onSettingsChanged(); }} />
+              <label class="opt" data-sel={settings.jpegLossless}>
+                <input type="radio" name="jpeg-mode" checked={settings.jpegLossless} onchange={() => { settings.jpegLossless = true; onSettingsChanged(); }} />
                 <span><span class="ot">Transcode</span><span class="od">Bit-exactly reversible; the original JPEG can be reconstructed.</span></span>
               </label>
-              <label class="opt" data-sel={!jpegLossless}>
-                <input type="radio" name="jpeg-mode" checked={!jpegLossless} onchange={() => { jpegLossless = false; onSettingsChanged(); }} />
-                <span><span class="ot">Reencode</span><span class="od">Uses distance and effort; not reversible.</span></span>
+              <label class="opt" data-sel={!settings.jpegLossless}>
+                <input type="radio" name="jpeg-mode" checked={!settings.jpegLossless} onchange={() => { settings.jpegLossless = false; onSettingsChanged(); }} />
+                <span><span class="ot">Reencode</span><span class="od">Uses settings.distance and settings.effort; not reversible.</span></span>
               </label>
-              <div class="mini" style="padding:6px 8px 0;border-top:1px solid var(--line-soft);margin-top:4px">--lossless_jpeg={jpegLossless ? 1 : 0}</div>
+              <div class="mini" style="padding:6px 8px 0;border-top:1px solid var(--line-soft);margin-top:4px">--lossless_jpeg={settings.jpegLossless ? 1 : 0}</div>
             </div>
           </div>
 
           <div class="card">
             <h3>Output</h3>
             <div class="in policy" data-testid="output-policy">
-              <label class="opt" data-sel={outputPolicy === 'alongside'}>
-                <input type="radio" name="output" checked={outputPolicy === 'alongside'} onchange={() => { outputPolicy = 'alongside'; onSettingsChanged(); }} />
+              <label class="opt" data-sel={settings.outputPolicy === 'alongside'}>
+                <input type="radio" name="output" checked={settings.outputPolicy === 'alongside'} onchange={() => { settings.outputPolicy = 'alongside'; onSettingsChanged(); }} />
                 <span><span class="ot">Alongside</span><span class="od">The original stays untouched.</span></span>
               </label>
-              <label class="opt" data-sel={outputPolicy === 'subfolder'}>
-                <input type="radio" name="output" checked={outputPolicy === 'subfolder'} onchange={() => { outputPolicy = 'subfolder'; onSettingsChanged(); }} />
+              <label class="opt" data-sel={settings.outputPolicy === 'subfolder'}>
+                <input type="radio" name="output" checked={settings.outputPolicy === 'subfolder'} onchange={() => { settings.outputPolicy = 'subfolder'; onSettingsChanged(); }} />
                 <span><span class="ot">Into subfolder</span><span class="od">./jxl/ relative to the source.</span></span>
               </label>
-              <label class="opt risk" data-sel={outputPolicy === 'replace'}>
-                <input type="radio" name="output" checked={outputPolicy === 'replace'} onchange={() => { outputPolicy = 'replace'; onSettingsChanged(); }} />
+              <label class="opt risk" data-sel={settings.outputPolicy === 'replace'}>
+                <input type="radio" name="output" checked={settings.outputPolicy === 'replace'} onchange={() => { settings.outputPolicy = 'replace'; onSettingsChanged(); }} />
                 <span><span class="ot">Replace, original to recycle bin</span><span class="od">Only after verification. Irreversible routes require confirmation.</span></span>
               </label>
             </div>
           </div>
 
-          {#if summary && !busy}
+          {#if run.summary && !run.busy}
             <div class="card">
               <h3>Output summary</h3>
               <div class="in kv">
-                <div><span>Converted</span><span>{summary.completed}{#if summary.failed > 0} - {summary.failed} failed{/if}{#if summary.skipped > 0} - {summary.skipped} skipped{/if}</span></div>
-                <div><span>Bytes</span><span>{formatBytes(summary.bytesIn)} -&gt; {formatBytes(summary.bytesOut)}</span></div>
-                <div><span>Saved</span><span class="success">{formatDelta(summary.bytesIn, summary.bytesOut)}</span></div>
+                <div><span>Converted</span><span>{run.summary.completed}{#if run.summary.failed > 0} - {run.summary.failed} failed{/if}{#if run.summary.skipped > 0} - {run.summary.skipped} skipped{/if}</span></div>
+                <div><span>Bytes</span><span>{formatBytes(run.summary.bytesIn)} -&gt; {formatBytes(run.summary.bytesOut)}</span></div>
+                <div><span>Saved</span><span class="success">{formatDelta(run.summary.bytesIn, run.summary.bytesOut)}</span></div>
               </div>
             </div>
             <JxlInfoPanel
               label={selectedResult ? (selectedResult.output ? compactPath(selectedResult.output, 34) : 'unavailable') : 'select a converted file'}
               emptyText="Select a converted file to inspect its JPEG XL metadata."
               hasSelection={selectedResult != null}
-              loading={metadataLoading}
-              error={metadataError}
-              output={metadataOutput}
+              loading={meta.loading}
+              error={meta.error}
+              output={meta.output}
             />
           {/if}
         </div>
@@ -1244,15 +1245,15 @@
     </div>
     {#if files.length > 0}
       <div class="convertbar" data-testid="convertbar">
-        {#if summary && !busy}
-          <span class:error={summary.failed > 0} class:success={summary.failed === 0}>{summary.completed} converted{#if summary.failed > 0} - {summary.failed} failed{/if}{#if summary.skipped > 0} - {summary.skipped} skipped{/if}</span>
-          <span class="mono-mini">{formatBytes(summary.bytesIn)} -&gt; {formatBytes(summary.bytesOut)}</span>
-          <span class="delta-chip" class:neg={savedPct(summary.bytesIn, summary.bytesOut) < 0}>{formatDelta(summary.bytesIn, summary.bytesOut)}</span>
+        {#if run.summary && !run.busy}
+          <span class:error={run.summary.failed > 0} class:success={run.summary.failed === 0}>{run.summary.completed} converted{#if run.summary.failed > 0} - {run.summary.failed} failed{/if}{#if run.summary.skipped > 0} - {run.summary.skipped} skipped{/if}</span>
+          <span class="mono-mini">{formatBytes(run.summary.bytesIn)} -&gt; {formatBytes(run.summary.bytesOut)}</span>
+          <span class="delta-chip" class:neg={savedPct(run.summary.bytesIn, run.summary.bytesOut) < 0}>{formatDelta(run.summary.bytesIn, run.summary.bytesOut)}</span>
         {:else}
           <span class="mini">{files.length} files - {formatBytes(totalSize)}</span>
         {/if}
         <span class="spacer"></span>
-        {#if !busy}<button class="btn" data-testid="new-files" onclick={clearAll}>Clear All</button>{/if}
+        {#if !run.busy}<button class="btn" data-testid="new-files" onclick={clearAll}>Clear All</button>{/if}
         <button class="btn primary convert-action" style={`background:var(--p-${dominantRoute === 'Transcode' ? 'transcode' : dominantRoute === 'Encode' ? 'encode' : 'reencode'});padding:11px`} data-testid="start-convert" onclick={() => void startConversion()} disabled={!canConvert}>Convert {pendingPaths.length || files.length} files</button>
       </div>
     {/if}
@@ -1272,8 +1273,8 @@
         <div class="card">
           <h3>Effort <span class="r">what this level adds</span></h3>
           <div class="in">
-            <EffortLadder effort={effort} routeMode={routeMode} onEffortInput={setEffortValue} />
-            <CommandPreviewPanel previews={commandPreviews} error={commandPreviewError} />
+            <EffortLadder effort={settings.effort} routeMode={routeMode} onEffortInput={setEffortValue} />
+            <CommandPreviewPanel previews={cmdPreview.previews} error={cmdPreview.error} />
           </div>
         </div>
 
@@ -1281,7 +1282,7 @@
           <div class="card">
             <h3>Quality</h3>
             <div class="in">
-              <QualitySliders distance={distance} quality={quality} outOfRange={outOfRange} routeMode={routeMode} locked={routeMode === 'lossless'} onDistance={setDistanceValue} onQuality={setQualityValue} />
+              <QualitySliders distance={settings.distance} quality={quality} outOfRange={outOfRange} routeMode={routeMode} locked={routeMode === 'lossless'} onDistance={setDistanceValue} onQuality={setQualityValue} />
               <div class="banner info" style="margin:10px 0 0"><span class="ic">i</span><span>Distance and quality control the same quantity; moving either slider moves the other. The run always uses -d.</span></div>
             </div>
           </div>
@@ -1292,11 +1293,11 @@
                 <span class="ic">i</span>
                 <span>Changes apply to this session only and are not saved to the preset. Persist them in the YAML file (Presets → Open in Editor); Reset restores the preset values.</span>
               </div>
-              {#if toolchain?.flagsLocked}
+              {#if tools.status?.flagsLocked}
                 <div class="banner warn"><span class="ic">!</span><span>Expert flags are locked because the installed cjxl version differs from the generated help.</span></div>
               {/if}
               <div class="flag-actions">
-                <button class="btn ghost" onclick={resetExpertFlags} disabled={Boolean(toolchain?.flagsLocked)}>Reset Expert flags</button>
+                <button class="btn ghost" onclick={resetExpertFlags} disabled={Boolean(tools.status?.flagsLocked)}>Reset Expert flags</button>
                 <span class="mini">Reset removes the extra flags stored in the preset so cjxl defaults apply.</span>
               </div>
               {#each flagSections as section}
@@ -1318,7 +1319,7 @@
                           placeholder={linked ? '' : 'cjxl default'}
                           aria-label={flagLabel(flag)}
                           title={flag.description}
-                          disabled={linked || Boolean(toolchain?.flagsLocked)}
+                          disabled={linked || Boolean(tools.status?.flagsLocked)}
                           oninput={(event) => setExpertFlagValue(flag.key, (event.currentTarget as HTMLInputElement).value)}
                         />
                       {:else}
@@ -1328,7 +1329,7 @@
                           checked={expertFlagEnabled(flag.key)}
                           aria-label={flagLabel(flag)}
                           title={flag.description}
-                          disabled={Boolean(toolchain?.flagsLocked)}
+                          disabled={Boolean(tools.status?.flagsLocked)}
                           onchange={(event) => setExpertFlagEnabled(flag.key, (event.currentTarget as HTMLInputElement).checked)}
                         />
                       {/if}
@@ -1346,7 +1347,7 @@
     <div class="body">
       <div class="toolbar" style="margin:-12px -12px 12px">
         <span class="badge b-reencode">Running</span>
-        <span class="mini">{presetName || 'preset'} - {processes} processes - {threads} threads</span>
+        <span class="mini">{presetName || 'preset'} - {settings.processes} processes - {settings.threads} threads</span>
         <span class="spacer"></span>
         <button class="btn" onclick={() => void togglePause()}>{progress.paused ? 'Resume' : 'Pause'}</button>
         <button class="btn danger" data-testid="cancel" onclick={() => void cancelConversion()}>Cancel</button>
@@ -1398,35 +1399,35 @@
     </div>
   {:else if view === 'tools'}
     <div class="body">
-      {#if toolchainError}
-        <div class="banner warn"><span class="ic">!</span><span>{toolchainError}</span><button class="btn ghost" style="margin-left:auto" onclick={() => void refreshToolchain()}>Retry</button></div>
+      {#if tools.error}
+        <div class="banner warn"><span class="ic">!</span><span>{tools.error}</span><button class="btn ghost" style="margin-left:auto" onclick={() => void refreshToolchain()}>Retry</button></div>
       {/if}
-      {#if toolchain?.flagsLocked}
-        <div class="banner warn"><span class="ic">!</span><span><b>Expert flags are locked.</b> Installed libjxl {toolchain.flagToolVersion || 'unknown'} differs from generated flags {toolchain.flagBaseVersion}.</span></div>
+      {#if tools.status?.flagsLocked}
+        <div class="banner warn"><span class="ic">!</span><span><b>Expert flags are locked.</b> Installed libjxl {tools.status.flagToolVersion || 'unknown'} differs from generated flags {tools.status.flagBaseVersion}.</span></div>
       {/if}
       <div class="cols">
         <div class="card">
           <h3>libjxl</h3>
           <div class="in">
-            <div class="row"><span class="k">Installed</span><span class="v">{toolchain?.installedVersion || 'not installed'}</span></div>
-            <div class="row"><span class="k">cjxl</span><span class="v">{toolchain?.cjxlVersion || '-'}</span></div>
-            <div class="row"><span class="k">djxl</span><span class="v">{toolchain?.djxlVersion || '-'}</span></div>
-            <div class="row"><span class="k">jxlinfo</span><span class="v">{toolchain?.jxlinfoVersion || '-'}</span></div>
-            <div class="row"><span class="k">Latest version</span><span class:warning={toolchain?.updateAvailable} class="v">{toolchain?.latestVersion || '-'}</span></div>
+            <div class="row"><span class="k">Installed</span><span class="v">{tools.status?.installedVersion || 'not installed'}</span></div>
+            <div class="row"><span class="k">cjxl</span><span class="v">{tools.status?.cjxlVersion || '-'}</span></div>
+            <div class="row"><span class="k">djxl</span><span class="v">{tools.status?.djxlVersion || '-'}</span></div>
+            <div class="row"><span class="k">jxlinfo</span><span class="v">{tools.status?.jxlinfoVersion || '-'}</span></div>
+            <div class="row"><span class="k">Latest version</span><span class:warning={tools.status?.updateAvailable} class="v">{tools.status?.latestVersion || '-'}</span></div>
             <div class="row"><span class="k">Asset</span><span class="v">jxl-x64-windows-static.zip</span></div>
             <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-              <button class="btn" data-testid="check-updates" onclick={() => void refreshToolchain()} disabled={installing}>Check for updates</button>
-              {#if toolchain?.updateAvailable || toolchain?.needsInstall}
-                <button class="btn primary" style="background:var(--p-encode)" onclick={() => void installToolchain()} disabled={installing}>{toolchain?.needsInstall ? 'Install toolchain' : `Update to ${toolchain.latestVersion}`}</button>
+              <button class="btn" data-testid="check-updates" onclick={() => void refreshToolchain()} disabled={tools.installing}>Check for updates</button>
+              {#if tools.status?.updateAvailable || tools.status?.needsInstall}
+                <button class="btn primary" style="background:var(--p-encode)" onclick={() => void installToolchain()} disabled={tools.installing}>{tools.status?.needsInstall ? 'Install toolchain' : `Update to ${tools.status.latestVersion}`}</button>
               {/if}
             </div>
-            {#if installing && installProgress}
-              <div class="mini" style="margin-top:8px">{installProgress.phase === 'downloading' ? 'Downloading' : 'Installing'}{#if installProgress.phase === 'downloading' && installProgress.total > 0} — {formatBytes(installProgress.downloaded)} / {formatBytes(installProgress.total)}{/if}</div>
-              {#if installProgress.phase === 'downloading' && installProgress.total > 0}
-                <div class="bar" style="margin-top:4px"><i style={`width:${Math.min(100, (installProgress.downloaded / installProgress.total) * 100)}%`}></i></div>
+            {#if tools.installing && tools.progress}
+              <div class="mini" style="margin-top:8px">{tools.progress.phase === 'downloading' ? 'Downloading' : 'Installing'}{#if tools.progress.phase === 'downloading' && tools.progress.total > 0} — {formatBytes(tools.progress.downloaded)} / {formatBytes(tools.progress.total)}{/if}</div>
+              {#if tools.progress.phase === 'downloading' && tools.progress.total > 0}
+                <div class="bar" style="margin-top:4px"><i style={`width:${Math.min(100, (tools.progress.downloaded / tools.progress.total) * 100)}%`}></i></div>
               {/if}
             {/if}
-            {#if toolchain && !toolchain.updateAvailable && !toolchain.needsInstall}
+            {#if tools.status && !tools.status.updateAvailable && !tools.status.needsInstall}
               <div class="mini" style="margin-top:6px">libjxl is up to date.</div>
             {/if}
           </div>
@@ -1435,22 +1436,22 @@
           <div class="card">
             <h3>Explorer context menu</h3>
             <div class="in">
-              <div class="row"><span class="k">Status</span><span class:success={contextMenuRegistered} class:muted={!contextMenuRegistered} class="v">{contextMenuRegistered ? 'registered' : 'not registered'}</span></div>
+              <div class="row"><span class="k">Status</span><span class:success={tools.contextMenu} class:muted={!tools.contextMenu} class="v">{tools.contextMenu ? 'registered' : 'not registered'}</span></div>
               <div class="row"><span class="k">Preset</span><span class="v">{bindings.contextMenu || 'not bound'}</span></div>
               <div class="mini" style="margin-top:8px">Per-user registration; Windows 11 shows it under Show more options.</div>
               <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
                 <button class="btn" onclick={() => void registerContextMenu()} disabled={!bindings.contextMenu}>Register</button>
-                <button class="btn danger" onclick={() => void unregisterContextMenu()} disabled={!contextMenuRegistered}>Remove entry</button>
+                <button class="btn danger" onclick={() => void unregisterContextMenu()} disabled={!tools.contextMenu}>Remove entry</button>
               </div>
             </div>
           </div>
           <div class="card">
             <h3>Flag changes</h3>
             <div class="in kv">
-              <div><span>Base</span><span>{toolchain?.flagBaseVersion || '-'}</span></div>
-              <div><span>Installed</span><span>{toolchain?.flagToolVersion || '-'}</span></div>
-              <div><span>Added</span><span>{toolchain?.addedFlags?.join(', ') || 'none'}</span></div>
-              <div><span>Removed</span><span>{toolchain?.removedFlags?.join(', ') || 'none'}</span></div>
+              <div><span>Base</span><span>{tools.status?.flagBaseVersion || '-'}</span></div>
+              <div><span>Installed</span><span>{tools.status?.flagToolVersion || '-'}</span></div>
+              <div><span>Added</span><span>{tools.status?.addedFlags?.join(', ') || 'none'}</span></div>
+              <div><span>Removed</span><span>{tools.status?.removedFlags?.join(', ') || 'none'}</span></div>
             </div>
           </div>
           <div class="card">
@@ -1599,12 +1600,12 @@
     <div class="body">
       <div class="cols wide-right">
         <div class="card">
-          <h3>History <span class="r">{historyEntries.length} conversions
+          <h3>History <span class="r">{history.entries.length} conversions
             <button class="icon-btn" aria-label="Reload history" title="Reload" onclick={() => void loadHistory()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-.9 4"></path><path d="M20 4v6h-6"></path></svg></button>
-            <button class="btn danger" style="padding:2px 10px" data-testid="history-clear" onclick={() => void clearHistoryAll()} disabled={historyEntries.length === 0}>Clear</button></span></h3>
-          {#if !historyLoaded}
+            <button class="btn danger" style="padding:2px 10px" data-testid="history-clear" onclick={() => void clearHistoryAll()} disabled={history.entries.length === 0}>Clear</button></span></h3>
+          {#if !history.loaded}
             <div class="empty">Loading history...</div>
-          {:else if historyEntries.length === 0}
+          {:else if history.entries.length === 0}
             <div class="empty">No conversions recorded yet. Successfully converted files appear here.</div>
           {:else}
             <table class="files group-files" data-testid="history-table">
@@ -1617,11 +1618,11 @@
               </colgroup>
               <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Original</th><th style="text-align:right">JXL</th><th style="text-align:right">Saved</th></tr></thead>
               <tbody>
-                {#each historyEntries as entry (entry.at + entry.output)}
+                {#each history.entries as entry (entry.at + entry.output)}
                   <tr
                     class="clickable"
-                    class:selected={historyMeta.entry === entry}
-                    onclick={() => { if (historyMeta.entry !== entry) void inspectHistoryEntry(entry); }}
+                    class:selected={history.meta.entry === entry}
+                    onclick={() => { if (history.meta.entry !== entry) void inspectHistoryEntry(entry); }}
                     title="{entry.at} · preset {entry.preset}"
                   >
                     <td class="fn" title={`${entry.at} · ${entry.input}`}>{entry.input.split(/[\\/]/).pop()}</td>
@@ -1637,12 +1638,12 @@
         </div>
         <div style="display:flex;flex-direction:column;gap:12px">
           <JxlInfoPanel
-            label={historyMeta.entry ? (historyMeta.error ? 'unavailable' : compactPath(historyMeta.entry.output, 34)) : 'select an entry'}
+            label={history.meta.entry ? (history.meta.error ? 'unavailable' : compactPath(history.meta.entry.output, 34)) : 'select an entry'}
             emptyText="Select a history entry to inspect its JPEG XL metadata."
-            hasSelection={historyMeta.entry != null}
-            loading={historyMeta.loading}
-            error={historyMeta.error}
-            output={historyMeta.output}
+            hasSelection={history.meta.entry != null}
+            loading={history.meta.loading}
+            error={history.meta.error}
+            output={history.meta.output}
           />
         </div>
       </div>
@@ -1650,17 +1651,17 @@
   {/if}
 
   <div class="statusbar">
-    {#if toolchain?.installedVersion}
-      <span class="ok"><span class="dotled"></span>cjxl {toolchain.installedVersion}</span>
+    {#if tools.status?.installedVersion}
+      <span class="ok"><span class="dotled"></span>cjxl {tools.status.installedVersion}</span>
     {:else}
       <span class="warning"><span class="dotled"></span>libjxl not installed</span>
     {/if}
     <span class="spacer"></span>
-    {#if installing && installProgress}
-      <span>{installProgress.phase === 'downloading' ? 'Downloading libjxl' : 'Installing libjxl'}{#if installProgress.phase === 'downloading' && installProgress.total > 0} — {formatBytes(installProgress.downloaded)} / {formatBytes(installProgress.total)}{/if}</span>
-    {:else if busy || view === 'automatic'}
+    {#if tools.installing && tools.progress}
+      <span>{tools.progress.phase === 'downloading' ? 'Downloading libjxl' : 'Installing libjxl'}{#if tools.progress.phase === 'downloading' && tools.progress.total > 0} — {formatBytes(tools.progress.downloaded)} / {formatBytes(tools.progress.total)}{/if}</span>
+    {:else if run.busy || view === 'automatic'}
       <span>{progress.completed} done - {progress.failed} failed</span><span>{formatRate(progress.throughput)}</span>
-    {:else if view === 'tools' && toolchain?.updateAvailable}
+    {:else if view === 'tools' && tools.status?.updateAvailable}
       <span class="up">Update available</span>
     {:else if files.length > 0}
       <span>{files.length} files - {formatBytes(totalSize)}</span>
