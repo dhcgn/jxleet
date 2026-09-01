@@ -37,6 +37,7 @@
   import JxlInfoPanel from './components/JxlInfoPanel.svelte';
   import AutomaticView from './views/AutomaticView.svelte';
   import ToolsView from './views/ToolsView.svelte';
+  import HistoryView from './views/HistoryView.svelte';
 
 
   let view = $state<View>('main');
@@ -1497,57 +1498,14 @@
        </div>
      </div>
   {:else if view === 'history'}
-    <div class="body">
-      <div class="cols wide-right">
-        <div class="card">
-          <h3>History <span class="r">{history.entries.length} conversions
-            <button class="icon-btn" aria-label="Reload history" title="Reload" onclick={() => void loadHistory()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-.9 4"></path><path d="M20 4v6h-6"></path></svg></button>
-            <button class="btn danger" style="padding:2px 10px" data-testid="history-clear" onclick={() => void clearHistoryAll()} disabled={history.entries.length === 0}>Clear</button></span></h3>
-          {#if !history.loaded}
-            <div class="empty">Loading history...</div>
-          {:else if history.entries.length === 0}
-            <div class="empty">No conversions recorded yet. Successfully converted files appear here.</div>
-          {:else}
-            <table class="files group-files" data-testid="history-table">
-              <colgroup>
-                <col class="gf-file" />
-                <col class="gf-hug" />
-                <col class="gf-hug" />
-                <col class="gf-hug" />
-                <col class="gf-hug" />
-              </colgroup>
-              <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Original</th><th style="text-align:right">JXL</th><th style="text-align:right">Saved</th></tr></thead>
-              <tbody>
-                {#each history.entries as entry (entry.at + entry.output)}
-                  <tr
-                    class="clickable"
-                    class:selected={history.meta.entry === entry}
-                    onclick={() => { if (history.meta.entry !== entry) void inspectHistoryEntry(entry); }}
-                    title="{entry.at} · preset {entry.preset}"
-                  >
-                    <td class="fn" title={`${entry.at} · ${entry.input}`}>{entry.input.split(/[\\/]/).pop()}</td>
-                    <td><span class={`badge ${routeClass(entry.route)}`}>{entry.route}</span></td>
-                    <td class="num">{formatBytes(entry.inputSize)}</td>
-                    <td class="num">{formatBytes(entry.outputSize)}</td>
-                    <td class="num"><span class="delta-chip" class:neg={savedPct(entry.inputSize, entry.outputSize) < 0}>{formatDelta(entry.inputSize, entry.outputSize)}</span></td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          {/if}
-        </div>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          <JxlInfoPanel
-            label={history.meta.entry ? (history.meta.error ? 'unavailable' : compactPath(history.meta.entry.output, 34)) : 'select an entry'}
-            emptyText="Select a history entry to inspect its JPEG XL metadata."
-            hasSelection={history.meta.entry != null}
-            loading={history.meta.loading}
-            error={history.meta.error}
-            output={history.meta.output}
-          />
-        </div>
-      </div>
-    </div>
+    <HistoryView
+      entries={history.entries}
+      loaded={history.loaded}
+      meta={history.meta}
+      onReload={() => void loadHistory()}
+      onClear={() => void clearHistoryAll()}
+      onInspect={(entry) => void inspectHistoryEntry(entry)}
+    />
   {/if}
 
   <div class="statusbar">
