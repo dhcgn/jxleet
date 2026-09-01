@@ -24,17 +24,17 @@
   import { effortNames, effortTools, stageIndexAt } from './lib/effort';
   import {
     distanceFromQuality,
-    distanceZoneStyle,
     formatDistance,
     qualityFromDistance,
     qualityStatusText,
-    qualityZoneStyle,
-    SLIDER_QUALITY_MIN,
   } from './lib/quality';
   import { compactPath, formatBytes, formatDelta, formatEta, formatRate, savedPct } from './lib/format';
   import { routeClass, routeTitle } from './lib/routes';
   import { flagLabel, hiddenExpertFlags, isLinkedFlagKey, sameFlags } from './lib/flags';
   import EffortLadder from './components/EffortLadder.svelte';
+  import QualitySliders from './components/QualitySliders.svelte';
+  import CommandPreviewPanel from './components/CommandPreview.svelte';
+  import JxlInfoPanel from './components/JxlInfoPanel.svelte';
 
 
   let view = $state<View>('main');
@@ -830,15 +830,13 @@
     collapsedGroups = next;
   }
 
-  function setDistance(event: Event): void {
-    distance = Number((event.currentTarget as HTMLInputElement).value);
+  function setDistanceValue(value: number): void {
+    distance = value;
     if (routeMode === 'lossy') lossyDistance = distance;
     onSettingsChanged();
   }
 
-  function setQuality(event: Event): void {
-    const position = Number((event.currentTarget as HTMLInputElement).value);
-    const value = 100 - position; // slider is inverted so best quality (100) sits on the left, matching distance 0
+  function setQualityValue(value: number): void {
     distance = distanceFromQuality(value);
     if (routeMode === 'lossy') lossyDistance = distance;
     onSettingsChanged();
@@ -1171,23 +1169,7 @@
           <div class="card">
             <h3>Compression <span class="r">stored in the preset</span></h3>
             <div class="in">
-              <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
-                <span class="k">Distance</span>
-                <span class="qnum" class:out-of-range={outOfRange}>{formatDistance(distance)}</span>
-                <span class="mini range-status" class:out-of-range={outOfRange} style="margin-left:auto">{qualityStatusText(routeMode, distance, outOfRange)}</span>
-              </div>
-              <div class="quality-range" style={distanceZoneStyle}>
-                <input type="range" min="0" max="5" step="0.025" value={distance} oninput={setDistance} aria-label="Distance" />
-              </div>
-              <div class="quality-guidance"><span>Recommended: 0.5 .. 3.0</span><span>1.0 = visually lossless</span></div>
-              <div style="display:flex;align-items:baseline;gap:8px;margin-top:10px;margin-bottom:2px">
-                <span class="k">Quality</span>
-                <span class="qnum">{quality}</span>
-              </div>
-              <div class="quality-range" style={qualityZoneStyle}>
-                <input type="range" min="0" max={100 - SLIDER_QUALITY_MIN} step="1" value={100 - quality} oninput={setQuality} aria-label="Quality" />
-              </div>
-              <div class="quality-guidance"><span>Recommended: 68 .. 96</span><span>90 = visually lossless</span></div>
+              <QualitySliders distance={distance} quality={quality} outOfRange={outOfRange} routeMode={routeMode} onDistance={setDistanceValue} onQuality={setQualityValue} />
               <div class="effort-basic" style="border-top:1px solid var(--line-soft);margin-top:8px;padding-top:8px">
                 <div style="display:flex;align-items:baseline;gap:8px">
                   <span class="k">Effort</span>
@@ -1246,20 +1228,14 @@
                 <div><span>Saved</span><span class="success">{formatDelta(summary.bytesIn, summary.bytesOut)}</span></div>
               </div>
             </div>
-            <div class="card">
-              <h3>jxlinfo <span class="r">{selectedResult ? (selectedResult.output ? compactPath(selectedResult.output, 34) : 'unavailable') : 'select a converted file'}</span></h3>
-              <div class="in">
-                {#if !selectedResult}
-                  <div class="empty">Select a converted file to inspect its JPEG XL metadata.</div>
-                {:else if metadataLoading}
-                  <div class="empty">Reading jxlinfo metadata...</div>
-                {:else if metadataError}
-                  <div class="banner warn" style="margin:0"><span class="ic">!</span><span>{metadataError}</span></div>
-                {:else}
-                  <pre class="metadata-output">{metadataOutput}</pre>
-                {/if}
-              </div>
-            </div>
+            <JxlInfoPanel
+              label={selectedResult ? (selectedResult.output ? compactPath(selectedResult.output, 34) : 'unavailable') : 'select a converted file'}
+              emptyText="Select a converted file to inspect its JPEG XL metadata."
+              hasSelection={selectedResult != null}
+              loading={metadataLoading}
+              error={metadataError}
+              output={metadataOutput}
+            />
           {/if}
         </div>
       </div>
@@ -1297,20 +1273,7 @@
           <h3>Effort <span class="r">what this level adds</span></h3>
           <div class="in">
             <EffortLadder effort={effort} routeMode={routeMode} onEffortInput={setEffortValue} />
-            {#if commandPreviewError}
-              <div class="banner warn" data-testid="cmd-preview-error"><span class="ic">!</span><span>{commandPreviewError}</span></div>
-            {:else if commandPreviews.length === 0}
-              <div class="cmd" data-testid="cmd-preview">Select a preset to preview the resolved cjxl command.</div>
-            {:else}
-              <div class="command-previews" data-testid="cmd-preview">
-                {#each commandPreviews as preview}
-                  <div class="command-preview">
-                    <div class="mini">{preview.matches?.join(', ') ?? 'default rule'}</div>
-                    <div class="cmd">{preview.command}</div>
-                  </div>
-                {/each}
-              </div>
-            {/if}
+            <CommandPreviewPanel previews={commandPreviews} error={commandPreviewError} />
           </div>
         </div>
 
@@ -1318,23 +1281,7 @@
           <div class="card">
             <h3>Quality</h3>
             <div class="in">
-              <div style="display:flex;align-items:baseline;gap:8px">
-                <span class="k">Distance</span>
-                <span class="qnum" class:out-of-range={outOfRange}>{formatDistance(distance)}</span>
-                <span class="mini range-status" class:out-of-range={outOfRange} style="margin-left:auto">{qualityStatusText(routeMode, distance, outOfRange)}</span>
-              </div>
-              <div class="quality-range" class:locked={routeMode === 'lossless'} style={distanceZoneStyle}>
-                <input type="range" min="0" max="5" step="0.025" value={distance} oninput={setDistance} disabled={routeMode === 'lossless'} aria-label="Distance" />
-              </div>
-              <div class="quality-guidance"><span>Recommended: 0.5 .. 3.0</span><span>1.0 = visually lossless</span></div>
-              <div style="display:flex;align-items:baseline;gap:8px;margin-top:10px">
-                <span class="k">Quality</span>
-                <span class="qnum">{quality}</span>
-              </div>
-              <div class="quality-range" class:locked={routeMode === 'lossless'} style={qualityZoneStyle}>
-                <input type="range" min="0" max={100 - SLIDER_QUALITY_MIN} step="1" value={100 - quality} oninput={setQuality} disabled={routeMode === 'lossless'} aria-label="Quality" />
-              </div>
-              <div class="quality-guidance"><span>Recommended: 68 .. 96</span><span>90 = visually lossless</span></div>
+              <QualitySliders distance={distance} quality={quality} outOfRange={outOfRange} routeMode={routeMode} locked={routeMode === 'lossless'} onDistance={setDistanceValue} onQuality={setQualityValue} />
               <div class="banner info" style="margin:10px 0 0"><span class="ic">i</span><span>Distance and quality control the same quantity; moving either slider moves the other. The run always uses -d.</span></div>
             </div>
           </div>
@@ -1689,20 +1636,14 @@
           {/if}
         </div>
         <div style="display:flex;flex-direction:column;gap:12px">
-          <div class="card">
-            <h3>jxlinfo <span class="r">{historyMeta.entry ? (historyMeta.error ? 'unavailable' : compactPath(historyMeta.entry.output, 34)) : 'select an entry'}</span></h3>
-            <div class="in">
-              {#if !historyMeta.entry}
-                <div class="empty">Select a history entry to inspect its JPEG XL metadata.</div>
-              {:else if historyMeta.loading}
-                <div class="empty">Reading jxlinfo metadata...</div>
-              {:else if historyMeta.error}
-                <div class="banner warn" style="margin:0"><span class="ic">!</span><span>{historyMeta.error}</span></div>
-              {:else}
-                <pre class="metadata-output">{historyMeta.output}</pre>
-              {/if}
-            </div>
-          </div>
+          <JxlInfoPanel
+            label={historyMeta.entry ? (historyMeta.error ? 'unavailable' : compactPath(historyMeta.entry.output, 34)) : 'select an entry'}
+            emptyText="Select a history entry to inspect its JPEG XL metadata."
+            hasSelection={historyMeta.entry != null}
+            loading={historyMeta.loading}
+            error={historyMeta.error}
+            output={historyMeta.output}
+          />
         </div>
       </div>
     </div>
