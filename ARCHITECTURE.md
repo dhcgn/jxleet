@@ -92,8 +92,14 @@ value.
 
 ### Effort
 
-`-e` 1–10, default 7. The effort ladder (coding tools × levels) is authored
-reference data, independent of the installed cjxl version.
+`-e` 1–10, default 7. The effort ladder (coding tools × levels) is reference
+data transcribed from libjxl's `doc/encode_effort.md` (spline detection is
+verified in the libjxl source instead), independent of the installed cjxl
+version. Tools with several strength stages are colour-graded
+orange → yellow → green → blue, blue marking the strongest form; the
+`8×8 blocks only` row is always yellow as it is a limitation. Every level
+cell carries a tooltip, and rows can define separate stage lists for the
+lossy and lossless modes. Tools of the other mode stay lit at half opacity.
 
 ## Presets
 

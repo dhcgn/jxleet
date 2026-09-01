@@ -51,21 +51,176 @@
     'glacier',
   ];
 
-  const effortTools = [
-    { name: 'Modular tree search', from: 3, lossy: false, lossless: true },
-    { name: 'Palette detection', from: 2, lossy: false, lossless: true },
-    { name: 'Delta palette', from: 6, lossy: false, lossless: true },
-    { name: 'Weighted predictor', from: 4, lossy: false, lossless: true },
-    { name: 'LZ77 in entropy coder', from: 2, lossy: true, lossless: true },
-    { name: 'Context clustering', from: 5, lossy: true, lossless: true },
-    { name: 'Adaptive quantisation', from: 3, lossy: true, lossless: false },
-    { name: 'Chroma from luma', from: 4, lossy: true, lossless: false },
-    { name: 'Patches / reference frames', from: 5, lossy: true, lossless: true },
-    { name: 'Dots and splines detection', from: 6, lossy: true, lossless: false },
-    { name: 'Error diffusion', from: 7, lossy: true, lossless: false },
-    { name: 'Extended block size search', from: 8, lossy: true, lossless: false },
-    { name: 'Full heuristic search', from: 9, lossy: true, lossless: true },
+  interface EffortStage {
+    from: number;
+    to?: number;
+    label: string;
+  }
+  interface EffortTool {
+    name: string;
+    tip: string;
+    lossy: boolean;
+    lossless: boolean;
+    stages?: EffortStage[];
+    stagesLossy?: EffortStage[];
+    stagesLossless?: EffortStage[];
+    alwaysYellow?: boolean;
+  }
+
+  // Transcribed from libjxl doc/encode_effort.md; splines verified in the source.
+  const effortTools: EffortTool[] = [
+    {
+      name: 'Fast-lossless path',
+      tip: 'e1 runs a dedicated fast-lossless encoder; the general modular pipeline starts at e2',
+      lossy: false,
+      lossless: true,
+      stages: [{ from: 1, to: 1, label: 'dedicated fast-lossless encoder' }],
+      alwaysYellow: true,
+    },
+    {
+      name: 'MA tree',
+      tip: 'meta-adaptive tree, the context model of the modular entropy coder',
+      lossy: false,
+      lossless: true,
+      stages: [
+        { from: 2, label: 'fixed tree, context from Gradient error' },
+        { from: 3, label: 'fixed tree, context from WP error' },
+        { from: 4, label: 'learned tree (more properties from e6)' },
+        { from: 10, label: 'global tree' },
+      ],
+    },
+    {
+      name: 'Predictors',
+      tip: 'modular-mode pixel predictors',
+      lossy: false,
+      lossless: true,
+      stages: [
+        { from: 1, label: 'fixed ClampedGradient predictor' },
+        { from: 3, label: 'fixed Weighted predictor added' },
+        { from: 4, label: 'ClampedGradient and Weighted both tried' },
+        { from: 8, label: 'tuned Weighted parameters; all predictors tried at e10' },
+      ],
+    },
+    {
+      name: 'RCTs',
+      tip: 'reversible colour transforms applied before prediction',
+      lossy: false,
+      lossless: true,
+      stages: [
+        { from: 1, label: 'fixed YCoCg' },
+        { from: 5, label: 'different local RCTs' },
+        { from: 6, label: 'more RCT variants, added through e9' },
+      ],
+    },
+    {
+      name: 'Palette',
+      tip: 'indexed-colour content encoded as a palette',
+      lossy: false,
+      lossless: true,
+      stages: [
+        { from: 1, label: 'simple palette detection' },
+        { from: 2, label: 'global channel palette' },
+        { from: 5, label: 'local palette / local channel palette' },
+      ],
+    },
+    {
+      name: 'Patches / reference frames',
+      tip: 'repeating content stored once and referenced elsewhere',
+      lossy: true,
+      lossless: true,
+      stages: [{ from: 5, label: 'patches and reference frames' }],
+      stagesLossy: [{ from: 7, label: 'patches including dots' }],
+    },
+    {
+      name: 'Entropy coding',
+      tip: 'Huffman vs ANS, and how exhaustive the entropy search is',
+      lossy: true,
+      lossless: true,
+      stagesLossless: [
+        { from: 1, label: 'Huffman, RLE-only LZ77' },
+        { from: 2, label: 'ANS' },
+        { from: 9, label: 'exhaustive entropy search' },
+      ],
+      stagesLossy: [
+        { from: 1, label: 'ANS, basic context clustering' },
+        { from: 3, label: 'better ANS' },
+        { from: 9, label: 'best context clustering' },
+      ],
+    },
+    {
+      name: '8×8 blocks only',
+      tip: 'VarDCT limited to 8×8 DCT blocks; variable block sizes start at e5',
+      lossy: true,
+      lossless: false,
+      stages: [{ from: 1, to: 4, label: 'only 8×8 DCT blocks' }],
+      alwaysYellow: true,
+    },
+    {
+      name: 'Variable block sizes',
+      tip: 'VarDCT blocks larger than 8×8, chosen by heuristics',
+      lossy: true,
+      lossless: false,
+      stages: [
+        { from: 5, label: 'simple heuristics' },
+        { from: 6, label: 'full heuristics' },
+      ],
+    },
+    {
+      name: 'Coefficient reordering',
+      tip: 'reordering of DCT coefficients before entropy coding',
+      lossy: true,
+      lossless: false,
+      stages: [{ from: 4, label: 'coefficient reordering' }],
+    },
+    {
+      name: 'Adaptive quantisation',
+      tip: 'per-block quantisation driven by the psychovisual model',
+      lossy: true,
+      lossless: false,
+      stages: [
+        { from: 5, label: 'adaptive quantisation' },
+        { from: 8, label: 'Butteraugli iterations' },
+        { from: 9, label: 'more Butteraugli iterations' },
+        { from: 10, label: 'more thorough quantisation' },
+      ],
+    },
+    {
+      name: 'Gabor-like transform',
+      tip: 'blur-like filtering of the XYB channels before the DCT',
+      lossy: true,
+      lossless: false,
+      stages: [{ from: 5, label: 'gabor-like transform' }],
+    },
+    {
+      name: 'Chroma from luma',
+      tip: 'correlates chroma DCT coefficients with the luma channel',
+      lossy: true,
+      lossless: false,
+      stages: [{ from: 5, label: 'chroma from luma' }],
+    },
+    {
+      name: 'Error diffusion',
+      tip: 'spreads quantisation error across neighbouring pixels',
+      lossy: true,
+      lossless: false,
+      stages: [{ from: 6, label: 'error diffusion' }],
+    },
+    {
+      name: 'Splines',
+      tip: 'thin curve-like features (verified in the libjxl source; not in encode_effort.md)',
+      lossy: true,
+      lossless: false,
+      stages: [{ from: 7, label: 'spline detection' }],
+    },
   ];
+
+  function stageIndexAt(stages: EffortStage[], level: number): number {
+    let index = -1;
+    for (let i = 0; i < stages.length; i++) {
+      if (stages[i].from <= level && (stages[i].to ?? 10) >= level) index = i;
+    }
+    return index;
+  }
 
   const hiddenExpertFlags = new Set(['--verbose', '--help', '--version', '--quiet']);
 
@@ -1449,10 +1604,16 @@
               <tbody>
                 {#each effortTools as tool}
                   {@const applicable = routeMode === 'lossy' ? tool.lossy : tool.lossless}
+                  {@const stages = (routeMode === 'lossy' ? tool.stagesLossy : tool.stagesLossless) ?? tool.stages ?? []}
                   <tr class:na={!applicable}>
-                    <td class="nm">{tool.name}</td>
+                    <td class="nm" title={tool.tip}>{tool.name}</td>
                     {#each effortNames as _, index}
-                      <td class:colhi={index + 1 === effort} class="cell"><span class:on={applicable && index + 1 >= tool.from} class:cur={applicable && index + 1 === effort} class="dot"></span></td>
+                      {@const level = index + 1}
+                      {@const stageIndex = stageIndexAt(stages, level)}
+                      {@const rank = tool.alwaysYellow ? 2 : stages.length - 1 - stageIndex}
+                      <td class:colhi={level === effort} class="cell" title={stageIndex >= 0 ? `${tool.name} (e${stages[stageIndex].from}+): ${stages[stageIndex].label}` : `${tool.name}: not active at e${level}`}>
+                        <span class={`dot${stageIndex >= 0 ? ` d${rank}` : ''}`} class:on={stageIndex >= 0} class:cur={applicable && level === effort}></span>
+                      </td>
                     {/each}
                     <td class="mode">
                       <span class="capability-icon" class:capability-yes={tool.lossy} role="img" aria-label={tool.lossy ? 'Lossy mode supported' : 'Lossy mode not supported'} title={tool.lossy ? 'Lossy mode supported' : 'Lossy mode not supported'}>
@@ -1468,6 +1629,7 @@
                 {/each}
               </tbody>
             </table>
+            <div class="mini ladder-doc">What each effort level enables: <a href="https://github.com/libjxl/libjxl/blob/main/doc/encode_effort.md" onclick={(e) => { e.preventDefault(); void Service.OpenURL('https://github.com/libjxl/libjxl/blob/main/doc/encode_effort.md'); }}>libjxl — encode effort</a></div>
             {#if commandPreviewError}
               <div class="banner warn" data-testid="cmd-preview-error"><span class="ic">!</span><span>{commandPreviewError}</span></div>
             {:else if commandPreviews.length === 0}
