@@ -356,8 +356,18 @@ The sliders color their bands by distance: below `0.5` purple, `0.5..1.0` dark g
 **Effort** (`-e`) trades encoding time for file size, from `1` (lightning) to `10`
 (glacier), default `7` (squirrel). The number alone tells you nothing useful, so the expert
 view shows an **effort ladder**: a grid of coding tools against the ten levels, lighting up
-as you drag. Tools that do not apply to the mode you are in stay visible but struck through,
-so you can see what the other mode would buy you.
+as you drag. Tools that come in several strengths are colour-graded — orange, yellow,
+green, then blue for the strongest form; the steps mark changes in the tool's
+implementation, such as more Butteraugli iterations or a more exhaustive search, not just
+on/off. Rows that are a plain limitation (like *8×8 blocks only* at the low efforts) stay
+yellow. Every level cell has a tooltip saying
+what exactly that effort does. Tools that do not apply to the mode you are in stay visible,
+struck through and faded to half opacity, so you can see what the other mode would buy you.
+
+What each effort level actually enables is documented upstream:
+[libjxl — encode effort](https://github.com/libjxl/libjxl/blob/main/doc/encode_effort.md).
+The ladder follows that document; the ladder data, its provenance and the update procedure
+are documented in [`frontend/src/lib/effort.md`](frontend/src/lib/effort.md).
 
 ## Output policies
 

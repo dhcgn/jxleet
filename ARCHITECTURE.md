@@ -92,8 +92,14 @@ value.
 
 ### Effort
 
-`-e` 1–10, default 7. The effort ladder (coding tools × levels) is authored
-reference data, independent of the installed cjxl version.
+`-e` 1–10, default 7. The effort ladder (coding tools × levels) is reference
+data transcribed from libjxl's `doc/encode_effort.md` (spline detection is
+verified in the libjxl source instead), independent of the installed cjxl
+version. Tools with several strength stages are colour-graded
+orange → yellow → green → blue, blue marking the strongest form; the
+`8×8 blocks only` row is always yellow as it is a limitation. Every level
+cell carries a tooltip, and rows can define separate stage lists for the
+lossy and lossless modes. Tools of the other mode stay lit at half opacity.
 
 ## Presets
 
@@ -166,14 +172,30 @@ one outstanding prompt via the `collision-prompt` event with
 
 ## Frontend
 
-The eight views (Drop, Basic/Main, Expert, Running, Done, Tools, Automatic,
-Presets — Running and Done are inline states of Main) are explicit branches in
-`App.svelte`. The active preset is the single source for the controls; Main and
-Expert edits are session-only overrides with an amber warning and Revert. The
+`frontend/src` is split into three layers:
+
+- **`App.svelte`** — the controller: grouped `$state` objects (`settings`,
+  `meta`, `run`, `tools`, `history`, `cmdPreview` plus the queue), deriveds,
+  all actions and the Wails event wiring, and the shell (toolbar, preset
+  strip, banners, statusbar, view switch).
+- **`views/`** — one component per view (Main, Expert, Presets, Tools,
+  History, Automatic). Each declares an explicit `Props` interface: state in
+  via props, changes back via `onXxx` callback props; slider edits always go
+  through callbacks because they must fire `onSettingsChanged()`. The two
+  preset drafts in PresetsView are `$bindable` props. Single-consumer
+  deriveds (file groups, flag sections, route counts) live in the view that
+  renders them.
+- **`components/`** — reusable widgets (EffortLadder, QualitySliders,
+  CommandPreview, JxlInfoPanel); **`lib/`** — pure modules (effort ladder
+  data, quality/distance math, formatters, route and cjxl-flag helpers).
+
+The active preset is the single source for the controls; Main and Expert
+edits are session-only overrides with an amber warning and Revert. The
 Expert view exposes the full generated flag surface with help tooltips, the
-effort ladder, and the exact command preview. Native Wails file drops target the
-whole window; a selected folder contributes only regular files directly inside
-it. Dark by default, operable from 420 px.
+effort ladder, and the exact command preview. Native Wails file drops target
+the whole window; a selected folder contributes only regular files directly
+inside it. Dark by default, operable from 420 px. CSS stays one global sheet
+(`public/style.css`); components reuse its classes.
 
 ## Storage
 

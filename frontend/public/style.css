@@ -1134,6 +1134,20 @@ input[type="range"] {
   text-decoration-color: #3a424b;
 }
 
+.ladder-doc {
+  margin-top: 8px;
+}
+
+.ladder-doc a {
+  color: var(--ink2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ladder-doc a:hover {
+  color: var(--ink);
+}
+
 .cell {
   width: 16px;
   text-align: center;
@@ -1151,13 +1165,29 @@ input[type="range"] {
   background: var(--p-encode);
 }
 
+/* Effort-ladder strength stages: blue is the strongest form of a tool,
+   the weaker stages step down green → yellow → orange. */
+.dot.on.d1 {
+  background: var(--p-transcode);
+}
+
+.dot.on.d2 {
+  background: var(--p-reencode);
+}
+
+.dot.on.d3 {
+  background: #e06c35;
+}
+
 .dot.cur {
   outline: 1px solid #6fd0e8;
   outline-offset: 1px;
 }
 
+/* Tools of the other mode stay lit at half opacity, so you can see
+   what that mode would buy you. */
 tr.na .dot.on {
-  background: #333a43;
+  opacity: 0.5;
 }
 
 .colhi {

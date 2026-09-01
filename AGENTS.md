@@ -21,7 +21,6 @@ is green.
 
 **Open (pick from here):**
 - Log view with tool messages; persistent run logs
-- Effort-ladder source data (currently authored reference data)
 - Full multi-rule preset → global-controls sync (session-only overrides today)
 
 ## Locked decisions (do not silently change)
