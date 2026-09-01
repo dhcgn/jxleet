@@ -129,7 +129,7 @@ func main() {
 	}
 
 	var wailsApp *application.App
-	svc := app.New(paths, cfg, toolchain.NewManager(paths.BinDir), app.Callbacks{
+	svc := app.New(paths, cfg, toolchain.NewManager(paths.BinDir), version, app.Callbacks{
 		Emit: func(name string, data any) {
 			if wailsApp != nil {
 				wailsApp.Event.Emit(name, data)

@@ -73,6 +73,16 @@ export function GetActivePreset(): $CancellablePromise<string> {
 }
 
 /**
+ * GetAppUpdate reports whether a newer jxleet release exists on GitHub. All
+ * failure modes — offline, rate limit, unparseable tag, dev build — report
+ * "nothing available" instead of an error, so a missing network never shows
+ * in the GUI.
+ */
+export function GetAppUpdate(): $CancellablePromise<$models.AppUpdate> {
+    return $Call.ByID(1143653916);
+}
+
+/**
  * GetBindings returns the configured preset for each entry point.
  */
 export function GetBindings(): $CancellablePromise<$models.Bindings> {
@@ -182,6 +192,13 @@ export function OpenPresetInEditor(name: string): $CancellablePromise<void> {
  */
 export function OpenStorageLocation(location: string): $CancellablePromise<void> {
     return $Call.ByID(2196472704, location);
+}
+
+/**
+ * OpenURL opens an https link in the system browser, nothing else.
+ */
+export function OpenURL(raw: string): $CancellablePromise<void> {
+    return $Call.ByID(17977755, raw);
 }
 
 /**

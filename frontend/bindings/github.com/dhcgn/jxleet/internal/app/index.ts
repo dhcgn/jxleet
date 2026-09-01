@@ -7,6 +7,7 @@ export {
 };
 
 export type {
+    AppUpdate,
     Bindings,
     CollisionPrompt,
     CommandPreview,
