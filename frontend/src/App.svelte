@@ -3,7 +3,6 @@
   import { Events } from '@wailsio/runtime';
   import { Service } from '../bindings/github.com/dhcgn/jxleet/internal/app';
   import type {
-    AppUpdate,
     Bindings,
     CollisionPrompt,
     CommandPreview,
@@ -19,6 +18,7 @@
     Status,
     ToolchainProgress,
     ToolchainStatus,
+    Update,
   } from '../bindings/github.com/dhcgn/jxleet/internal/app';
 
   type View = 'main' | 'expert' | 'presets' | 'tools' | 'automatic' | 'history';
@@ -106,7 +106,7 @@
     percent: 0,
   });
   let appStatus = $state<Status | null>(null);
-  let appUpdate = $state<AppUpdate | null>(null);
+  let appUpdate = $state<Update | null>(null);
   let toolchain = $state<ToolchainStatus | null>(null);
   let toolchainError = $state('');
   let contextMenuRegistered = $state(false);

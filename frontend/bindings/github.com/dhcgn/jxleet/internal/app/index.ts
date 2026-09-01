@@ -7,7 +7,6 @@ export {
 };
 
 export type {
-    AppUpdate,
     Bindings,
     CollisionPrompt,
     CommandPreview,
@@ -24,5 +23,6 @@ export type {
     ProgressUpdate,
     Status,
     ToolchainProgress,
-    ToolchainStatus
+    ToolchainStatus,
+    Update
 } from "./models.js";

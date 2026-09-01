@@ -18,9 +18,9 @@ import (
 // toolchain: nothing is ever downloaded automatically.
 const appRepo = "dhcgn/jxleet"
 
-// AppUpdate is the app-release banner state. Available is true only when the
+// Update is the app-release banner state. Available is true only when the
 // latest stable GitHub release is newer than the running build.
-type AppUpdate struct {
+type Update struct {
 	Current   string `json:"current"`
 	Latest    string `json:"latest"`
 	URL       string `json:"url"`
@@ -70,8 +70,8 @@ func latestAppRelease(ctx context.Context, client *http.Client, apiBase string) 
 // failure modes — offline, rate limit, unparseable tag, dev build — report
 // "nothing available" instead of an error, so a missing network never shows
 // in the GUI.
-func (s *Service) GetAppUpdate() AppUpdate {
-	update := AppUpdate{
+func (s *Service) GetAppUpdate() Update {
+	update := Update{
 		Current: s.appVersion,
 		URL:     "https://github.com/" + appRepo + "/releases/latest",
 	}

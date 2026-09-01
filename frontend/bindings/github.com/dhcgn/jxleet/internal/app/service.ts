@@ -78,7 +78,7 @@ export function GetActivePreset(): $CancellablePromise<string> {
  * "nothing available" instead of an error, so a missing network never shows
  * in the GUI.
  */
-export function GetAppUpdate(): $CancellablePromise<$models.AppUpdate> {
+export function GetAppUpdate(): $CancellablePromise<$models.Update> {
     return $Call.ByID(1143653916);
 }
 
