@@ -3,6 +3,7 @@
   import { Events } from '@wailsio/runtime';
   import { Service } from '../bindings/github.com/dhcgn/jxleet/internal/app';
   import type {
+    AppUpdate,
     Bindings,
     CollisionPrompt,
     CommandPreview,
@@ -105,6 +106,7 @@
     percent: 0,
   });
   let appStatus = $state<Status | null>(null);
+  let appUpdate = $state<AppUpdate | null>(null);
   let toolchain = $state<ToolchainStatus | null>(null);
   let toolchainError = $state('');
   let contextMenuRegistered = $state(false);
@@ -386,6 +388,10 @@
       }
       // Recover an output-exists prompt that fired before the subscription.
       collisionPrompt = await Service.GetPendingCollision();
+      // Non-blocking: GitHub rate limits/offline just mean no banner.
+      void Service.GetAppUpdate()
+        .then((update) => { appUpdate = update; })
+        .catch(() => {});
       void refreshCommandPreview();
     } catch (error) {
       errorMessage = errorText(error);
@@ -1139,6 +1145,15 @@
     <div class="banner warn" role="alert">
       <span class="ic">!</span><span>{errorMessage}</span>
       <button class="alert-close" aria-label="Dismiss message" title="Dismiss" onclick={dismissMessage}>x</button>
+    </div>
+  {/if}
+
+  {#if appUpdate?.available}
+    <div class="banner warn" role="status" data-testid="app-update">
+      <span class="ic">!</span>
+      <span>jxleet {appUpdate.latest} is available on GitHub — you are running {appUpdate.current}.</span>
+      <button class="btn" style="margin-left:auto" onclick={() => void Service.OpenURL(appUpdate?.url ?? '')}>Open release page</button>
+      <button class="alert-close" aria-label="Dismiss update notice" title="Dismiss" onclick={() => { appUpdate = null; }}>x</button>
     </div>
   {/if}
 

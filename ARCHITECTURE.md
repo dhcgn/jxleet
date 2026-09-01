@@ -51,7 +51,7 @@ items are tracked in `AGENTS.md`.
 | Package | Responsibility |
 |---|---|
 | `main.go` | Thin wiring: parse args, single-instance startup, launch the app |
-| `internal/app` | Wails services exposed to the frontend: file intake, conversion control, presets, toolchain status/install, history, collision resolution. Emits the `files`, conversion-progress, `collision-prompt` and `toolchain-progress` events |
+| `internal/app` | Wails services exposed to the frontend: file intake, conversion control, presets, toolchain status/install, app update check (own GitHub releases, notify-only), history, collision resolution. Emits the `files`, conversion-progress, `collision-prompt` and `toolchain-progress` events |
 | `internal/cli` | Strict path/flag parsing for path invocation, `--preset` override, exit codes. No dialogs |
 | `internal/routes` | Route determination, route colours, effort-ladder reference data |
 | `internal/preset` | YAML load/save, schema + version migration, validation, CRUD/import/export, entry-point bindings, read-only defaults |
@@ -198,4 +198,8 @@ it. Dark by default, operable from 420 px.
   suffix marks a pre-release) and on every `dev` push (`vX.Y.Z-beta.N`
   pre-releases). Publishes a zip with `jxleet.exe` and a `SHA256SUMS` file to
   a GitHub Release; the version is stamped into the binary via
-  `-ldflags -X main.version` by `task build` with `VERSION` set.
+  `-ldflags -X main.version` by `task build` with `VERSION` set
+- App updates: on start the GUI compares the stamped version against the
+  latest GitHub release (`GetAppUpdate`) and shows a dismissable banner when a
+  newer one exists. Notify-only: dev builds, offline runs and pre-releases
+  never warn, and nothing is ever downloaded automatically

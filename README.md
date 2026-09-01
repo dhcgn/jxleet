@@ -395,6 +395,10 @@ jxleet does not bundle libjxl. It manages it.
 Installed versions of `cjxl`, `djxl` and `jxlinfo` are shown on every start and compared
 against the latest libjxl release. The binaries are downloaded and saved under `%LOCALAPPDATA%\jxleet\bin\`. 
 
+jxleet also watches its **own** releases: on start it checks the GitHub release feed and shows
+a dismissable warning banner when a newer version exists. Notify-only, like the toolchain —
+the banner links to the release page; downloading and replacing the binary stays your call.
+
 ## History
 
 Every successful conversion is recorded in `%APPDATA%\jxleet\history.jsonl` — one JSON
