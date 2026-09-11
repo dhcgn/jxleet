@@ -510,6 +510,12 @@ last, and one preset covers a folder of anything.
 **Does JPEG XL open anywhere yet?**
 Support is getting more common, but it is not universal. If you need to share images with people who cannot open JPEG XL yet, consider exporting to a more widely supported format like JPEG.
 
+**My JXL images look bad in the web browser — why?**
+For the best experience browsing JPEG XL images, make sure your browser has JPEG XL decoding
+enabled (a feature flag in most browsers — see the tutorials at
+[jpegxl.io](https://www.jpegxl.io/#tutorials)). Without native decoding, a gallery or viewer
+may fall back to a re-encoded JPEG copy, which looks worse than the actual `.jxl` file.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
