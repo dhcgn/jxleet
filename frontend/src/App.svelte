@@ -1093,6 +1093,13 @@
     {:else}
       <span class="warning"><span class="dotled"></span>libjxl not installed</span>
     {/if}
+    {#if appUpdate?.available}
+      <span class="up" data-testid="app-version" title="jxleet {appUpdate.current} — {appUpdate.latest} available (see banner above)"><span class="dotled"></span>jxleet {appUpdate.current}</span>
+    {:else if appUpdate}
+      <span class="ok" data-testid="app-version" title="jxleet {appUpdate.current} — up to date"><span class="dotled"></span>jxleet {appUpdate.current || '…'}</span>
+    {:else}
+      <span data-testid="app-version" title="jxleet update check pending"><span class="dotled"></span>jxleet …</span>
+    {/if}
     <span class="spacer"></span>
     {#if tools.installing && tools.progress}
       <span>{tools.progress.phase === 'downloading' ? 'Downloading libjxl' : 'Installing libjxl'}{#if tools.progress.phase === 'downloading' && tools.progress.total > 0} — {formatBytes(tools.progress.downloaded)} / {formatBytes(tools.progress.total)}{/if}</span>
