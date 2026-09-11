@@ -8,6 +8,7 @@ import (
 
 	"github.com/dhcgn/jxleet/internal/cjxl"
 	"github.com/dhcgn/jxleet/internal/config"
+	"github.com/dhcgn/jxleet/internal/convert"
 	"github.com/dhcgn/jxleet/internal/preset"
 	"github.com/dhcgn/jxleet/internal/routes"
 )
@@ -513,5 +514,34 @@ func TestGetPresetCore(t *testing.T) {
 	}
 	if len(core.Flags) != 1 || core.Flags[0].Key != "--progressive" {
 		t.Errorf("flags = %+v", core.Flags)
+	}
+}
+
+func TestProgressUpdateStartsAtTen(t *testing.T) {
+	if got := progressUpdate(convert.Progress{}); got.Percent != 0 {
+		t.Errorf("empty percent = %v, want 0", got.Percent)
+	}
+	if got := progressUpdate(convert.Progress{Total: 4}); got.Percent != 10 {
+		t.Errorf("started percent = %v, want 10", got.Percent)
+	}
+	if got := progressUpdate(convert.Progress{Total: 4, Completed: 2}); got.Percent != 55 {
+		t.Errorf("half percent = %v, want 55", got.Percent)
+	}
+	if got := progressUpdate(convert.Progress{Total: 4, Completed: 4}); got.Percent != 100 {
+		t.Errorf("done percent = %v, want 100", got.Percent)
+	}
+}
+
+func TestFileUpdateCarriesSettings(t *testing.T) {
+	update := fileUpdate(7, convert.FileResult{
+		Input: "a.png",
+		Route: routes.RouteEncode,
+		Args:  []cjxl.Arg{{Key: "-d", Value: "0.5"}, {Key: "-e", Value: "9"}},
+	})
+	if update.Seq != 7 {
+		t.Errorf("seq = %d, want 7", update.Seq)
+	}
+	if update.Settings != "D 0.5 \u00b7 E 9" {
+		t.Errorf("settings = %q, want D/E chip", update.Settings)
 	}
 }

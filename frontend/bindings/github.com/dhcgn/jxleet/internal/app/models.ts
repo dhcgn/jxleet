@@ -82,6 +82,7 @@ export interface FilePreview {
  * FileUpdate is emitted when one file finishes.
  */
 export interface FileUpdate {
+    "seq": number;
     "input": string;
     "output": string;
     "format": string;
@@ -93,6 +94,9 @@ export interface FileUpdate {
     "cancelled": boolean;
     "error": string;
     "warning": string;
+    "pid": number;
+    "settings": string;
+    "flagsSet": boolean;
 }
 
 /**

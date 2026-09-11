@@ -25,6 +25,7 @@
   import { formatBytes, formatRate } from './lib/format';
   import { sameFlags } from './lib/flags';
   import AutomaticView from './views/AutomaticView.svelte';
+  import StatsView from './views/StatsView.svelte';
   import ToolsView from './views/ToolsView.svelte';
   import HistoryView from './views/HistoryView.svelte';
   import PresetsView from './views/PresetsView.svelte';
@@ -43,12 +44,16 @@
   let inputPaths = $state<string[]>([]);
   let files = $state<FilePreview[]>([]);
   let results = $state<FileUpdate[]>([]);
-  // Settings fingerprint of the run that produced each result, keyed by input
-  // path. Compared against the current settings so a changed distance, effort,
-  // preset or filename flag re-queues the file instead of reporting it done.
-  let fingerprintByInput = $state<Record<string, string>>({});
+  // Settings fingerprints of the runs that produced results, per input path.
+  // A list (not one value) so converting the same file again with different
+  // settings appends a comparable row instead of overwriting the previous one.
+  let fingerprintByInput = $state<Record<string, string[]>>({});
   // Fingerprint of the in-flight run, tagging results as they arrive.
   let runFingerprint = '';
+  // In-flight files by input path, from conversion-file-start events. Used for
+  // PID display, elapsed timers and per-file cancel. Cleared per file on its
+  // conversion-file event and wholesale when a run finishes.
+  let inFlightByInput = $state<Record<string, { pid: number; startedAt: number }>>({});
 
   // Grouped state: each object is one prop for a view component.
   let meta = $state({ selection: '', output: '', error: '', loading: false });
@@ -124,20 +129,26 @@
   let outOfRange = $derived(routeMode !== 'lossless' && (settings.distance < 0.5 || settings.distance > 3));
   let canConvert = $derived(inputPaths.length > 0 && files.length > 0 && presetName !== '' && !run.busy && !tools.installing);
   let resultByInput = $derived.by(() => {
-    const map = new Map<string, FileUpdate>();
-    for (const result of results) map.set(result.input, result);
+    const map = new Map<string, FileUpdate[]>();
+    for (const result of results) {
+      const list = map.get(result.input) ?? [];
+      list.push(result);
+      map.set(result.input, list);
+    }
     return map;
   });
   // Files that still need conversion: no result yet, failed/cancelled (retry),
-  // or converted with different settings — a new distance, effort, preset or
-  // filename flag means the stored result no longer matches the current plan.
-  // Successfully converted files with a matching fingerprint stay excluded so
-  // adding files after a finished run only converts the new ones.
+  // or never converted with the current settings. Fingerprints accumulate per
+  // input so a repeat run with different settings appends a new row while an
+  // identical repeat stays excluded.
   let pendingPaths = $derived(
     files
       .filter((file) => {
-        const result = resultByInput.get(file.path);
-        return !result || result.error !== '' || result.cancelled || fingerprintByInput[file.path] !== currentFingerprint;
+        const list = resultByInput.get(file.path) ?? [];
+        if (list.length === 0) return true;
+        const latest = list[list.length - 1];
+        if (latest.error !== '' || latest.cancelled) return true;
+        return !(fingerprintByInput[file.path] ?? []).includes(currentFingerprint);
       })
       .map((file) => file.path),
   );
@@ -200,7 +211,9 @@
       if (event?.data) {
         const update = event.data as FileUpdate;
         results = [...results, update];
-        fingerprintByInput[update.input] = runFingerprint;
+        const seen = fingerprintByInput[update.input] ?? [];
+        if (!seen.includes(runFingerprint)) fingerprintByInput[update.input] = [...seen, runFingerprint];
+        delete inFlightByInput[update.input];
         if (!update.error && !update.skipped && !update.cancelled && update.inputSize >= 0) {
           sessionStats = {
             count: sessionStats.count + 1,
@@ -208,6 +221,17 @@
           };
         }
       }
+    });
+    const offFileStart = Events.On('conversion-file-start', (event: any) => {
+      const data = event?.data as { input?: string; pid?: number; startedAt?: number } | undefined;
+      if (data?.input) {
+        inFlightByInput[data.input] = { pid: data.pid ?? 0, startedAt: Date.now() };
+      }
+    });
+    // Native file-table context menu ("Clear table"); ignored mid-run like the
+    // hidden Clear All button so a run cannot wipe its own queue display.
+    const offClearTable = Events.On('clear-table', () => {
+      if (!run.busy) clearAll();
     });
     const offToolchainProgress = Events.On('toolchain-progress', (event: any) => {
       if (event?.data) {
@@ -218,6 +242,7 @@
       run.summary = event?.data as ConversionSummary;
       progress = { ...progress, paused: false, percent: 100 };
       run.busy = false;
+      inFlightByInput = {};
       collisionPrompt = null; // a cancelled run resolves outstanding prompts itself
       if (run.summary?.cancelled) {
         errorMessage = '! cancelled by user';
@@ -236,6 +261,8 @@
       offPreset();
       offProgress();
       offFile();
+      offFileStart();
+      offClearTable();
       offDone();
       offError();
       offToolchainProgress();
@@ -444,7 +471,8 @@
     meta.loading = false;
     metadataRequest += 1;
     run.summary = null;
-    progress = { ...progress, total: runPaths.length, completed: 0, failed: 0, skipped: 0, inFlight: 0, percent: 0, paused: false };
+    progress = { ...progress, total: runPaths.length, completed: 0, failed: 0, skipped: 0, inFlight: 0, percent: 10, paused: false };
+    inFlightByInput = {};
     const options = currentOptions();
     runFingerprint = optionsFingerprint(options);
     try {
@@ -470,6 +498,14 @@
   async function cancelConversion(): Promise<void> {
     try {
       await Service.CancelConversion();
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  async function cancelFile(input: string): Promise<void> {
+    try {
+      await Service.CancelFileConversion(input);
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -661,6 +697,7 @@
     commandPreviewRequest += 1;
     results = [];
     fingerprintByInput = {};
+    inFlightByInput = {};
     runFingerprint = '';
     meta.selection = '';
     meta.output = '';
@@ -852,7 +889,7 @@
   }
 
   async function selectResult(result: FileUpdate): Promise<void> {
-    meta.selection = result.input;
+    meta.selection = String(result.seq);
     meta.output = '';
     meta.error = '';
     meta.loading = true;
@@ -916,8 +953,9 @@
     <button class="btn ghost" onclick={() => { view = 'presets'; }}>Presets</button>
     <button class="btn ghost" onclick={() => { view = 'tools'; }}>Tools</button>
     <button class="btn ghost" onclick={openHistory}>History</button>
+    <button class="btn ghost" onclick={() => { view = 'stats'; }}>Stats</button>
     <span class="spacer"></span>
-    {#if view === 'presets' || view === 'tools' || view === 'history'}
+    {#if view === 'presets' || view === 'tools' || view === 'history' || view === 'stats'}
       <button class="btn" onclick={() => { view = 'main'; }}>Back</button>
     {/if}
   </div>
@@ -980,6 +1018,7 @@
       meta={meta}
       run={run}
       progress={progress}
+      inFlight={inFlightByInput}
       settings={settings}
       routeMode={routeMode}
       quality={quality}
@@ -993,6 +1032,7 @@
       onOpenFolder={() => void openFolder()}
       onTogglePause={() => void togglePause()}
       onCancel={() => void cancelConversion()}
+      onCancelFile={(input) => void cancelFile(input)}
       onInstallToolchain={() => void installToolchain()}
       onGoToPresets={() => { view = 'presets'; }}
       onSelectResult={(result) => void selectResult(result)}
@@ -1085,6 +1125,8 @@
       onClear={() => void clearHistoryAll()}
       onInspect={(entry) => void inspectHistoryEntry(entry)}
     />
+  {:else if view === 'stats'}
+    <StatsView />
   {/if}
 
   <div class="statusbar">

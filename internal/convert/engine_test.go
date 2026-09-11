@@ -247,6 +247,143 @@ func TestEngineCancel(t *testing.T) {
 	}
 }
 
+// TestEngineFileStartEmitted verifies one start event per file, carrying the
+// input path, so the UI can show PID/elapsed for in-flight files.
+func TestEngineFileStartEmitted(t *testing.T) {
+	dir := t.TempDir()
+	mk := func(n string) string { p := filepath.Join(dir, n); pngFile(t, p); return p }
+	inputs := []string{mk("a.png"), mk("b.png")}
+	var mu sync.Mutex
+	var starts []FileStarted
+	e := New(Deps{Encoder: &fakeEncoder{}}, Settings{Processes: 2, Preset: encodePreset()})
+	e.OnFileStart = func(s FileStarted) {
+		mu.Lock()
+		starts = append(starts, s)
+		mu.Unlock()
+	}
+	sum := e.Run(context.Background(), inputs)
+	if sum.Completed != 2 {
+		t.Fatalf("summary = %+v, want 2 completed", sum)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(starts) < 2 {
+		t.Fatalf("starts = %d, want at least 2", len(starts))
+	}
+	seen := map[string]bool{}
+	for _, s := range starts {
+		seen[s.Input] = true
+		if s.StartedAt.IsZero() {
+			t.Errorf("start for %s has zero StartedAt", s.Input)
+		}
+	}
+	for _, in := range inputs {
+		if !seen[in] {
+			t.Errorf("no start event for %s", in)
+		}
+	}
+}
+
+// TestEngineCancelFile verifies that cancelling one file leaves the other to
+// finish, and that unknown paths report false.
+func TestEngineCancelFile(t *testing.T) {
+	dir := t.TempDir()
+	mk := func(n string) string { p := filepath.Join(dir, n); pngFile(t, p); return p }
+	blocked, quick := mk("blocked.png"), mk("quick.png")
+	enc := &fakeEncoder{}
+	// Block only one input; let the other finish instantly.
+	e := New(Deps{Encoder: &blockOneEncoder{enc: enc, blockInput: blocked}}, Settings{Processes: 2, Preset: encodePreset()})
+	var mu sync.Mutex
+	var started []string
+	var results []FileResult
+	e.OnFileStart = func(s FileStarted) {
+		mu.Lock()
+		started = append(started, s.Input)
+		mu.Unlock()
+	}
+	e.OnFile = func(r FileResult) {
+		mu.Lock()
+		results = append(results, r)
+		mu.Unlock()
+	}
+	e.Start(context.Background())
+	e.Add([]string{blocked, quick})
+	e.CloseInput()
+	// Wait until both files are in flight, then cancel only the blocked one.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		mu.Lock()
+		n := len(started)
+		mu.Unlock()
+		if n >= 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for both files to start")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if !e.CancelFile(blocked) {
+		t.Error("CancelFile(blocked) = false, want true")
+	}
+	if e.CancelFile(filepath.Join(dir, "missing.png")) {
+		t.Error("CancelFile(missing) = true, want false")
+	}
+	sum := e.Wait()
+	if sum.Completed != 1 {
+		t.Errorf("completed = %d, want 1 (quick only)", sum.Completed)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	for _, r := range results {
+		if r.Input == blocked && !r.Cancelled {
+			t.Errorf("blocked result = %+v, want Cancelled", r)
+		}
+	}
+}
+
+// TestEngineResultCarriesArgs verifies the resolved args ride along for the
+// settings chips that distinguish repeat runs of one file.
+func TestEngineResultCarriesArgs(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "a.png")
+	pngFile(t, p)
+	var got []FileResult
+	e := New(Deps{Encoder: &fakeEncoder{}}, Settings{Processes: 1, Preset: encodePreset()})
+	e.OnFile = func(r FileResult) { got = append(got, r) }
+	sum := e.Run(context.Background(), []string{p})
+	if sum.Completed != 1 {
+		t.Fatalf("summary = %+v, want 1 completed", sum)
+	}
+	if len(got) != 1 || len(got[0].Args) == 0 {
+		t.Fatalf("result args = %+v, want resolved encoder args", got)
+	}
+	found := false
+	for _, a := range got[0].Args {
+		if a.Key == "-e" && a.Value == "7" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("result args = %+v, want -e 7", got[0].Args)
+	}
+}
+
+// blockOneEncoder blocks until ctx cancellation for one input, delegating the
+// rest to the wrapped fake.
+type blockOneEncoder struct {
+	enc        *fakeEncoder
+	blockInput string
+}
+
+func (b *blockOneEncoder) Run(ctx context.Context, args []cjxl.Arg, input, output string) cjxl.Result {
+	if input == b.blockInput {
+		<-ctx.Done()
+		return cjxl.Result{ExitCode: -1, Err: ctx.Err()}
+	}
+	return b.enc.Run(ctx, args, input, output)
+}
+
 func TestEngineCoalesce(t *testing.T) {
 	dir := t.TempDir()
 	mk := func(n string) string { p := filepath.Join(dir, n); pngFile(t, p); return p }

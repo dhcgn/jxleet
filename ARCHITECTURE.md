@@ -51,16 +51,16 @@ items are tracked in `AGENTS.md`.
 | Package | Responsibility |
 |---|---|
 | `main.go` | Thin wiring: parse args, single-instance startup, launch the app |
-| `internal/app` | Wails services exposed to the frontend: file intake, conversion control, presets, toolchain status/install, app update check/install via the Wails updater (notify-only), history, collision resolution. Emits the `files`, conversion-progress, `collision-prompt` and `toolchain-progress` events |
+| `internal/app` | Wails services exposed to the frontend: file intake, conversion control, presets, toolchain status/install, app update check/install via the Wails updater (notify-only), history, collision resolution. Emits the `files`, conversion-progress, `conversion-file-start`, `collision-prompt` and `toolchain-progress` events |
 | `internal/cli` | Strict path/flag parsing for path invocation, `--preset` override, exit codes. No dialogs |
 | `internal/routes` | Route determination, route colours, effort-ladder reference data |
 | `internal/preset` | YAML load/save, schema + version migration, validation, CRUD/import/export, entry-point bindings, read-only defaults |
-| `internal/cjxl` | Command builder (args assembled verbatim from the preset) and process runner, output/JSON parsing |
+| `internal/cjxl` | Command builder (args assembled verbatim from the preset) and process runner, output/JSON parsing. `RunWithStart` reports the child PID so in-flight files can be watched and cancelled individually |
 | `internal/cjxl/flags` | `go:generate` scraper of `cjxl --help -v -v -v -v`: generated flag definitions, versioned snapshots (drive the Expert UI, preset validation, and the diff on version bump), parser tests against captured help output |
 | `internal/djxl` | Decode verification for the replace safety order |
 | `internal/jxlinfo` | `jxlinfo -v` invocation and output parsing (result and history drill-down) |
 | `internal/process` | Child-process execution with hidden windows |
-| `internal/convert` | The engine: queue, worker pool, pause/resume/cancel, throughput-based ETA, collision handling, incremental adds after a finished run |
+| `internal/convert` | The engine: queue, worker pool, pause/resume/cancel (whole-run and per-file via `CancelFile`), per-file start events (`OnFileStart` with PID), throughput-based ETA, collision handling, incremental adds after a finished run. `FileResult` carries the PID and resolved args so repeats of one file render as comparable rows |
 | `internal/output` | Output policies (alongside/subfolder/replace), name collisions, recycle bin |
 | `internal/ipc` | Named-pipe single instance (per-user SID), handover, takeover when the owner is unreachable, coalescing |
 | `internal/shellext` | Per-user Explorer context-menu registration (registry, no admin) |
@@ -162,7 +162,9 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   bar. A handover arriving after the previous run finished auto-starts a new run
 - Takeover if the pipe is stale (owner crashed): try-connect, then claim
 - Engine: worker pool with processes and threads (`--num_threads`) configurable
-  separately; pause/resume/cancel; ETA from measured throughput over a sliding
+  separately; pause/resume/cancel (whole-run plus one file at a time); run
+  progress counts the run start as 10% so the bar moves immediately, then
+  scales completed work over 10–100%; ETA from measured throughput over a sliding
   window of recent files
 
 ## Toolchain management
@@ -190,12 +192,19 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   all actions and the Wails event wiring, and the shell (toolbar, preset
   strip, banners, statusbar, view switch).
 - **`views/`** — one component per view (Main, Expert, Presets, Tools,
-  History, Automatic). Each declares an explicit `Props` interface: state in
+  History, Automatic, Stats). Each declares an explicit `Props` interface: state in
   via props, changes back via `onXxx` callback props; slider edits always go
   through callbacks because they must fire `onSettingsChanged()`. The two
   preset drafts in PresetsView are `$bindable` props. Single-consumer
   deriveds (file groups, flag sections, route counts) live in the view that
-  renders them.
+  renders them. The Main view keys result rows by per-run `seq` so converting
+  one file twice shows two comparable rows (each labelled with its settings);
+  an in-flight file gets a full-width busy row with PID, an elapsed timer past
+  10 s and a cancel button. Right-click menus are native Wails context menus
+  registered in `main.go` (`file-table` → Clear via a `clear-table` event the
+  frontend owns, `file-row` → per-file cancel with the input path as menu
+  data). Stats is a static mock (no backend
+  calls) until wired to real run data.
 - **`components/`** — reusable widgets (EffortLadder, QualitySliders,
   CommandPreview, JxlInfoPanel); **`lib/`** — pure modules (effort ladder
   data, quality/distance math, formatters, route and cjxl-flag helpers).

@@ -31,6 +31,13 @@ export function CancelConversion(): $CancellablePromise<void> {
 }
 
 /**
+ * CancelFileConversion cancels one in-flight file; queued work continues.
+ */
+export function CancelFileConversion(input: string): $CancellablePromise<void> {
+    return $Call.ByID(2494327166, input);
+}
+
+/**
  * CheckForAppUpdate opens the Wails update window and runs the full
  * check → download → verify → install flow. It is only ever called from the
  * banner's Update button or the manual check action: no download starts

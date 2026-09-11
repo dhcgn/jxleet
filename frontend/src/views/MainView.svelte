@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ConversionSummary, FilePreview, FileUpdate, ProgressUpdate, Status, ToolchainProgress, ToolchainStatus } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
+  import { onMount } from 'svelte';
   import { compactPath, formatBytes, formatDelta, formatEta, formatRate, savedPct } from '../lib/format';
   import { effortNames } from '../lib/effort';
   import { routeClass, routeTitle } from '../lib/routes';
@@ -13,6 +14,7 @@
     meta: { selection: string; output: string; error: string; loading: boolean };
     run: { busy: boolean; summary: ConversionSummary | null };
     progress: ProgressUpdate;
+    inFlight: Record<string, { pid: number; startedAt: number }>;
     settings: { distance: number; effort: number; jpegLossless: boolean; outputPolicy: string; embedSettings: boolean; jxlInfoSidecar: boolean };
     routeMode: RouteMode;
     quality: number;
@@ -26,6 +28,7 @@
     onOpenFolder(): void;
     onTogglePause(): void;
     onCancel(): void;
+    onCancelFile(input: string): void;
     onInstallToolchain(): void;
     onGoToPresets(): void;
     onSelectResult(result: FileUpdate): void;
@@ -45,6 +48,7 @@
     meta,
     run,
     progress,
+    inFlight,
     settings,
     routeMode,
     quality,
@@ -58,6 +62,7 @@
     onOpenFolder,
     onTogglePause,
     onCancel,
+    onCancelFile,
     onInstallToolchain,
     onGoToPresets,
     onSelectResult,
@@ -73,12 +78,18 @@
   }: Props = $props();
 
   let collapsedGroups = $state(new Set<string>());
-  let resultByInput = $derived.by(() => {
-    const map = new Map<string, FileUpdate>();
-    for (const result of results) map.set(result.input, result);
+  // One input can have several results (re-converted with different
+  // settings); each conversion keeps its own row keyed by seq.
+  let resultsByInput = $derived.by(() => {
+    const map = new Map<string, FileUpdate[]>();
+    for (const result of results) {
+      const list = map.get(result.input) ?? [];
+      list.push(result);
+      map.set(result.input, list);
+    }
     return map;
   });
-  let selectedResult = $derived(results.find((result) => result.input === meta.selection) ?? null);
+  let selectedResult = $derived(results.find((result) => String(result.seq) === meta.selection) ?? null);
   let routeCounts = $derived.by(() => ({
     Transcode: files.filter((file) => file.route === 'Transcode').length,
     Reencode: files.filter((file) => file.route === 'Reencode').length,
@@ -118,7 +129,8 @@
       }
       group.files.push(file);
       group.sizeIn += file.size;
-      const result = resultByInput.get(file.path);
+      const fileResults = resultsByInput.get(file.path) ?? [];
+      const result = fileResults[fileResults.length - 1];
       if (result && !result.error && !result.skipped && !result.cancelled) {
         group.sizeOut += result.outputSize;
         group.sizeDoneIn += result.inputSize;
@@ -130,14 +142,10 @@
   });
   let fileStatuses = $derived.by(() => {
     const map = new Map<string, string>();
-    let runningLeft = run.busy ? progress.inFlight : 0;
     for (const file of files) {
-      const result = resultByInput.get(file.path);
-      if (result) {
-        map.set(file.path, result.error ? 'failed' : result.skipped ? 'skipped' : result.cancelled ? 'cancelled' : 'done');
-      } else if (run.busy && runningLeft > 0) {
+      if ((resultsByInput.get(file.path) ?? []).length > 0) continue;
+      if (inFlight[file.path]) {
         map.set(file.path, 'running');
-        runningLeft -= 1;
       } else if (run.busy) {
         map.set(file.path, 'waiting');
       } else {
@@ -149,6 +157,24 @@
 
   function fileStatus(file: FilePreview): string {
     return fileStatuses.get(file.path) ?? '';
+  }
+
+  // Ticking clock for elapsed timers; only runs during a conversion.
+  let now = $state(Date.now());
+  onMount(() => {
+    const timer = setInterval(() => {
+      if (run.busy) now = Date.now();
+    }, 1000);
+    return () => clearInterval(timer);
+  });
+
+  // MM:ss once a task runs longer than 10s, else empty.
+  function elapsedText(input: string): string {
+    const entry = inFlight[input];
+    if (!entry) return '';
+    const sec = Math.floor((now - entry.startedAt) / 1000);
+    if (sec < 10) return '';
+    return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
   }
 
   function toggleGroup(key: string): void {
@@ -190,25 +216,6 @@
       <button class="btn ghost" style="margin-left:auto" onclick={onGoToPresets}>Set bindings</button>
     </div>
   {/if}
-  {#if files.length === 0 && !run.busy}
-    <div
-      class="drop"
-      aria-label="Drop files or folders"
-    >
-    <div class="big">Drop files or folders here</div>
-    <div class="sub">jxleet detects the input format and chooses the route. Unsupported files are skipped and reported.</div>
-    <div style="display:flex;gap:14px;justify-content:center;margin-top:6px;flex-wrap:wrap">
-      <span class="badge b-transcode">JPEG - transcode</span>
-      <span class="badge b-reencode">JPEG / JXL - reencode</span>
-      <span class="badge b-encode">Pixel - encode</span>
-    </div>
-    <div class="sub" style="margin-top:10px">or use one of the native open actions</div>
-    <div style="display:flex;gap:8px;justify-content:center;margin:4px auto 0;flex-wrap:wrap">
-      <button class="btn primary" style="background:var(--p-encode)" onclick={onOpenFile}>Open File</button>
-      <button class="btn" onclick={onOpenFolder}>Open Folder</button>
-    </div>
-  </div>
-  {:else}
   {#if run.busy}
     <div class="run-strip" data-testid="run-strip">
       <div class="run-head">
@@ -222,14 +229,32 @@
       <div class="bar"><i style={`width:${Math.min(100, progress.percent)}%`}></i></div>
     </div>
   {/if}
-  {#if presetName === ''}
+  {#if presetName === '' && files.length > 0}
     <div class="banner info" style="margin-bottom:12px"><span class="ic">i</span><span>Files are selected. Select a preset in the toolbar to classify their routes.</span></div>
   {/if}
-  {#if files.length === 0}
-    <div class="empty">Preparing the queue...</div>
-  {:else}
   <div class="cols">
-    <div class="groups-col">
+    <div class="groups-col" style="--custom-contextmenu: file-table; --default-contextmenu: hide">
+      {#if files.length === 0 && !run.busy}
+      <div
+        class="drop"
+        aria-label="Drop files or folders"
+      >
+      <div class="big">Drop files or folders here</div>
+      <div class="sub">jxleet detects the input format and chooses the route. Unsupported files are skipped and reported.</div>
+      <div style="display:flex;gap:14px;justify-content:center;margin-top:6px;flex-wrap:wrap">
+        <span class="badge b-transcode">JPEG - transcode</span>
+        <span class="badge b-reencode">JPEG / JXL - reencode</span>
+        <span class="badge b-encode">Pixel - encode</span>
+      </div>
+      <div class="sub" style="margin-top:10px">or use one of the native open actions</div>
+      <div style="display:flex;gap:8px;justify-content:center;margin:4px auto 0;flex-wrap:wrap">
+        <button class="btn primary" style="background:var(--p-encode)" onclick={onOpenFile}>Open File</button>
+        <button class="btn" onclick={onOpenFolder}>Open Folder</button>
+      </div>
+    </div>
+      {:else if files.length === 0}
+        <div class="empty">Preparing the queue...</div>
+      {:else}
       {#each groups as group (group.key)}
         <div class="card group" data-testid={`group-${group.route.toLowerCase()}`}>
           <button type="button" class="group-head" aria-expanded={!collapsedGroups.has(group.key)} onclick={() => toggleGroup(group.key)}>
@@ -259,28 +284,52 @@
               <thead><tr><th>File</th><th style="text-align:right">Size</th><th style="text-align:right">JXL</th><th>Result</th></tr></thead>
               <tbody>
                 {#each group.files as file (file.path)}
-                  {@const result = resultByInput.get(file.path)}
-                  {@const failed = result != null && result.error !== ''}
-                  {@const warn = result != null && result.error === '' && !result.skipped && !result.cancelled && result.warning !== '' ? result.warning : ''}
-                  {@const inspectable = run.summary != null && !run.busy && result != null && !failed && !result.skipped && !result.cancelled}
-                  <tr
-                    class:selected={result != null && meta.selection === result.input}
-                    class:clickable={inspectable}
-                    onclick={() => { if (inspectable && result) void onSelectResult(result); }}
-                  >
-                    <td class="fn" title={file.path}>{file.name}</td>
-                    <td class="num">{formatBytes(file.size)}</td>
-                    <td class="num">{result && !failed && !result.skipped && !result.cancelled ? formatBytes(result.outputSize) : '-'}</td>
-                    <td class="status-cell" class:success={result != null && !failed && !result.skipped && !result.cancelled} class:error={failed} title={warn || undefined}>
-                      {#if result}
+                  {@const fileResults = resultsByInput.get(file.path) ?? []}
+                  {@const flight = inFlight[file.path]}
+                  {#each fileResults as result (result.seq)}
+                    {@const failed = result.error !== ''}
+                    {@const warn = result.error === '' && !result.skipped && !result.cancelled && result.warning !== '' ? result.warning : ''}
+                    {@const inspectable = run.summary != null && !run.busy && !failed && !result.skipped && !result.cancelled}
+                    <tr
+                      class:selected={meta.selection === String(result.seq)}
+                      class:clickable={inspectable}
+                      onclick={() => { if (inspectable) void onSelectResult(result); }}
+                    >
+                      <td class="fn" title={file.path}>{file.name}{#if result.settings}<div class="mono-mini" title={result.flagsSet ? `${result.settings} + extra flags` : result.settings}>{result.settings}{#if result.flagsSet} +flags{/if}</div>{/if}</td>
+                      <td class="num">{formatBytes(file.size)}</td>
+                      <td class="num">{!failed && !result.skipped && !result.cancelled ? formatBytes(result.outputSize) : '-'}</td>
+                      <td class="status-cell" class:success={!failed && !result.skipped && !result.cancelled} class:error={failed} title={warn || undefined}>
                         {failed ? (result.error || 'failed') : result.skipped ? (result.skipReason || 'skipped') : result.cancelled ? 'cancelled' : formatDelta(result.inputSize, result.outputSize)}{warn ? ' ⚠' : ''}
-                      {:else if group.skip}
-                        {file.reason || 'skipped'}
-                      {:else if run.busy}
-                        {fileStatus(file)}
-                      {/if}
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
+                  {/each}
+                  {#if flight}
+                    <tr style="--custom-contextmenu: file-row; --custom-contextmenu-data: {file.path}; --default-contextmenu: hide">
+                      <td colspan={4}>
+                        <div class="live-row">
+                          <span class="badge b-reencode">Converting</span>
+                          <span class="fn" title={file.path}>{file.name}</span>
+                          {#if flight.pid > 0}<span class="mono-mini">PID {flight.pid}</span>{/if}
+                          {#if elapsedText(file.path) !== ''}<span class="mono-mini">{elapsedText(file.path)}</span>{/if}
+                          <span class="spacer"></span>
+                          <button class="btn" onclick={() => onCancelFile(file.path)}>Cancel file</button>
+                        </div>
+                      </td>
+                    </tr>
+                  {:else if fileResults.length === 0}
+                    <tr>
+                      <td class="fn" title={file.path}>{file.name}</td>
+                      <td class="num">{formatBytes(file.size)}</td>
+                      <td class="num">-</td>
+                      <td class="status-cell">
+                        {#if group.skip}
+                          {file.reason || 'skipped'}
+                        {:else if run.busy}
+                          {fileStatus(file)}
+                        {/if}
+                      </td>
+                    </tr>
+                  {/if}
                 {/each}
               </tbody>
             </table>
@@ -288,6 +337,7 @@
         </div>
       {/each}
       <div class="mini" style="padding:0 2px">Drop more files or folders anywhere in the window to add them.</div>
+      {/if}
     </div>
 
     <div style="display:flex;flex-direction:column;gap:12px">
@@ -372,8 +422,6 @@
       {/if}
     </div>
   </div>
-  {/if}
-  {/if}
 </div>
 {#if files.length > 0}
   <div class="convertbar" data-testid="convertbar">
