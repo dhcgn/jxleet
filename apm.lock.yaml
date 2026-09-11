@@ -1,16 +1,16 @@
 lockfile_version: '1'
-generated_at: '2026-08-29T20:56:59.979598+00:00'
+generated_at: '2026-09-11T09:40:39.562087+00:00'
 apm_version: 0.28.0
 dependencies:
 - repo_url: dhcgn/personal-dev-skills
-  name: go-dev
+  name: dev-go
   host: github.com
-  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
-  version: 1.0.1
-  virtual_path: profiles/go-dev
+  resolved_commit: c491d80312bcc7ec89b1a76fdbd59efa8266b59e
+  version: 1.1.0
+  virtual_path: profiles/dev-go
   is_virtual: true
   package_type: apm_package
-  content_hash: sha256:0548ae5f99322aa7cf0d1cf0e884f4f3ca65d87691c188ec437460617944740e
+  content_hash: sha256:5b4e7f496365dd221bf4f55276e0b045a170290f0fd72f0bcfda9a28968678c6
 - repo_url: spf13/go-skills
   name: go-skills
   host: github.com
@@ -92,25 +92,9 @@ dependencies:
     .agents/skills/wails/SKILL.md: sha256:90a6dc2d796c739458751e83a41c2afc5fea1c1b38b2243dee05c8b8c899494d
   content_hash: sha256:2525c86faaf8aa549e733f5725deaa8afd63e0a4df4a2c8b0a3dfe016f6eb75c
 - repo_url: dhcgn/personal-dev-skills
-  name: gh
-  host: github.com
-  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
-  version: unknown
-  virtual_path: .apm/skills/gh
-  is_virtual: true
-  depth: 2
-  resolved_by: dhcgn/personal-dev-skills
-  package_type: claude_skill
-  deployed_files:
-  - .agents/skills/gh
-  - .agents/skills/gh/SKILL.md
-  deployed_file_hashes:
-    .agents/skills/gh/SKILL.md: sha256:fb77a6b4d05ed8491399f1868a0b280c917116c0a4a3120324b3ea340aeb8c37
-  content_hash: sha256:11b1620bd3cd417f86cb6ae6af940cd13ffdba26ea6163d4ed88bc9a259d2d77
-- repo_url: dhcgn/personal-dev-skills
   name: github-markdown-images
   host: github.com
-  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
+  resolved_commit: c491d80312bcc7ec89b1a76fdbd59efa8266b59e
   version: unknown
   virtual_path: .apm/skills/github-markdown-images
   is_virtual: true
@@ -122,11 +106,11 @@ dependencies:
   - .agents/skills/github-markdown-images/SKILL.md
   deployed_file_hashes:
     .agents/skills/github-markdown-images/SKILL.md: sha256:189ff0c432e2cdc1655dc6ec9a64a96372d0ece902c7ade8a9c86349c1ec34e7
-  content_hash: sha256:d5e9ab8cea311c665ef50b79b3240a41353417058bf3f8c957ab3e36938f575c
+  content_hash: sha256:9aff34b7976c08babea011ee658a51fb451c795855bad99401ac831a63eec84b
 - repo_url: dhcgn/personal-dev-skills
   name: go-1-27-features
   host: github.com
-  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
+  resolved_commit: c491d80312bcc7ec89b1a76fdbd59efa8266b59e
   version: unknown
   virtual_path: .apm/skills/go-1-27-features
   is_virtual: true
@@ -138,11 +122,11 @@ dependencies:
   - .agents/skills/go-1-27-features/SKILL.md
   deployed_file_hashes:
     .agents/skills/go-1-27-features/SKILL.md: sha256:14c2bae9d227307a464dc199bb578e54ad0192d454f2f366b208e5a549ffd7db
-  content_hash: sha256:0b22e0952f51358613ab9d41ad451d3e0385bde3a41f6e84215febfb0027911b
+  content_hash: sha256:7928a74e0a5d2bcef72fde8f10f8f7a018f2e88bbabcc99bfcc00b20cf6439dd
 - repo_url: dhcgn/personal-dev-skills
   name: go-linq
   host: github.com
-  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
+  resolved_commit: c491d80312bcc7ec89b1a76fdbd59efa8266b59e
   version: unknown
   virtual_path: .apm/skills/go-linq
   is_virtual: true
@@ -154,11 +138,11 @@ dependencies:
   - .agents/skills/go-linq/SKILL.md
   deployed_file_hashes:
     .agents/skills/go-linq/SKILL.md: sha256:dcb7a9f7ba9615fd5b5c91bf0b17ee23d13f026f05c797de49a678a5f160edb9
-  content_hash: sha256:8c8153bea5856b1ce97fb4f97e4f6692efffc4ca7bfa838e080c082f6d0a9190
+  content_hash: sha256:dd15cb3b4ce7cdcc10b116ba2eba94d5d9523ddc24d05a31d8c3f80083f7fa1f
 - repo_url: dhcgn/personal-dev-skills
   name: go-newest-version
   host: github.com
-  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
+  resolved_commit: c491d80312bcc7ec89b1a76fdbd59efa8266b59e
   version: unknown
   virtual_path: .apm/skills/go-newest-version
   is_virtual: true
@@ -170,15 +154,67 @@ dependencies:
   - .agents/skills/go-newest-version/SKILL.md
   deployed_file_hashes:
     .agents/skills/go-newest-version/SKILL.md: sha256:abf073d76b4af9d535c6f27d7271ac2dfb7ac4250ab34392236652757620fd9b
-  content_hash: sha256:f3a3205f195552ad402e0e4d3ed984e991d1c7ef0b5003ab37dbfa0f5c335013
+  content_hash: sha256:d01c8601310d72c675480b0ba9f8f978104a9277a3536551bed98c8e3fe7118f
+- repo_url: dhcgn/personal-dev-skills
+  name: dev-base
+  host: github.com
+  resolved_commit: c491d80312bcc7ec89b1a76fdbd59efa8266b59e
+  version: 1.1.0
+  virtual_path: profiles/dev-base
+  is_virtual: true
+  depth: 2
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: apm_package
+  content_hash: sha256:37e86f3559c1b002e3f26d7c92f4bd71d532194b694a371a13a244abba59a8ec
+- repo_url: spf13/go-skills
+  name: go-skills
+  host: github.com
+  resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
+  version: e67851c
+  depth: 2
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: marketplace_plugin
+  content_hash: sha256:eb178c0b7b51540bc8224cc5c929dad9326e8bb2d65ee2e125dd2eaab05de2a1
+- repo_url: dhcgn/personal-dev-skills
+  name: devcontainer-debug-windows
+  host: github.com
+  resolved_commit: c491d80312bcc7ec89b1a76fdbd59efa8266b59e
+  version: unknown
+  virtual_path: .apm/skills/devcontainer-debug-windows
+  is_virtual: true
+  depth: 3
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/devcontainer-debug-windows
+  - .agents/skills/devcontainer-debug-windows/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/devcontainer-debug-windows/SKILL.md: sha256:ddcbef8c331f161541d08f00fa682c1350c910d1f2dadacd395d072d13d9a8bd
+  content_hash: sha256:118a7fc180d08acfddcc2bfa07ee1b073b3814bfaab13f502256088aff4103b0
+- repo_url: dhcgn/personal-dev-skills
+  name: gh
+  host: github.com
+  resolved_commit: c491d80312bcc7ec89b1a76fdbd59efa8266b59e
+  version: unknown
+  virtual_path: .apm/skills/gh
+  is_virtual: true
+  depth: 3
+  resolved_by: dhcgn/personal-dev-skills
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/gh
+  - .agents/skills/gh/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/gh/SKILL.md: sha256:fb77a6b4d05ed8491399f1868a0b280c917116c0a4a3120324b3ea340aeb8c37
+  content_hash: sha256:1ac1371927caf3f7ab7d1e41505d67b340f8a197f02da382ae50e6ed478d786a
 - repo_url: dhcgn/personal-dev-skills
   name: markdown-from-website
   host: github.com
-  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
+  resolved_commit: c491d80312bcc7ec89b1a76fdbd59efa8266b59e
   version: unknown
   virtual_path: .apm/skills/markdown-from-website
   is_virtual: true
-  depth: 2
+  depth: 3
   resolved_by: dhcgn/personal-dev-skills
   package_type: claude_skill
   deployed_files:
@@ -190,15 +226,15 @@ dependencies:
     .agents/skills/markdown-from-website/SKILL.md: sha256:9cdd8a342b42add7d7ffb09d0954f2d1aa56145c245edef444a8fb2c74de1ed0
     .agents/skills/markdown-from-website/scripts/get-markdown.ps1: sha256:8f7cd9332537ce47e708b2c89240ac7aa6c3c7ed7946f16ba0535e98c1e9b1fa
     .agents/skills/markdown-from-website/scripts/get-markdown.sh: sha256:089fa053aa393ace92c89a363829836c759551b4a35f46364a796552f78138e4
-  content_hash: sha256:6d60b92cfbe9fe1c1ee306636822c58175f4250d7c0e12c5e57df10b9197c03c
+  content_hash: sha256:290a9adf79ac29134b56466c77aaa495b51164b918e7a8231a876afaf37260bd
 - repo_url: dhcgn/personal-dev-skills
   name: rtk
   host: github.com
-  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
+  resolved_commit: c491d80312bcc7ec89b1a76fdbd59efa8266b59e
   version: unknown
   virtual_path: .apm/skills/rtk
   is_virtual: true
-  depth: 2
+  depth: 3
   resolved_by: dhcgn/personal-dev-skills
   package_type: claude_skill
   deployed_files:
@@ -206,15 +242,15 @@ dependencies:
   - .agents/skills/rtk/SKILL.md
   deployed_file_hashes:
     .agents/skills/rtk/SKILL.md: sha256:a1250e77a0404e11156ee2709c8e592d70fcfc00df97169791dec7020a9f7141
-  content_hash: sha256:42b00a447aedfbe67e9c40bc2eb2243c23110f36eb03671b48839bc181fae5a8
+  content_hash: sha256:45c31e7ad3529a40503c583aba23e288c39f0e5102c817b01d2b289b7934b783
 - repo_url: dhcgn/personal-dev-skills
   name: wsl
   host: github.com
-  resolved_commit: f112e8e4434808b8c9597aa316bf153975a34f58
+  resolved_commit: c491d80312bcc7ec89b1a76fdbd59efa8266b59e
   version: unknown
   virtual_path: .apm/skills/wsl
   is_virtual: true
-  depth: 2
+  depth: 3
   resolved_by: dhcgn/personal-dev-skills
   package_type: claude_skill
   deployed_files:
@@ -222,14 +258,14 @@ dependencies:
   - .agents/skills/wsl/SKILL.md
   deployed_file_hashes:
     .agents/skills/wsl/SKILL.md: sha256:37989ad169642b6351cf5ee4d3c37d8fa0ec3949c421ba6ead8a5105cd5151fc
-  content_hash: sha256:6595d187aea0614f99c311415395932a93bef3ef4a88bb7ac5bba1d2d4ba63e2
+  content_hash: sha256:3966e67d1b3dfbf1da315f332712bc0b71fc781234d129aa3dbb0246a48a1e09
 - repo_url: dietrichgebert/ponytail
   materialization_repo_url: DietrichGebert/ponytail
   name: ponytail
   host: github.com
-  resolved_commit: 2ed6c52c9d7e5e56942508591085fd45dea277d3
-  version: 2ed6c52
-  depth: 2
+  resolved_commit: 356918eba965ee1eac64bd3a7f0dd02108350de5
+  version: 356918e
+  depth: 3
   resolved_by: dhcgn/personal-dev-skills
   package_type: marketplace_plugin
   deployed_files:
@@ -252,17 +288,26 @@ dependencies:
     .agents/skills/ponytail-help/SKILL.md: sha256:2264d1615117b02b0fd5a69ec84cd2757006471a78e4d6c22eed6d581c1d37a4
     .agents/skills/ponytail-review/SKILL.md: sha256:40df33b58fc6ef889b93585733feb9566b76e9586efa7f376785c1e995197ac0
     .agents/skills/ponytail/SKILL.md: sha256:1316a2f3f95741d2300b116fe0c2d81ce4a9568656ed0a62643f54aaf09957f2
-  content_hash: sha256:595855eee726cb344087c38d7a3c29586ce8a0dd9a2e7ad8e8eedc91c8d8c575
-- repo_url: spf13/go-skills
-  name: go-skills
-  host: github.com
-  resolved_commit: e67851cfcca008592c7c4965b8220c7cb37e2f1c
-  version: e67851c
-  depth: 2
-  resolved_by: dhcgn/personal-dev-skills
-  package_type: marketplace_plugin
-  content_hash: sha256:eb178c0b7b51540bc8224cc5c929dad9326e8bb2d65ee2e125dd2eaab05de2a1
+  content_hash: sha256:1d4fc3af9bab7473f2fb6f0d2cad9638f7bd3bae6d1c024ea6ad7d6cdcf76683
 deployments:
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/devcontainer-debug-windows
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/devcontainer-debug-windows
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/devcontainer-debug-windows
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/devcontainer-debug-windows/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - dhcgn/personal-dev-skills/.apm/skills/devcontainer-debug-windows
+  active_owner: dhcgn/personal-dev-skills/.apm/skills/devcontainer-debug-windows
+  content_hash: sha256:ddcbef8c331f161541d08f00fa682c1350c910d1f2dadacd395d072d13d9a8bd
 - kind: project-relative
   target: opencode
   value: .agents/skills/fileflow-pathologize

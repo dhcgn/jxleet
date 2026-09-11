@@ -9,7 +9,7 @@ targets:
   - opencode
 dependencies:
   apm:
-    - dhcgn/personal-dev-skills/profiles/go-dev
+    - dhcgn/personal-dev-skills/profiles/dev-go
     - spf13/go-skills/go
     - spf13/go-skills/wails
     - spf13/go-skills/go-spec-reviewer
