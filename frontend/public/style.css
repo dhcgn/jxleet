@@ -618,9 +618,9 @@ input[type="range"] {
   display: grid;
   height: 100%;
   min-height: 250px;
-  place-content: center;
+  place-content: start center;
   gap: 8px;
-  padding: 26px;
+  padding: 48px 26px;
   background: repeating-linear-gradient(135deg, #12151a 0 8px, #14181e 8px 16px);
   border: 1px dashed #333b45;
   border-radius: 3px;
@@ -1533,6 +1533,20 @@ tr.na .dot.on {
 
 .group-files .status-cell {
   white-space: normal;
+}
+
+/* In-flight file: one full-width busy row carrying PID, elapsed and cancel. */
+.live-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.live-row .fn {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* History view: rows are inspectable like the Main view results. */

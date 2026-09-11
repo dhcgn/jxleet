@@ -15,7 +15,6 @@
     run: { busy: boolean; summary: ConversionSummary | null };
     progress: ProgressUpdate;
     inFlight: Record<string, { pid: number; startedAt: number }>;
-    pendingPaths: string[];
     settings: { distance: number; effort: number; jpegLossless: boolean; outputPolicy: string; embedSettings: boolean; jxlInfoSidecar: boolean };
     routeMode: RouteMode;
     quality: number;
@@ -50,7 +49,6 @@
     run,
     progress,
     inFlight,
-    pendingPaths,
     settings,
     routeMode,
     quality,
@@ -161,13 +159,6 @@
     return fileStatuses.get(file.path) ?? '';
   }
 
-  // A file gets an extra live row while its current run has not reported back.
-  function showLiveRow(file: FilePreview): boolean {
-    if (!run.busy) return false;
-    if (inFlight[file.path]) return true;
-    return pendingPaths.includes(file.path) && (resultsByInput.get(file.path) ?? []).length > 0;
-  }
-
   // Ticking clock for elapsed timers; only runs during a conversion.
   let now = $state(Date.now());
   onMount(() => {
@@ -242,8 +233,7 @@
     <div class="banner info" style="margin-bottom:12px"><span class="ic">i</span><span>Files are selected. Select a preset in the toolbar to classify their routes.</span></div>
   {/if}
   <div class="cols">
-    <!-- svelte-ignore a11y_no_static_element_interactions: right-click clears the table like the Clear All button -->
-    <div class="groups-col" oncontextmenu={(event) => { event.preventDefault(); onClearAll(); }}>
+    <div class="groups-col" style="--custom-contextmenu: file-table; --default-contextmenu: hide">
       {#if files.length === 0 && !run.busy}
       <div
         class="drop"
@@ -313,37 +303,29 @@
                       </td>
                     </tr>
                   {/each}
-                  {#if fileResults.length === 0}
-                    <tr
-                      oncontextmenu={(event) => { if (flight) { event.preventDefault(); event.stopPropagation(); onCancelFile(file.path); } }}
-                    >
+                  {#if flight}
+                    <tr style="--custom-contextmenu: file-row; --custom-contextmenu-data: {file.path}; --default-contextmenu: hide">
+                      <td colspan={4}>
+                        <div class="live-row">
+                          <span class="badge b-reencode">Converting</span>
+                          <span class="fn" title={file.path}>{file.name}</span>
+                          {#if flight.pid > 0}<span class="mono-mini">PID {flight.pid}</span>{/if}
+                          {#if elapsedText(file.path) !== ''}<span class="mono-mini">{elapsedText(file.path)}</span>{/if}
+                          <span class="spacer"></span>
+                          <button class="btn" onclick={() => onCancelFile(file.path)}>Cancel file</button>
+                        </div>
+                      </td>
+                    </tr>
+                  {:else if fileResults.length === 0}
+                    <tr>
                       <td class="fn" title={file.path}>{file.name}</td>
                       <td class="num">{formatBytes(file.size)}</td>
                       <td class="num">-</td>
                       <td class="status-cell">
-                        {#if flight}
-                          <span>running{#if flight.pid > 0} · PID {flight.pid}{/if}{#if elapsedText(file.path) !== ''} · {elapsedText(file.path)}{/if}</span>
-                          <button class="icon-btn" title="Cancel this file" aria-label="Cancel this file" onclick={() => onCancelFile(file.path)}>✕</button>
-                        {:else if group.skip}
+                        {#if group.skip}
                           {file.reason || 'skipped'}
                         {:else if run.busy}
                           {fileStatus(file)}
-                        {/if}
-                      </td>
-                    </tr>
-                  {:else if showLiveRow(file)}
-                    <tr
-                      oncontextmenu={(event) => { if (flight) { event.preventDefault(); event.stopPropagation(); onCancelFile(file.path); } }}
-                    >
-                      <td class="fn" title={file.path}>{file.name}<div class="mono-mini">current run</div></td>
-                      <td class="num">{formatBytes(file.size)}</td>
-                      <td class="num">-</td>
-                      <td class="status-cell">
-                        {#if flight}
-                          <span>running{#if flight.pid > 0} · PID {flight.pid}{/if}{#if elapsedText(file.path) !== ''} · {elapsedText(file.path)}{/if}</span>
-                          <button class="icon-btn" title="Cancel this file" aria-label="Cancel this file" onclick={() => onCancelFile(file.path)}>✕</button>
-                        {:else}
-                          waiting
                         {/if}
                       </td>
                     </tr>

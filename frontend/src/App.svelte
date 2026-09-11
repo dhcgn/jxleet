@@ -228,6 +228,11 @@
         inFlightByInput[data.input] = { pid: data.pid ?? 0, startedAt: Date.now() };
       }
     });
+    // Native file-table context menu ("Clear table"); ignored mid-run like the
+    // hidden Clear All button so a run cannot wipe its own queue display.
+    const offClearTable = Events.On('clear-table', () => {
+      if (!run.busy) clearAll();
+    });
     const offToolchainProgress = Events.On('toolchain-progress', (event: any) => {
       if (event?.data) {
         tools.progress = event.data as ToolchainProgress;
@@ -257,6 +262,7 @@
       offProgress();
       offFile();
       offFileStart();
+      offClearTable();
       offDone();
       offError();
       offToolchainProgress();
@@ -1013,7 +1019,6 @@
       run={run}
       progress={progress}
       inFlight={inFlightByInput}
-      pendingPaths={pendingPaths}
       settings={settings}
       routeMode={routeMode}
       quality={quality}

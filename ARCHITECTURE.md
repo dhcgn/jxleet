@@ -198,9 +198,12 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   preset drafts in PresetsView are `$bindable` props. Single-consumer
   deriveds (file groups, flag sections, route counts) live in the view that
   renders them. The Main view keys result rows by per-run `seq` so converting
-  one file twice shows two comparable rows (each labelled with its settings),
-  tracks in-flight PIDs with an elapsed timer past 10 s, and clears via the
-  table context menu as well as Clear All. Stats is a static mock (no backend
+  one file twice shows two comparable rows (each labelled with its settings);
+  an in-flight file gets a full-width busy row with PID, an elapsed timer past
+  10 s and a cancel button. Right-click menus are native Wails context menus
+  registered in `main.go` (`file-table` → Clear via a `clear-table` event the
+  frontend owns, `file-row` → per-file cancel with the input path as menu
+  data). Stats is a static mock (no backend
   calls) until wired to real run data.
 - **`components/`** — reusable widgets (EffortLadder, QualitySliders,
   CommandPreview, JxlInfoPanel); **`lib/`** — pure modules (effort ladder

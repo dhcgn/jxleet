@@ -48,6 +48,9 @@ func init() {
 	application.RegisterEvent[string]("preset")
 	application.RegisterEvent[app.ToolchainProgress]("toolchain-progress")
 	application.RegisterEvent[app.CollisionPrompt]("collision-prompt")
+	// Emitted when the file-table context menu picks "Clear table"; the
+	// queue state lives in the frontend, which clears itself on receipt.
+	application.RegisterEvent[string]("clear-table")
 }
 
 func main() {
@@ -219,6 +222,23 @@ func main() {
 	window.OnWindowEvent(events.Windows.WebViewNavigationCompleted, func(_ *application.WindowEvent) {
 		window.Show()
 	})
+
+	// Right-click menus for the Main-view file table (MainView.svelte opts in
+	// via --custom-contextmenu CSS properties). "Clear table" only signals the
+	// frontend, which owns the queue; "Cancel this file" carries the input
+	// path in --custom-contextmenu-data and cancels that file directly.
+	tableMenu := wailsApp.ContextMenu.New()
+	tableMenu.Add("Clear table").OnClick(func(_ *application.Context) {
+		wailsApp.Event.Emit("clear-table", "")
+	})
+	wailsApp.ContextMenu.Add("file-table", tableMenu)
+	rowMenu := wailsApp.ContextMenu.New()
+	rowMenu.Add("Cancel this file").OnClick(func(ctx *application.Context) {
+		if err := svc.CancelFileConversion(ctx.ContextMenuData()); err != nil {
+			log.Printf("context menu: %v", err)
+		}
+	})
+	wailsApp.ContextMenu.Add("file-row", rowMenu)
 
 	// App updates are notify-only: the updater is initialized without a
 	// CheckInterval, so nothing is ever checked or downloaded automatically.
