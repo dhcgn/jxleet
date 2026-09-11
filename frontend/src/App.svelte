@@ -43,6 +43,12 @@
   let inputPaths = $state<string[]>([]);
   let files = $state<FilePreview[]>([]);
   let results = $state<FileUpdate[]>([]);
+  // Settings fingerprint of the run that produced each result, keyed by input
+  // path. Compared against the current settings so a changed distance, effort,
+  // preset or filename flag re-queues the file instead of reporting it done.
+  let fingerprintByInput = $state<Record<string, string>>({});
+  // Fingerprint of the in-flight run, tagging results as they arrive.
+  let runFingerprint = '';
 
   // Grouped state: each object is one prop for a view component.
   let meta = $state({ selection: '', output: '', error: '', loading: false });
@@ -119,14 +125,16 @@
     for (const result of results) map.set(result.input, result);
     return map;
   });
-  // Files that still need conversion: no result yet, or failed/cancelled (retry).
-  // Successfully converted files are excluded so adding files after a finished
-  // run only converts the new ones.
+  // Files that still need conversion: no result yet, failed/cancelled (retry),
+  // or converted with different settings — a new distance, effort, preset or
+  // filename flag means the stored result no longer matches the current plan.
+  // Successfully converted files with a matching fingerprint stay excluded so
+  // adding files after a finished run only converts the new ones.
   let pendingPaths = $derived(
     files
       .filter((file) => {
         const result = resultByInput.get(file.path);
-        return !result || result.error !== '' || result.cancelled;
+        return !result || result.error !== '' || result.cancelled || fingerprintByInput[file.path] !== currentFingerprint;
       })
       .map((file) => file.path),
   );
@@ -188,6 +196,7 @@
       if (event?.data) {
         const update = event.data as FileUpdate;
         results = [...results, update];
+        fingerprintByInput[update.input] = runFingerprint;
         if (!update.error && !update.skipped && !update.cancelled && update.inputSize >= 0) {
           sessionStats = {
             count: sessionStats.count + 1,
@@ -275,6 +284,26 @@
       loaded = true;
     }
   }
+
+  // Fingerprint of the output-affecting settings. Processes/threads are
+  // excluded: they don't change the output bytes.
+  function optionsFingerprint(o: ConversionOptions): string {
+    return JSON.stringify({
+      preset: o.preset,
+      jpegMode: o.jpegMode,
+      distance: o.distance,
+      useDistance: o.useDistance,
+      useQuality: o.useQuality,
+      effort: o.effort,
+      useEffort: o.useEffort,
+      outputPolicy: o.outputPolicy,
+      embedSettings: o.embedSettings,
+      useEmbedSettings: o.useEmbedSettings,
+      expertFlags: o.expertFlags,
+    });
+  }
+
+  let currentFingerprint = $derived(optionsFingerprint(currentOptions()));
 
   function currentOptions(): ConversionOptions {
     return {
@@ -408,8 +437,10 @@
     metadataRequest += 1;
     run.summary = null;
     progress = { ...progress, total: runPaths.length, completed: 0, failed: 0, skipped: 0, inFlight: 0, percent: 0, paused: false };
+    const options = currentOptions();
+    runFingerprint = optionsFingerprint(options);
     try {
-      await Service.StartConversion(runPaths, currentOptions());
+      await Service.StartConversion(runPaths, options);
     } catch (error) {
       run.busy = false;
       errorMessage = errorText(error);
@@ -608,6 +639,8 @@
     cmdPreview.error = '';
     commandPreviewRequest += 1;
     results = [];
+    fingerprintByInput = {};
+    runFingerprint = '';
     meta.selection = '';
     meta.output = '';
     meta.error = '';
