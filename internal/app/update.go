@@ -2,15 +2,12 @@ package app
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"net/http"
 	neturl "net/url"
-	"strings"
 	"time"
 
 	"github.com/dhcgn/jxleet/internal/process"
-	"github.com/dhcgn/jxleet/internal/toolchain"
 )
 
 // appRepo is this project's own GitHub repository, checked once per start so
@@ -27,71 +24,43 @@ type Update struct {
 	Available bool   `json:"available"`
 }
 
-type appReleaseResponse struct {
-	TagName string `json:"tag_name"`
-	HTMLURL string `json:"html_url"`
-}
-
-// latestAppRelease queries the GitHub API for the newest release of the app
-// itself; /releases/latest excludes drafts and pre-releases.
-func latestAppRelease(ctx context.Context, client *http.Client, apiBase string) (version, htmlURL string, err error) {
-	if client == nil {
-		client = &http.Client{Timeout: 10 * time.Second}
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		strings.TrimRight(apiBase, "/")+"/"+appRepo+"/releases/latest", nil)
-	if err != nil {
-		return "", "", fmt.Errorf("app update: build request: %w", err)
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "jxleet")
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", "", fmt.Errorf("app update: query GitHub: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("app update: GitHub API returned %s", resp.Status)
-	}
-	var body appReleaseResponse
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return "", "", fmt.Errorf("app update: decode release: %w", err)
-	}
-	if body.TagName == "" {
-		return "", "", fmt.Errorf("app update: release has no tag")
-	}
-	if body.HTMLURL == "" {
-		body.HTMLURL = "https://github.com/" + appRepo + "/releases/latest"
-	}
-	return body.TagName, body.HTMLURL, nil
-}
-
-// GetAppUpdate reports whether a newer jxleet release exists on GitHub. All
-// failure modes — offline, rate limit, unparseable tag, dev build — report
-// "nothing available" instead of an error, so a missing network never shows
-// in the GUI.
+// GetAppUpdate reports whether a newer jxleet release exists on GitHub, via
+// the silent update check wired in Callbacks (the Wails updater's Check — no
+// window ever opens here). All failure modes — offline, rate limit,
+// unconfigured updater, dev build — report "nothing available" instead of an
+// error, so a missing network never shows in the GUI.
 func (s *Service) GetAppUpdate() Update {
 	update := Update{
 		Current: s.appVersion,
 		URL:     "https://github.com/" + appRepo + "/releases/latest",
 	}
-	if s.appVersion == "" || s.appVersion == "dev" {
+	if s.appVersion == "" || s.appVersion == "dev" || s.cb.CheckAppUpdate == nil {
 		return update
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	latest, url, err := latestAppRelease(ctx, nil, "https://api.github.com")
-	if err != nil {
+	checked, err := s.cb.CheckAppUpdate(ctx)
+	if err != nil || !checked.Available {
 		return update
 	}
-	cmp, err := toolchain.CompareVersions(latest, s.appVersion)
-	if err != nil {
-		return update
+	update.Latest = checked.Latest
+	if checked.URL != "" {
+		update.URL = checked.URL
 	}
-	update.Latest = latest
-	update.URL = url
-	update.Available = cmp > 0
+	update.Available = true
 	return update
+}
+
+// CheckForAppUpdate opens the Wails update window and runs the full
+// check → download → verify → install flow. It is only ever called from the
+// banner's Update button or the manual check action: no download starts
+// without the user asking. The window itself stays open for the up-to-date
+// and error states, so the caller needs nothing back.
+func (s *Service) CheckForAppUpdate() error {
+	if s.cb.InstallAppUpdate == nil {
+		return errors.New("app updates are not available in this build")
+	}
+	return s.cb.InstallAppUpdate(context.Background())
 }
 
 // OpenURL opens an https link in the system browser, nothing else.

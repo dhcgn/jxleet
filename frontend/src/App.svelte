@@ -499,6 +499,17 @@
     }
   }
 
+  // User-triggered only: opens the Wails update window, which checks,
+  // downloads, verifies and installs. Nothing starts without this call,
+  // keeping updates notify-only.
+  async function checkAppUpdate(): Promise<void> {
+    try {
+      await Service.CheckForAppUpdate();
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
   async function createPreset(): Promise<void> {
     const name = window.prompt('Preset name');
     if (!name) return;
@@ -939,7 +950,7 @@
     <div class="banner warn" role="status" data-testid="app-update">
       <span class="ic">!</span>
       <span>jxleet {appUpdate.latest} is available on GitHub — you are running {appUpdate.current}.</span>
-      <button class="btn" style="margin-left:auto" onclick={() => void Service.OpenURL(appUpdate?.url ?? '')}>Open release page</button>
+      <button class="btn primary" style="margin-left:auto" onclick={() => void checkAppUpdate()}>Update…</button>
       <button class="alert-close" aria-label="Dismiss update notice" title="Dismiss" onclick={() => { appUpdate = null; }}>x</button>
     </div>
   {/if}
@@ -1034,8 +1045,10 @@
     <ToolsView
       tools={tools}
       bindings={bindings}
+      appUpdate={appUpdate}
       onRefresh={() => void refreshToolchain()}
       onInstall={() => void installToolchain()}
+      onCheckAppUpdate={() => void checkAppUpdate()}
       onRegister={() => void registerContextMenu()}
       onUnregister={() => void unregisterContextMenu()}
       onOpenStorage={(location) => void openStorage(location)}

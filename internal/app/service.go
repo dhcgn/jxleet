@@ -36,6 +36,12 @@ type Callbacks struct {
 	Emit        func(name string, data any)
 	OpenFiles   func() ([]string, error)
 	OpenFolders func() ([]string, error)
+	// CheckAppUpdate silently reports a newer release, if any. Nil means app
+	// updates are unavailable (dev builds, updater init failure).
+	CheckAppUpdate func(ctx context.Context) (Update, error)
+	// InstallAppUpdate opens the update window and runs the full
+	// check → download → verify → install flow. Nil means unavailable.
+	InstallAppUpdate func(ctx context.Context) error
 }
 
 // Service is the root object bound to the frontend.

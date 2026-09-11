@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Bindings, ToolchainProgress, ToolchainStatus } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
+  import type { Bindings, ToolchainProgress, ToolchainStatus, Update } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
   import { formatBytes } from '../lib/format';
 
   interface Props {
@@ -11,13 +11,15 @@
       contextMenu: boolean;
     };
     bindings: Bindings;
+    appUpdate: Update | null;
     onRefresh(): void;
     onInstall(): void;
+    onCheckAppUpdate(): void;
     onRegister(): void;
     onUnregister(): void;
     onOpenStorage(location: string): void;
   }
-  let { tools, bindings, onRefresh, onInstall, onRegister, onUnregister, onOpenStorage }: Props = $props();
+  let { tools, bindings, appUpdate, onRefresh, onInstall, onCheckAppUpdate, onRegister, onUnregister, onOpenStorage }: Props = $props();
 </script>
 
 <div class="body">
@@ -55,6 +57,21 @@
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <h3>jxleet</h3>
+        <div class="in">
+          <div class="row"><span class="k">Installed</span><span class="v">{appUpdate?.current || '-'}</span></div>
+          <div class="row"><span class="k">Latest</span><span class:warning={appUpdate?.available} class="v">{appUpdate?.latest || '-'}</span></div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <button class="btn" data-testid="check-app-updates" onclick={() => void onCheckAppUpdate()}>Check for updates</button>
+          </div>
+          {#if appUpdate?.available}
+            <div class="mini" style="margin-top:6px">jxleet {appUpdate.latest} is available — see the banner above to install.</div>
+          {:else}
+            <div class="mini" style="margin-top:6px">Checking opens the update window, which also reports when you are up to date.</div>
+          {/if}
+        </div>
+      </div>
       <div class="card">
         <h3>Explorer context menu</h3>
         <div class="in">

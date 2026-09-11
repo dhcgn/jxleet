@@ -31,6 +31,17 @@ export function CancelConversion(): $CancellablePromise<void> {
 }
 
 /**
+ * CheckForAppUpdate opens the Wails update window and runs the full
+ * check → download → verify → install flow. It is only ever called from the
+ * banner's Update button or the manual check action: no download starts
+ * without the user asking. The window itself stays open for the up-to-date
+ * and error states, so the caller needs nothing back.
+ */
+export function CheckForAppUpdate(): $CancellablePromise<void> {
+    return $Call.ByID(3479790745);
+}
+
+/**
  * ClearHistory removes every recorded conversion.
  */
 export function ClearHistory(): $CancellablePromise<void> {
@@ -73,10 +84,11 @@ export function GetActivePreset(): $CancellablePromise<string> {
 }
 
 /**
- * GetAppUpdate reports whether a newer jxleet release exists on GitHub. All
- * failure modes — offline, rate limit, unparseable tag, dev build — report
- * "nothing available" instead of an error, so a missing network never shows
- * in the GUI.
+ * GetAppUpdate reports whether a newer jxleet release exists on GitHub, via
+ * the silent update check wired in Callbacks (the Wails updater's Check — no
+ * window ever opens here). All failure modes — offline, rate limit,
+ * unconfigured updater, dev build — report "nothing available" instead of an
+ * error, so a missing network never shows in the GUI.
  */
 export function GetAppUpdate(): $CancellablePromise<$models.Update> {
     return $Call.ByID(1143653916);
