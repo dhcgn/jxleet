@@ -37,6 +37,10 @@ type Output struct {
 	// EmbedSettings appends the encoding settings to the output filename
 	// (e.g. photo.d1.00-e7-cjxl0.11.1.jxl). False when unset.
 	EmbedSettings bool `yaml:"embed_settings,omitempty"`
+	// JXLInfoSidecar writes the verbose jxlinfo output as a sidecar file next
+	// to the converted file (<output>.jxlinfo.txt), always overwriting.
+	// False when unset.
+	JXLInfoSidecar bool `yaml:"jxlinfo_sidecar,omitempty"`
 }
 
 // Rule pairs a set of format filters with an ordered list of cjxl arguments.

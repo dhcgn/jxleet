@@ -64,6 +64,10 @@ const presetSchema = `{
         "embed_settings": {
           "type": "boolean",
           "description": "When true, append the encoding settings to the output filename (e.g. photo.d1.00-e7-cjxl0.11.1.jxl). Defaults to false."
+        },
+        "jxlinfo_sidecar": {
+          "type": "boolean",
+          "description": "When true, write the verbose jxlinfo output as a sidecar file next to the converted file (<output>.jxlinfo.txt), always overwriting. Defaults to false."
         }
       }
     },

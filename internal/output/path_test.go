@@ -116,3 +116,9 @@ func TestPrepareWithSuffix(t *testing.T) {
 		t.Errorf("numbered final = %s", num.Final)
 	}
 }
+
+func TestSidecarPath(t *testing.T) {
+	if got := SidecarPath(filepath.Join("d", "photo.d1.00-e7-cjxl0.11.1.jxl")); got != filepath.Join("d", "photo.d1.00-e7-cjxl0.11.1.jxl.jxlinfo.txt") {
+		t.Errorf("sidecar = %s", got)
+	}
+}

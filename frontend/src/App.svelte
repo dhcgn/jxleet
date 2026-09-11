@@ -72,6 +72,7 @@
     jpegLossless: true,
     outputPolicy: 'alongside',
     embedSettings: false,
+    jxlInfoSidecar: false,
     processes: 2,
     threads: 8,
     lossyDistance: 1.0,
@@ -107,6 +108,7 @@
   let presetPolicyDraft = $state('');
   let presetCollisionDraft = $state('skip');
   let presetEmbedDraft = $state(false);
+  let presetSidecarDraft = $state(false);
 
   let totalSize = $derived(files.reduce((total, file) => total + file.size, 0));
   let selectedPresetData = $derived(presets.find((preset) => preset.name === selectedPreset) ?? null);
@@ -115,7 +117,8 @@
     Boolean(selectedPresetData) &&
       (presetPolicyDraft !== selectedPresetData?.policy ||
         presetCollisionDraft !== selectedPresetData?.collision ||
-        presetEmbedDraft !== Boolean(selectedPresetData?.embedSettings)),
+        presetEmbedDraft !== Boolean(selectedPresetData?.embedSettings) ||
+        presetSidecarDraft !== Boolean(selectedPresetData?.jxlInfoSidecar)),
   );
   let quality = $derived(Math.round(qualityFromDistance(settings.distance)));
   let outOfRange = $derived(routeMode !== 'lossless' && (settings.distance < 0.5 || settings.distance > 3));
@@ -149,6 +152,7 @@
       settings.jpegLossless !== snapshot.jpegLossless ||
       settings.outputPolicy !== snapshot.policy ||
       settings.embedSettings !== snapshot.embedSettings ||
+      settings.jxlInfoSidecar !== snapshot.jxlInfoSidecar ||
       !sameFlags(expertOverrides, snapshot.flags)
     );
   });
@@ -299,6 +303,8 @@
       outputPolicy: o.outputPolicy,
       embedSettings: o.embedSettings,
       useEmbedSettings: o.useEmbedSettings,
+      jxlInfoSidecar: o.jxlInfoSidecar,
+      useJxlInfoSidecar: o.useJxlInfoSidecar,
       expertFlags: o.expertFlags,
     });
   }
@@ -319,6 +325,8 @@
       outputPolicy: settings.outputPolicy,
       embedSettings: settings.embedSettings,
       useEmbedSettings: true,
+      jxlInfoSidecar: settings.jxlInfoSidecar,
+      useJxlInfoSidecar: true,
       expertFlags: expertOverrides,
       resetExpert: false, // flags live in the preset; Expert edits persist there
     };
@@ -557,12 +565,14 @@
     presetPolicyDraft = selected?.policy ?? '';
     presetCollisionDraft = selected?.collision ?? 'skip';
     presetEmbedDraft = Boolean(selected?.embedSettings);
+    presetSidecarDraft = Boolean(selected?.jxlInfoSidecar);
+    presetSidecarDraft = Boolean(selected?.jxlInfoSidecar);
   }
 
   async function savePresetOutput(): Promise<void> {
     if (!selectedPreset || selectedPresetReadOnly || !presetOutputDirty) return;
     try {
-      await Service.SavePresetOutput(selectedPreset, presetPolicyDraft, presetCollisionDraft, presetEmbedDraft);
+      await Service.SavePresetOutput(selectedPreset, presetPolicyDraft, presetCollisionDraft, presetEmbedDraft, presetSidecarDraft);
       await refreshPresets();
       selectPreset(selectedPreset);
       // A saved output block changes what the GUI controls show for this preset.
@@ -708,6 +718,7 @@
     jpegLossless: boolean;
     policy: string;
     embedSettings: boolean;
+    jxlInfoSidecar: boolean;
     flags: FlagOverride[];
   }
 
@@ -719,6 +730,7 @@
     jpegMode: string;
     policy: string;
     embedSettings: boolean;
+    jxlInfoSidecar: boolean;
     flags: FlagOverride[] | null;
   }): CoreSnapshot {
     const flags = core.flags ?? [];
@@ -729,6 +741,7 @@
     settings.jpegLossless = core.jpegMode !== 'reencode';
     settings.outputPolicy = core.policy || 'alongside';
     settings.embedSettings = core.embedSettings ?? false;
+    settings.jxlInfoSidecar = core.jxlInfoSidecar ?? false;
     expertOverrides = flags.map((flag) => ({ ...flag }));
     return {
       distance: core.distance,
@@ -736,6 +749,7 @@
       jpegLossless: settings.jpegLossless,
       policy: settings.outputPolicy,
       embedSettings: settings.embedSettings,
+      jxlInfoSidecar: settings.jxlInfoSidecar,
       flags,
     };
   }
@@ -761,6 +775,7 @@
       jpegMode: coreSnapshot.jpegLossless ? 'transcode' : 'reencode',
       policy: coreSnapshot.policy,
       embedSettings: coreSnapshot.embedSettings,
+      jxlInfoSidecar: coreSnapshot.jxlInfoSidecar,
       flags: coreSnapshot.flags,
     });
     onSettingsChanged();
@@ -977,6 +992,7 @@
       onSetJpegMode={(lossless) => { settings.jpegLossless = lossless; onSettingsChanged(); }}
       onSetOutputPolicy={(policy) => { settings.outputPolicy = policy; onSettingsChanged(); }}
       onSetEmbedSettings={(embed) => { settings.embedSettings = embed; onSettingsChanged(); }}
+      onSetJxlInfoSidecar={(sidecar) => { settings.jxlInfoSidecar = sidecar; onSettingsChanged(); }}
       onStart={() => void startConversion()}
     />
   {:else if view === 'expert'}
@@ -1035,6 +1051,7 @@
       bind:policyDraft={presetPolicyDraft}
       bind:collisionDraft={presetCollisionDraft}
       bind:embedDraft={presetEmbedDraft}
+      bind:sidecarDraft={presetSidecarDraft}
       onSelect={selectPreset}
       onCreate={() => void createPreset()}
       onDuplicate={() => void duplicatePreset()}

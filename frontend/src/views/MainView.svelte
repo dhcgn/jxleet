@@ -13,7 +13,7 @@
     meta: { selection: string; output: string; error: string; loading: boolean };
     run: { busy: boolean; summary: ConversionSummary | null };
     progress: ProgressUpdate;
-    settings: { distance: number; effort: number; jpegLossless: boolean; outputPolicy: string; embedSettings: boolean };
+    settings: { distance: number; effort: number; jpegLossless: boolean; outputPolicy: string; embedSettings: boolean; jxlInfoSidecar: boolean };
     routeMode: RouteMode;
     quality: number;
     outOfRange: boolean;
@@ -36,6 +36,7 @@
     onSetJpegMode(lossless: boolean): void;
     onSetOutputPolicy(policy: 'alongside' | 'subfolder' | 'replace'): void;
     onSetEmbedSettings(embed: boolean): void;
+    onSetJxlInfoSidecar(sidecar: boolean): void;
     onStart(): void;
   }
   let {
@@ -67,6 +68,7 @@
     onSetJpegMode,
     onSetOutputPolicy,
     onSetEmbedSettings,
+    onSetJxlInfoSidecar,
     onStart,
   }: Props = $props();
 
@@ -259,6 +261,7 @@
                 {#each group.files as file (file.path)}
                   {@const result = resultByInput.get(file.path)}
                   {@const failed = result != null && result.error !== ''}
+                  {@const warn = result != null && result.error === '' && !result.skipped && !result.cancelled && result.warning !== '' ? result.warning : ''}
                   {@const inspectable = run.summary != null && !run.busy && result != null && !failed && !result.skipped && !result.cancelled}
                   <tr
                     class:selected={result != null && meta.selection === result.input}
@@ -268,9 +271,9 @@
                     <td class="fn" title={file.path}>{file.name}</td>
                     <td class="num">{formatBytes(file.size)}</td>
                     <td class="num">{result && !failed && !result.skipped && !result.cancelled ? formatBytes(result.outputSize) : '-'}</td>
-                    <td class="status-cell" class:success={result != null && !failed && !result.skipped && !result.cancelled} class:error={failed}>
+                    <td class="status-cell" class:success={result != null && !failed && !result.skipped && !result.cancelled} class:error={failed} title={warn || undefined}>
                       {#if result}
-                        {failed ? (result.error || 'failed') : result.skipped ? (result.skipReason || 'skipped') : result.cancelled ? 'cancelled' : formatDelta(result.inputSize, result.outputSize)}
+                        {failed ? (result.error || 'failed') : result.skipped ? (result.skipReason || 'skipped') : result.cancelled ? 'cancelled' : formatDelta(result.inputSize, result.outputSize)}{warn ? ' ⚠' : ''}
                       {:else if group.skip}
                         {file.reason || 'skipped'}
                       {:else if run.busy}
@@ -341,6 +344,10 @@
           <label class="opt" data-sel={settings.embedSettings}>
             <input type="checkbox" checked={settings.embedSettings} onchange={(event) => onSetEmbedSettings((event.currentTarget as HTMLInputElement).checked)} data-testid="embed-settings" />
             <span><span class="ot">Settings in filename</span><span class="od">photo.d1.00-e7-cjxl0.11.1.jxl instead of photo.jxl</span></span>
+          </label>
+          <label class="opt" data-sel={settings.jxlInfoSidecar}>
+            <input type="checkbox" checked={settings.jxlInfoSidecar} onchange={(event) => onSetJxlInfoSidecar((event.currentTarget as HTMLInputElement).checked)} data-testid="jxlinfo-sidecar" />
+            <span><span class="ot">JXL info sidecar</span><span class="od">&lt;output&gt;.jxlinfo.txt next to the converted file, always overwritten</span></span>
           </label>
         </div>
       </div>

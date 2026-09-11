@@ -23,7 +23,7 @@ var DefaultPresets = []Preset{
 		Description: "CLI defaults: lossy d 0.3, effort 8, originals replaced after verification.",
 		Version:     CurrentVersion,
 		ReadOnly:    true,
-		Output:      Output{Policy: PolicyReplace, OnCollision: CollisionSkip},
+		Output:      Output{Policy: PolicyReplace, OnCollision: CollisionSkip, EmbedSettings: true},
 		Rules: []Rule{
 			{
 				Match: []string{"*"},
