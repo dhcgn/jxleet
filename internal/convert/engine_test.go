@@ -2,6 +2,7 @@ package convert
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -349,5 +350,110 @@ func TestEngineEmbedsSettingsInFilename(t *testing.T) {
 	}
 	if _, err := os.Stat(want); err != nil {
 		t.Errorf("missing suffixed output: %v", err)
+	}
+}
+
+// fakeInspector records inspected paths and returns canned metadata.
+type fakeInspector struct {
+	info  string
+	err   error
+	calls []string
+}
+
+func (f *fakeInspector) Inspect(_ context.Context, path string) (string, error) {
+	f.calls = append(f.calls, path)
+	return f.info, f.err
+}
+
+func sidecarPreset() preset.Preset {
+	ps := encodePreset()
+	ps.Output.JXLInfoSidecar = true
+	ps.Rules[0].Args = []cjxl.Arg{{Key: "-d", Value: "0.5"}, {Key: "-e", Value: "7"}}
+	return ps
+}
+
+func TestEngineWritesJXLInfoSidecar(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "a.png")
+	pngFile(t, p)
+	inspector := &fakeInspector{info: "meta"}
+	var done []FileResult
+	e := New(Deps{Encoder: &fakeEncoder{}, Inspector: inspector}, Settings{Processes: 1, Preset: sidecarPreset()})
+	e.OnFile = func(r FileResult) { done = append(done, r) }
+	sum := e.Run(context.Background(), []string{p})
+	if sum.Completed != 1 {
+		t.Fatalf("summary = %+v", sum)
+	}
+	sidecar := filepath.Join(dir, "a.jxl.jxlinfo.txt")
+	data, err := os.ReadFile(sidecar)
+	if err != nil {
+		t.Fatalf("missing sidecar: %v", err)
+	}
+	if string(data) != "meta\n" {
+		t.Errorf("sidecar = %q", data)
+	}
+	if len(done) != 1 || done[0].Warning != "" {
+		t.Errorf("result = %+v, want no warning", done)
+	}
+	if len(inspector.calls) != 1 {
+		t.Fatalf("inspect calls = %d, want 1", len(inspector.calls))
+	}
+}
+
+func TestEngineSidecarOverwritesExisting(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "a.png")
+	pngFile(t, p)
+	sidecar := filepath.Join(dir, "a.jxl.jxlinfo.txt")
+	if err := os.WriteFile(sidecar, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e := New(Deps{Encoder: &fakeEncoder{}, Inspector: &fakeInspector{info: "new"}}, Settings{Processes: 1, Preset: sidecarPreset()})
+	if sum := e.Run(context.Background(), []string{p}); sum.Completed != 1 {
+		t.Fatalf("summary = %+v", sum)
+	}
+	data, err := os.ReadFile(sidecar)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "new\n" {
+		t.Errorf("sidecar = %q, want overwrite", data)
+	}
+}
+
+func TestEngineSidecarFailureWarns(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "a.png")
+	pngFile(t, p)
+	e := New(
+		Deps{Encoder: &fakeEncoder{}, Inspector: &fakeInspector{err: errors.New("boom")}},
+		Settings{Processes: 1, Preset: sidecarPreset()},
+	)
+	var done []FileResult
+	e.OnFile = func(r FileResult) { done = append(done, r) }
+	sum := e.Run(context.Background(), []string{p})
+	if sum.Completed != 1 || sum.Failed != 0 {
+		t.Fatalf("sidecar failure should not fail the conversion: %+v", sum)
+	}
+	if len(done) != 1 || done[0].Warning == "" {
+		t.Fatalf("result = %+v, want a warning", done)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "a.jxl.jxlinfo.txt")); !os.IsNotExist(err) {
+		t.Error("failed sidecar should leave no file behind")
+	}
+}
+
+func TestEngineSidecarNilInspectorWarns(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "a.png")
+	pngFile(t, p)
+	e := New(Deps{Encoder: &fakeEncoder{}}, Settings{Processes: 1, Preset: sidecarPreset()})
+	var done []FileResult
+	e.OnFile = func(r FileResult) { done = append(done, r) }
+	if sum := e.Run(context.Background(), []string{p}); sum.Completed != 1 {
+		t.Fatalf("summary = %+v", sum)
+	}
+	if len(done) != 1 || done[0].Warning == "" {
+		t.Errorf("result = %+v, want a missing-inspector warning", done)
 	}
 }

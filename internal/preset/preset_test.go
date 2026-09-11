@@ -195,7 +195,7 @@ func TestUnmarshalEmbedSettings(t *testing.T) {
 	}
 	withFlag := `name: web
 version: 1
-output: {policy: alongside, embed_settings: true}
+output: {policy: alongside, embed_settings: true, jxlinfo_sidecar: true}
 rules:
   - match: ["*"]
     args:
@@ -208,6 +208,9 @@ rules:
 	if !flagged.Output.EmbedSettings {
 		t.Error("embed_settings: true should parse")
 	}
+	if !flagged.Output.JXLInfoSidecar {
+		t.Error("jxlinfo_sidecar: true should parse")
+	}
 	data, err := Marshal(flagged)
 	if err != nil {
 		t.Fatal(err)
@@ -218,5 +221,8 @@ rules:
 	}
 	if !roundTripped.Output.EmbedSettings {
 		t.Error("embed_settings did not survive a marshal round-trip")
+	}
+	if !roundTripped.Output.JXLInfoSidecar {
+		t.Error("jxlinfo_sidecar did not survive a marshal round-trip")
 	}
 }

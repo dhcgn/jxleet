@@ -44,6 +44,8 @@ export interface ConversionOptions {
     "outputPolicy": string;
     "embedSettings": boolean;
     "useEmbedSettings": boolean;
+    "jxlInfoSidecar": boolean;
+    "useJxlInfoSidecar": boolean;
     "expertFlags": FlagOverride[] | null;
     "resetExpert": boolean;
 }
@@ -90,6 +92,7 @@ export interface FileUpdate {
     "skipReason": string;
     "cancelled": boolean;
     "error": string;
+    "warning": string;
 }
 
 /**
@@ -142,6 +145,7 @@ export interface PresetCore {
     "jpegMode": string;
     "policy": string;
     "embedSettings": boolean;
+    "jxlInfoSidecar": boolean;
     "flags": FlagOverride[] | null;
 }
 
@@ -164,6 +168,7 @@ export interface PresetSummary {
     "policy": string;
     "collision": string;
     "embedSettings": boolean;
+    "jxlInfoSidecar": boolean;
     "readOnly": boolean;
     "coreValue": string;
     "effort": string;

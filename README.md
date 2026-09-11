@@ -232,6 +232,7 @@ output:
   subfolder: jxl
   on_collision: skip      # skip | number | overwrite
   embed_settings: false   # true → photo.d1.00-e7-cjxl0.11.1.jxl instead of photo.jxl
+  jxlinfo_sidecar: false  # true → <output>.jxlinfo.txt next to the converted file
 
 rules:
   # JPEG stays recoverable — the original can be reconstructed from the result
@@ -403,6 +404,15 @@ keeps two decimals so suffixed files sort in numeric order; the transcode route 
 `d0.00` with the rule's effort. The Main view has a matching checkbox (a session-only
 override, like the output policy), and the preset value can be changed in the Presets view
 or directly in the YAML file.
+
+### JXL info sidecar
+
+With `output.jxlinfo_sidecar: true`, the verbose `jxlinfo -v` output for each converted
+file is written next to it as `<output>.jxlinfo.txt` — e.g.
+`photo.d1.00-e7-cjxl0.11.1.jxl.jxlinfo.txt` — always overwriting an existing sidecar.
+A failed sidecar keeps the conversion successful and is reported as a warning on that
+file's result row. Like the filename setting above, the Main view has a session-only
+checkbox and the Presets view persists the preset value.
 
 ## The managed toolchain
 

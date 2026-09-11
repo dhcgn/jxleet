@@ -23,6 +23,12 @@ type Encoder interface {
 	Run(ctx context.Context, args []cjxl.Arg, input, output string) cjxl.Result
 }
 
+// Inspector returns verbose metadata for a .jxl file. *jxlinfo.Runner
+// satisfies it; tests inject a fake.
+type Inspector interface {
+	Inspect(ctx context.Context, jxlPath string) (string, error)
+}
+
 // CollisionAction is the answer to an interactive output-exists prompt.
 type CollisionAction int
 
@@ -39,8 +45,9 @@ const (
 
 // Deps are the external collaborators the engine needs.
 type Deps struct {
-	Encoder  Encoder
-	Verifier output.Verifier // required for the replace policy; may be nil otherwise
+	Encoder   Encoder
+	Verifier  output.Verifier // required for the replace policy; may be nil otherwise
+	Inspector Inspector       // required for the jxlinfo-sidecar flag; may be nil otherwise
 }
 
 // Settings configure a run. Processes and Threads are independent: Processes is
@@ -67,6 +74,7 @@ type FileResult struct {
 	SkipReason string
 	Cancelled  bool
 	Err        error
+	Warning    string // non-fatal note, e.g. a failed jxlinfo sidecar
 	Duration   time.Duration
 }
 
@@ -447,11 +455,38 @@ func (e *Engine) process(ctx context.Context, path string) FileResult {
 		return res
 	}
 
+	// Sidecar runs after a successful finalize: its failures only warn, and a
+	// failed conversion never leaves a sidecar behind.
+	if eff.JXLInfoSidecar {
+		e.writeSidecar(ctx, &res, plan)
+	}
+
 	if fi, err := os.Stat(plan.Final); err == nil {
 		res.OutputSize = fi.Size()
 	}
 	res.Duration = time.Since(start)
 	return res
+}
+
+// writeSidecar inspects the finalized output and writes the jxlinfo sidecar
+// next to it, always overwriting. Failures only warn: the conversion itself
+// already succeeded.
+func (e *Engine) writeSidecar(ctx context.Context, res *FileResult, plan output.Plan) {
+	if e.deps.Inspector == nil {
+		res.Warning = "jxlinfo sidecar requested but no inspector is configured"
+		return
+	}
+	info, err := e.deps.Inspector.Inspect(ctx, plan.Final)
+	if err != nil {
+		if ctx.Err() != nil {
+			return // cancelled during teardown; the file already succeeded
+		}
+		res.Warning = err.Error()
+		return
+	}
+	if err := os.WriteFile(output.SidecarPath(plan.Final), []byte(info+"\n"), 0o644); err != nil {
+		res.Warning = "jxlinfo sidecar: " + err.Error()
+	}
 }
 
 // resolveCollision decides an output-exists collision and reports whether the

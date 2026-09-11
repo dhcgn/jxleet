@@ -264,13 +264,13 @@ export function ResumeConversion(): $CancellablePromise<void> {
 }
 
 /**
- * SavePresetOutput persists output policy, collision handling and the
- * settings-in-filename flag of a writable preset. Saving re-marshals the YAML
- * and drops any comments in that file; comment-heavy, hand-edited presets
- * should be changed in the editor instead.
+ * SavePresetOutput persists output policy, collision handling, the
+ * settings-in-filename flag and the jxlinfo-sidecar flag of a writable preset.
+ * Saving re-marshals the YAML and drops any comments in that file;
+ * comment-heavy, hand-edited presets should be changed in the editor instead.
  */
-export function SavePresetOutput(name: string, policy: string, collision: string, embedSettings: boolean): $CancellablePromise<void> {
-    return $Call.ByID(445715341, name, policy, collision, embedSettings);
+export function SavePresetOutput(name: string, policy: string, collision: string, embedSettings: boolean, jxlInfoSidecar: boolean): $CancellablePromise<void> {
+    return $Call.ByID(445715341, name, policy, collision, embedSettings, jxlInfoSidecar);
 }
 
 /**

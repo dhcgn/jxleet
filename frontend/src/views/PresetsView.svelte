@@ -11,6 +11,7 @@
     policyDraft?: string;
     collisionDraft?: string;
     embedDraft?: boolean;
+    sidecarDraft?: boolean;
     onSelect(name: string): void;
     onCreate(): void;
     onDuplicate(): void;
@@ -32,6 +33,7 @@
     policyDraft = $bindable(''),
     collisionDraft = $bindable('skip'),
     embedDraft = $bindable(false),
+    sidecarDraft = $bindable(false),
     onSelect,
     onCreate,
     onDuplicate,
@@ -107,6 +109,10 @@
                 <label class="opt" style="display:flex;gap:6px;align-items:center" title="Append the encoding settings to the output filename, e.g. photo.d1.00-e7-cjxl0.11.1.jxl">
                   <input type="checkbox" bind:checked={embedDraft} disabled={readOnly} data-testid="preset-embed-settings" />
                   <span>Settings in filename</span>
+                </label>
+                <label class="opt" style="display:flex;gap:6px;align-items:center" title="Write the verbose jxlinfo output as <output>.jxlinfo.txt next to the converted file, always overwriting">
+                  <input type="checkbox" bind:checked={sidecarDraft} disabled={readOnly} data-testid="preset-jxlinfo-sidecar" />
+                  <span>JXL info sidecar</span>
                 </label>
                 <button class="btn" data-testid="preset-save-output" onclick={() => void onSaveOutput()} disabled={readOnly || !outputDirty}>Save</button>
               </div>

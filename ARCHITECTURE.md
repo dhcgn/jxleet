@@ -105,7 +105,7 @@ lossy and lossless modes. Tools of the other mode stay lit at half opacity.
 
 One YAML file per preset in `%APPDATA%\jxleet\presets\`:
 
-- Schema: `name`, `description`, `version`, `output{policy, subfolder, on_collision, embed_settings}`, `rules[]{match[], args{}}`
+- Schema: `name`, `description`, `version`, `output{policy, subfolder, on_collision, embed_settings, jxlinfo_sidecar}`, `rules[]{match[], args{}}`
 - Rules evaluate top to bottom, first match wins; a trailing `"*"` rule is the fallback; without one, unmatched files are skipped and reported
 - `args` are passed to `cjxl` **verbatim** — short and long forms both valid, valueless flags as `true`. No wrapper vocabulary
 - Presets carry a `# yaml-language-server` modeline pointing at the committed `preset.schema.json`
@@ -147,6 +147,11 @@ version are inserted before `.jxl` (`photo.d1.00-e7-cjxl0.11.1.jxl`); distance
 always keeps two decimals so suffixed files sort in numeric order, and the
 transcode route reports `d0.00`. The GUI checkbox is a session-only override
 (via `ConversionOptions`), like the output policy.
+
+When `output.jxlinfo_sidecar` is true, the engine inspects the finalized output
+and writes `<final>.jxlinfo.txt` next to it, always overwriting. The sidecar
+runs after `Finalize`, so its failures only warn on the `FileResult` (surfaced
+as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
 
 ## Concurrency and single instance
 

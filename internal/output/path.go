@@ -89,6 +89,12 @@ func PrepareWithSuffix(input string, out preset.Output, suffix string) (Plan, er
 	return plan, nil
 }
 
+// SidecarPath returns the jxlinfo sidecar path for a converted file:
+// the final .jxl path with ".jxlinfo.txt" appended.
+func SidecarPath(final string) string {
+	return final + ".jxlinfo.txt"
+}
+
 // jxlName returns the .jxl output filename for an input path, inserting the
 // settings suffix (without a leading dot) before the extension when set.
 func jxlName(input, suffix string) string {
