@@ -81,6 +81,30 @@ task check      # build, vet, lint, race tests  (the CI gate)
   like `v1.3.0-rc.1` becomes a pre-release); pushes to `dev` publish
   `vX.Y.Z-beta.N` pre-releases. Artifact: zip with `jxleet.exe` + `SHA256SUMS`.
 
+## Releasing
+- Releases are cut by pushing a version tag; **nothing is built locally**. The
+  `/make-release` command walks through it — preflight, tag, watch, verify.
+- Preflight: clean tree, on `main`, `main` not behind `origin/main`, `task check`
+  green. Then `git tag -a vX.Y.Z -m "vX.Y.Z"` and push the tag.
+- A hyphenated tag (`v1.3.0-rc.1`) publishes as a pre-release automatically.
+  Betas (`vX.Y.Z-beta.N`) come from pushes to `dev`, never from tags.
+- Watch the run to green (`gh run watch <id> --exit-status`) and verify with
+  `gh release view <tag>`: `isPrerelease` must match the tag form and both assets
+  must be present. Never move or re-push a published tag.
+- **The release format is an updater contract — do not change any of these:**
+  - Tag keeps the leading `v` (`vX.Y.Z`); the app strips it for the update check.
+  - Asset stays `jxleet_<version-without-v>_windows_amd64.zip` — the updater's
+    default matcher keys on the `windows`+`amd64` substrings.
+  - The zip contains exactly one top-level entry (`jxleet.exe` at its root);
+    multi-entry archives are rejected by the updater.
+  - `SHA256SUMS` ships next to the zip; downloads are checksum-verified against it.
+  - The version is stamped via `-X main.version` by `task build` with `VERSION`
+    set (release.yml does this). Local builds report `dev` and never check for
+    updates — that is intentional, not a bug.
+  - Pre-releases stay excluded from the update feed (`/releases/latest`, no
+    `CheckInterval`): stable users are never offered betas, and nothing downloads
+    without the user asking (notify-only, locked decision above).
+
 ## Conventions
 - Windows paths use backslashes. This machine has WSL, Docker, and `gh` available.
 - Prefix shell commands covered by the **rtk** skill (`.agents/skills/rtk/SKILL.md`) with
