@@ -42,6 +42,8 @@ export interface ConversionOptions {
     "effort": number;
     "useEffort": boolean;
     "outputPolicy": string;
+    "embedSettings": boolean;
+    "useEmbedSettings": boolean;
     "expertFlags": FlagOverride[] | null;
     "resetExpert": boolean;
 }
@@ -127,9 +129,9 @@ export interface HistoryEntry {
 
 /**
  * PresetCore is the readable core of a preset: distance, effort, JPEG mode,
- * output policy and the extra cjxl flags of the fallback ("*") rule. The GUI
- * snapshots it via GetPresetCore when a preset is selected and uses the
- * snapshot for the dirty check and the Revert action.
+ * output policy, the settings-in-filename flag and the extra cjxl flags of the
+ * fallback ("*") rule. The GUI snapshots it via GetPresetCore when a preset is
+ * selected and uses the snapshot for the dirty check and the Revert action.
  */
 export interface PresetCore {
     "name": string;
@@ -139,6 +141,7 @@ export interface PresetCore {
     "effort": number;
     "jpegMode": string;
     "policy": string;
+    "embedSettings": boolean;
     "flags": FlagOverride[] | null;
 }
 
@@ -160,6 +163,7 @@ export interface PresetSummary {
     "description": string;
     "policy": string;
     "collision": string;
+    "embedSettings": boolean;
     "readOnly": boolean;
     "coreValue": string;
     "effort": string;

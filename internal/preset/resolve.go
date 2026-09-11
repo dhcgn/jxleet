@@ -62,3 +62,16 @@ func EffectiveDistance(args []cjxl.Arg) (float64, bool) {
 	}
 	return 0, false
 }
+
+// EffectiveEffort returns the value of -e / --effort for a rule's args, and
+// whether it was specified.
+func EffectiveEffort(args []cjxl.Arg) (int, bool) {
+	for _, a := range args {
+		if a.Key == "-e" || a.Key == "--effort" {
+			if v, err := strconv.Atoi(a.Value); err == nil {
+				return v, true
+			}
+		}
+	}
+	return 0, false
+}

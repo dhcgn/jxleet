@@ -325,3 +325,29 @@ func TestEngineTryAddWhileRunningReturnsTrue(t *testing.T) {
 	e.Cancel()
 	_ = e.Wait()
 }
+
+func TestEngineEmbedsSettingsInFilename(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "a.png")
+	pngFile(t, p)
+	ps := encodePreset()
+	ps.Output.EmbedSettings = true
+	ps.Rules[0].Args = []cjxl.Arg{{Key: "-d", Value: "1"}, {Key: "-e", Value: "7"}}
+	var done []FileResult
+	e := New(Deps{Encoder: &fakeEncoder{}}, Settings{Processes: 1, Preset: ps, CJXLVersion: "0.11.1"})
+	e.OnFile = func(r FileResult) { done = append(done, r) }
+	sum := e.Run(context.Background(), []string{p})
+	if sum.Completed != 1 {
+		t.Fatalf("summary = %+v", sum)
+	}
+	if len(done) != 1 {
+		t.Fatalf("OnFile called %d times", len(done))
+	}
+	want := filepath.Join(dir, "a.d1.00-e7-cjxl0.11.1.jxl")
+	if done[0].Output != want {
+		t.Errorf("output = %q, want %q", done[0].Output, want)
+	}
+	if _, err := os.Stat(want); err != nil {
+		t.Errorf("missing suffixed output: %v", err)
+	}
+}

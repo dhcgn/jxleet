@@ -34,12 +34,19 @@ type Plan struct {
 // resolves name collisions per the policy but does not touch the filesystem
 // beyond stat checks.
 func Prepare(input string, out preset.Output) (Plan, error) {
+	return PrepareWithSuffix(input, out, "")
+}
+
+// PrepareWithSuffix is Prepare with a settings suffix (see SettingsSuffix)
+// inserted before the .jxl extension, e.g. photo.d1.00-e7-cjxl0.11.1.jxl. An
+// empty suffix behaves exactly like Prepare.
+func PrepareWithSuffix(input string, out preset.Output, suffix string) (Plan, error) {
 	absIn, err := filepath.Abs(input)
 	if err != nil {
 		return Plan{}, err
 	}
 	dir := filepath.Dir(absIn)
-	base := jxlName(absIn)
+	base := jxlName(absIn, suffix)
 
 	finalDir := dir
 	if out.Policy == preset.PolicySubfolder {
@@ -82,11 +89,16 @@ func Prepare(input string, out preset.Output) (Plan, error) {
 	return plan, nil
 }
 
-// jxlName returns the .jxl output filename for an input path.
-func jxlName(input string) string {
+// jxlName returns the .jxl output filename for an input path, inserting the
+// settings suffix (without a leading dot) before the extension when set.
+func jxlName(input, suffix string) string {
 	b := filepath.Base(input)
 	ext := filepath.Ext(b)
-	return strings.TrimSuffix(b, ext) + ".jxl"
+	stem := strings.TrimSuffix(b, ext)
+	if suffix != "" {
+		stem += "." + suffix
+	}
+	return stem + ".jxl"
 }
 
 // nextNumbered finds "name (1).jxl", "name (2).jxl", ... that does not exist.

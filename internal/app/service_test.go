@@ -241,7 +241,7 @@ func TestPresetRuleSummaries(t *testing.T) {
 func TestSavePresetOutput(t *testing.T) {
 	service := testService(t)
 	saveTestPreset(t, service)
-	if err := service.SavePresetOutput("test", string(preset.PolicyReplace), string(preset.CollisionOverwrite)); err != nil {
+	if err := service.SavePresetOutput("test", string(preset.PolicyReplace), string(preset.CollisionOverwrite), true); err != nil {
 		t.Fatal(err)
 	}
 	updated, err := preset.NewStore(service.paths.PresetsDir).Load("test")
@@ -251,13 +251,16 @@ func TestSavePresetOutput(t *testing.T) {
 	if updated.Output.Policy != preset.PolicyReplace || updated.Output.OnCollision != preset.CollisionOverwrite {
 		t.Fatalf("output = %+v", updated.Output)
 	}
+	if !updated.Output.EmbedSettings {
+		t.Errorf("embed_settings = false, want true")
+	}
 
 	defaultStore := preset.NewStore(filepath.Join(t.TempDir(), "presets"))
 	if _, err := preset.EnsureDefaults(defaultStore); err != nil {
 		t.Fatal(err)
 	}
 	service.paths.PresetsDir = defaultStore.Dir
-	if err := service.SavePresetOutput("default-gui", string(preset.PolicyReplace), string(preset.CollisionSkip)); err == nil {
+	if err := service.SavePresetOutput("default-gui", string(preset.PolicyReplace), string(preset.CollisionSkip), false); err == nil {
 		t.Error("read-only default output change should fail")
 	}
 }

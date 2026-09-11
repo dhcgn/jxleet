@@ -184,3 +184,39 @@ func TestMigrate(t *testing.T) {
 		t.Error("future version should be rejected")
 	}
 }
+
+func TestUnmarshalEmbedSettings(t *testing.T) {
+	p, err := Unmarshal([]byte(sampleYAML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Output.EmbedSettings {
+		t.Error("embed_settings should default to false when unset")
+	}
+	withFlag := `name: web
+version: 1
+output: {policy: alongside, embed_settings: true}
+rules:
+  - match: ["*"]
+    args:
+      "-d": 1.0
+`
+	flagged, err := Unmarshal([]byte(withFlag))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !flagged.Output.EmbedSettings {
+		t.Error("embed_settings: true should parse")
+	}
+	data, err := Marshal(flagged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roundTripped, err := Unmarshal(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !roundTripped.Output.EmbedSettings {
+		t.Error("embed_settings did not survive a marshal round-trip")
+	}
+}

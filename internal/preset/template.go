@@ -27,6 +27,7 @@ output:
   policy: alongside        # alongside | subfolder | replace
   # subfolder: jxl         # where results go when policy: subfolder
   on_collision: skip       # skip | number | overwrite
+  # embed_settings: true   # photo.d1.00-e7-cjxl0.11.1.jxl instead of photo.jxl
 rules:
   - match: ['*']           # catch-all — first matching rule wins
     args:

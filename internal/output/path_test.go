@@ -94,3 +94,25 @@ func TestPrepareCollision(t *testing.T) {
 		t.Errorf("overwrite should keep the original name, got %s skip=%v", over.Final, over.Skip)
 	}
 }
+
+func TestPrepareWithSuffix(t *testing.T) {
+	dir := t.TempDir()
+	in := filepath.Join(dir, "photo.jpg")
+	plan, err := PrepareWithSuffix(in, preset.Output{Policy: preset.PolicyAlongside, OnCollision: preset.CollisionSkip}, "d1.00-e7-cjxl0.11.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Final != filepath.Join(dir, "photo.d1.00-e7-cjxl0.11.1.jxl") {
+		t.Errorf("final = %s", plan.Final)
+	}
+
+	// Collision numbering keeps the suffix.
+	touch(t, plan.Final)
+	num, err := PrepareWithSuffix(in, preset.Output{Policy: preset.PolicyAlongside, OnCollision: preset.CollisionNumber}, "d1.00-e7-cjxl0.11.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if num.Final != filepath.Join(dir, "photo.d1.00-e7-cjxl0.11.1 (1).jxl") {
+		t.Errorf("numbered final = %s", num.Final)
+	}
+}

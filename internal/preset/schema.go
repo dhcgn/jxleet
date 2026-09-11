@@ -60,6 +60,10 @@ const presetSchema = `{
           "type": "string",
           "enum": ["skip", "number", "overwrite"],
           "description": "What to do when the output path already exists."
+        },
+        "embed_settings": {
+          "type": "boolean",
+          "description": "When true, append the encoding settings to the output filename (e.g. photo.d1.00-e7-cjxl0.11.1.jxl). Defaults to false."
         }
       }
     },
