@@ -296,15 +296,16 @@ func (s *Service) SetBinding(entryPoint, presetName string) error {
 
 // PresetSummary is the compact data shown by the Presets view.
 type PresetSummary struct {
-	Name        string              `json:"name"`
-	Description string              `json:"description"`
-	Policy      string              `json:"policy"`
-	Collision   string              `json:"collision"`
-	ReadOnly    bool                `json:"readOnly"`
-	CoreValue   string              `json:"coreValue"`
-	Effort      string              `json:"effort"`
-	JPEGMode    string              `json:"jpegMode"`
-	Rules       []PresetRuleSummary `json:"rules"`
+	Name          string              `json:"name"`
+	Description   string              `json:"description"`
+	Policy        string              `json:"policy"`
+	Collision     string              `json:"collision"`
+	EmbedSettings bool                `json:"embedSettings"`
+	ReadOnly      bool                `json:"readOnly"`
+	CoreValue     string              `json:"coreValue"`
+	Effort        string              `json:"effort"`
+	JPEGMode      string              `json:"jpegMode"`
+	Rules         []PresetRuleSummary `json:"rules"`
 }
 
 // PresetRuleSummary is one file-filter rule shown in the selected-preset details.
@@ -333,24 +334,26 @@ func (s *Service) ListPresets() ([]PresetSummary, error) {
 	result := make([]PresetSummary, 0, len(items))
 	for _, p := range items {
 		result = append(result, PresetSummary{
-			Name:        p.Name,
-			Description: p.Description,
-			Policy:      string(p.Output.Policy),
-			Collision:   collisionOrDefault(p.Output.OnCollision),
-			ReadOnly:    p.ReadOnly,
-			CoreValue:   summarizeCoreValue(p),
-			Effort:      summarizeEffort(p),
-			JPEGMode:    summarizeJPEGMode(p),
-			Rules:       summarizeRules(p),
+			Name:          p.Name,
+			Description:   p.Description,
+			Policy:        string(p.Output.Policy),
+			Collision:     collisionOrDefault(p.Output.OnCollision),
+			EmbedSettings: p.Output.EmbedSettings,
+			ReadOnly:      p.ReadOnly,
+			CoreValue:     summarizeCoreValue(p),
+			Effort:        summarizeEffort(p),
+			JPEGMode:      summarizeJPEGMode(p),
+			Rules:         summarizeRules(p),
 		})
 	}
 	return result, nil
 }
 
-// SavePresetOutput persists output policy and collision handling of a writable
-// preset. Saving re-marshals the YAML and drops any comments in that file;
-// comment-heavy, hand-edited presets should be changed in the editor instead.
-func (s *Service) SavePresetOutput(name, policy, collision string) error {
+// SavePresetOutput persists output policy, collision handling and the
+// settings-in-filename flag of a writable preset. Saving re-marshals the YAML
+// and drops any comments in that file; comment-heavy, hand-edited presets
+// should be changed in the editor instead.
+func (s *Service) SavePresetOutput(name, policy, collision string, embedSettings bool) error {
 	p, err := preset.NewStore(s.paths.PresetsDir).Load(name)
 	if err != nil {
 		return err
@@ -375,22 +378,24 @@ func (s *Service) SavePresetOutput(name, policy, collision string) error {
 		p.Output.Subfolder = "jxl"
 	}
 	p.Output.OnCollision = selectedCollision
+	p.Output.EmbedSettings = embedSettings
 	return preset.NewStore(s.paths.PresetsDir).Save(p)
 }
 
 // PresetCore is the readable core of a preset: distance, effort, JPEG mode,
-// output policy and the extra cjxl flags of the fallback ("*") rule. The GUI
-// snapshots it via GetPresetCore when a preset is selected and uses the
-// snapshot for the dirty check and the Revert action.
+// output policy, the settings-in-filename flag and the extra cjxl flags of the
+// fallback ("*") rule. The GUI snapshots it via GetPresetCore when a preset is
+// selected and uses the snapshot for the dirty check and the Revert action.
 type PresetCore struct {
-	Name       string         `json:"name"`
-	ReadOnly   bool           `json:"readOnly"`
-	Distance   float64        `json:"distance"`
-	UseQuality bool           `json:"useQuality"`
-	Effort     int            `json:"effort"`
-	JPEGMode   string         `json:"jpegMode"`
-	Policy     string         `json:"policy"`
-	Flags      []FlagOverride `json:"flags"`
+	Name          string         `json:"name"`
+	ReadOnly      bool           `json:"readOnly"`
+	Distance      float64        `json:"distance"`
+	UseQuality    bool           `json:"useQuality"`
+	Effort        int            `json:"effort"`
+	JPEGMode      string         `json:"jpegMode"`
+	Policy        string         `json:"policy"`
+	EmbedSettings bool           `json:"embedSettings"`
+	Flags         []FlagOverride `json:"flags"`
 }
 
 // fallbackRuleIndex returns the index of the catch-all rule (matching "*");
@@ -416,6 +421,7 @@ func (s *Service) GetPresetCore(name string) (PresetCore, error) {
 	core := PresetCore{
 		Name: p.Name, ReadOnly: p.ReadOnly,
 		Distance: 1, Effort: 7, JPEGMode: "transcode", Policy: string(p.Output.Policy),
+		EmbedSettings: p.Output.EmbedSettings,
 	}
 	if core.Policy == "" {
 		core.Policy = string(preset.PolicyAlongside)
@@ -546,18 +552,20 @@ func (s *Service) OpenStorageLocation(location string) error {
 // ConversionOptions are the temporary GUI settings applied to a preset for one
 // run. The stored preset is never modified by these overrides.
 type ConversionOptions struct {
-	Preset       string         `json:"preset"`
-	Processes    int            `json:"processes"`
-	Threads      int            `json:"threads"`
-	JPEGMode     string         `json:"jpegMode"`
-	Distance     float64        `json:"distance"`
-	UseDistance  bool           `json:"useDistance"`
-	UseQuality   bool           `json:"useQuality"`
-	Effort       int            `json:"effort"`
-	UseEffort    bool           `json:"useEffort"`
-	OutputPolicy string         `json:"outputPolicy"`
-	ExpertFlags  []FlagOverride `json:"expertFlags"`
-	ResetExpert  bool           `json:"resetExpert"`
+	Preset           string         `json:"preset"`
+	Processes        int            `json:"processes"`
+	Threads          int            `json:"threads"`
+	JPEGMode         string         `json:"jpegMode"`
+	Distance         float64        `json:"distance"`
+	UseDistance      bool           `json:"useDistance"`
+	UseQuality       bool           `json:"useQuality"`
+	Effort           int            `json:"effort"`
+	UseEffort        bool           `json:"useEffort"`
+	OutputPolicy     string         `json:"outputPolicy"`
+	EmbedSettings    bool           `json:"embedSettings"`
+	UseEmbedSettings bool           `json:"useEmbedSettings"`
+	ExpertFlags      []FlagOverride `json:"expertFlags"`
+	ResetExpert      bool           `json:"resetExpert"`
 }
 
 // FlagInfo describes one generated cjxl flag for the Expert UI.
@@ -763,10 +771,11 @@ func (s *Service) StartConversion(paths []string, options ConversionOptions) err
 			Verifier: djxl.NewVerifier(installed.DJXLPath),
 		},
 		convert.Settings{
-			Processes: options.Processes,
-			Threads:   options.Threads,
-			Preset:    p,
-			Deletion:  output.DeletionByRoute{},
+			Processes:   options.Processes,
+			Threads:     options.Threads,
+			Preset:      p,
+			Deletion:    output.DeletionByRoute{},
+			CJXLVersion: installed.Version,
 		},
 	)
 	engine.OnProgress = func(progress convert.Progress) {
@@ -1105,6 +1114,9 @@ func (s *Service) effectivePreset(options ConversionOptions) (preset.Preset, err
 		if policy == preset.PolicySubfolder && p.Output.Subfolder == "" {
 			p.Output.Subfolder = "jxl"
 		}
+	}
+	if options.UseEmbedSettings {
+		p.Output.EmbedSettings = options.EmbedSettings
 	}
 	for i := range p.Rules {
 		args := append([]cjxl.Arg(nil), p.Rules[i].Args...)

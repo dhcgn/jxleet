@@ -10,6 +10,7 @@
     outputDirty: boolean;
     policyDraft?: string;
     collisionDraft?: string;
+    embedDraft?: boolean;
     onSelect(name: string): void;
     onCreate(): void;
     onDuplicate(): void;
@@ -30,6 +31,7 @@
     outputDirty,
     policyDraft = $bindable(''),
     collisionDraft = $bindable('skip'),
+    embedDraft = $bindable(false),
     onSelect,
     onCreate,
     onDuplicate,
@@ -102,6 +104,10 @@
                   <option value="number">Number the new file</option>
                   <option value="overwrite">Overwrite existing</option>
                 </select>
+                <label class="opt" style="display:flex;gap:6px;align-items:center" title="Append the encoding settings to the output filename, e.g. photo.d1.00-e7-cjxl0.11.1.jxl">
+                  <input type="checkbox" bind:checked={embedDraft} disabled={readOnly} data-testid="preset-embed-settings" />
+                  <span>Settings in filename</span>
+                </label>
                 <button class="btn" data-testid="preset-save-output" onclick={() => void onSaveOutput()} disabled={readOnly || !outputDirty}>Save</button>
               </div>
               {#if readOnly}

@@ -45,12 +45,14 @@ type Deps struct {
 
 // Settings configure a run. Processes and Threads are independent: Processes is
 // how many cjxl invocations run in parallel, Threads is --num_threads passed to
-// each (0 leaves it to the preset / cjxl default).
+// each (0 leaves it to the preset / cjxl default). CJXLVersion is the installed
+// toolchain version embedded in output filenames when the preset enables it.
 type Settings struct {
-	Processes int
-	Threads   int
-	Preset    preset.Preset
-	Deletion  output.DeletionByRoute
+	Processes   int
+	Threads     int
+	Preset      preset.Preset
+	Deletion    output.DeletionByRoute
+	CJXLVersion string
 }
 
 // FileResult is the outcome for one input file.
@@ -384,7 +386,11 @@ func (e *Engine) process(ctx context.Context, path string) FileResult {
 	}
 
 	eff := output.EffectiveOutput(e.settings.Preset.Output, route, e.settings.Deletion)
-	plan, err := output.Prepare(path, eff)
+	suffix := ""
+	if eff.EmbedSettings {
+		suffix = output.SuffixFor(route, args, e.settings.CJXLVersion)
+	}
+	plan, err := output.PrepareWithSuffix(path, eff, suffix)
 	if err != nil {
 		res.Err = err
 		res.Duration = time.Since(start)
@@ -396,7 +402,7 @@ func (e *Engine) process(ctx context.Context, path string) FileResult {
 		if e.resolveCollision(path, plan.Final) {
 			retry := eff
 			retry.OnCollision = preset.CollisionOverwrite
-			plan, err = output.Prepare(path, retry)
+			plan, err = output.PrepareWithSuffix(path, retry, suffix)
 			if err != nil {
 				res.Err = err
 				res.Duration = time.Since(start)

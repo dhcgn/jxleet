@@ -34,6 +34,9 @@ type Output struct {
 	Policy      Policy    `yaml:"policy"`
 	Subfolder   string    `yaml:"subfolder,omitempty"`
 	OnCollision Collision `yaml:"on_collision,omitempty"`
+	// EmbedSettings appends the encoding settings to the output filename
+	// (e.g. photo.d1.00-e7-cjxl0.11.1.jxl). False when unset.
+	EmbedSettings bool `yaml:"embed_settings,omitempty"`
 }
 
 // Rule pairs a set of format filters with an ordered list of cjxl arguments.

@@ -13,7 +13,7 @@
     meta: { selection: string; output: string; error: string; loading: boolean };
     run: { busy: boolean; summary: ConversionSummary | null };
     progress: ProgressUpdate;
-    settings: { distance: number; effort: number; jpegLossless: boolean; outputPolicy: string };
+    settings: { distance: number; effort: number; jpegLossless: boolean; outputPolicy: string; embedSettings: boolean };
     routeMode: RouteMode;
     quality: number;
     outOfRange: boolean;
@@ -35,6 +35,7 @@
     onSetEffort(value: number): void;
     onSetJpegMode(lossless: boolean): void;
     onSetOutputPolicy(policy: 'alongside' | 'subfolder' | 'replace'): void;
+    onSetEmbedSettings(embed: boolean): void;
     onStart(): void;
   }
   let {
@@ -65,6 +66,7 @@
     onSetEffort,
     onSetJpegMode,
     onSetOutputPolicy,
+    onSetEmbedSettings,
     onStart,
   }: Props = $props();
 
@@ -335,6 +337,10 @@
           <label class="opt risk" data-sel={settings.outputPolicy === 'replace'}>
             <input type="radio" name="output" checked={settings.outputPolicy === 'replace'} onchange={() => onSetOutputPolicy('replace')} />
             <span><span class="ot">Replace, original to recycle bin</span><span class="od">Only after verification. Irreversible routes require confirmation.</span></span>
+          </label>
+          <label class="opt" data-sel={settings.embedSettings}>
+            <input type="checkbox" checked={settings.embedSettings} onchange={(event) => onSetEmbedSettings((event.currentTarget as HTMLInputElement).checked)} data-testid="embed-settings" />
+            <span><span class="ot">Settings in filename</span><span class="od">photo.d1.00-e7-cjxl0.11.1.jxl instead of photo.jxl</span></span>
           </label>
         </div>
       </div>

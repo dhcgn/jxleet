@@ -231,6 +231,7 @@ output:
   policy: alongside       # alongside | subfolder | replace
   subfolder: jxl
   on_collision: skip      # skip | number | overwrite
+  embed_settings: false   # true → photo.d1.00-e7-cjxl0.11.1.jxl instead of photo.jxl
 
 rules:
   # JPEG stays recoverable — the original can be reconstructed from the result
@@ -393,6 +394,15 @@ When the target `.jxl` already exists, the preset's `on_collision` decides: `ski
 default), `number` a new name, `overwrite` silently. Under `skip`, the GUI asks instead of
 skipping silently: overwrite this file, overwrite all, skip this file, or skip all — presets
 configured for `number` or `overwrite` never prompt.
+
+### Settings in the filename
+
+With `output.embed_settings: true`, the distance, effort and used cjxl version are appended
+to the output name: `photo.d1.00-e7-cjxl0.11.1.jxl` instead of `photo.jxl`. Distance always
+keeps two decimals so suffixed files sort in numeric order; the transcode route reports
+`d0.00` with the rule's effort. The Main view has a matching checkbox (a session-only
+override, like the output policy), and the preset value can be changed in the Presets view
+or directly in the YAML file.
 
 ## The managed toolchain
 

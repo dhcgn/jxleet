@@ -65,6 +65,7 @@
     effort: 7,
     jpegLossless: true,
     outputPolicy: 'alongside',
+    embedSettings: false,
     processes: 2,
     threads: 8,
     lossyDistance: 1.0,
@@ -99,13 +100,16 @@
   let collisionPrompt = $state<CollisionPrompt | null>(null);
   let presetPolicyDraft = $state('');
   let presetCollisionDraft = $state('skip');
+  let presetEmbedDraft = $state(false);
 
   let totalSize = $derived(files.reduce((total, file) => total + file.size, 0));
   let selectedPresetData = $derived(presets.find((preset) => preset.name === selectedPreset) ?? null);
   let selectedPresetReadOnly = $derived(presets.find((preset) => preset.name === selectedPreset)?.readOnly ?? false);
   let presetOutputDirty = $derived(
     Boolean(selectedPresetData) &&
-      (presetPolicyDraft !== selectedPresetData?.policy || presetCollisionDraft !== selectedPresetData?.collision),
+      (presetPolicyDraft !== selectedPresetData?.policy ||
+        presetCollisionDraft !== selectedPresetData?.collision ||
+        presetEmbedDraft !== Boolean(selectedPresetData?.embedSettings)),
   );
   let quality = $derived(Math.round(qualityFromDistance(settings.distance)));
   let outOfRange = $derived(routeMode !== 'lossless' && (settings.distance < 0.5 || settings.distance > 3));
@@ -136,6 +140,7 @@
       settings.effort !== snapshot.effort ||
       settings.jpegLossless !== snapshot.jpegLossless ||
       settings.outputPolicy !== snapshot.policy ||
+      settings.embedSettings !== snapshot.embedSettings ||
       !sameFlags(expertOverrides, snapshot.flags)
     );
   });
@@ -283,6 +288,8 @@
       effort: settings.effort,
       useEffort: true,
       outputPolicy: settings.outputPolicy,
+      embedSettings: settings.embedSettings,
+      useEmbedSettings: true,
       expertFlags: expertOverrides,
       resetExpert: false, // flags live in the preset; Expert edits persist there
     };
@@ -518,12 +525,13 @@
     const selected = presets.find((preset) => preset.name === name);
     presetPolicyDraft = selected?.policy ?? '';
     presetCollisionDraft = selected?.collision ?? 'skip';
+    presetEmbedDraft = Boolean(selected?.embedSettings);
   }
 
   async function savePresetOutput(): Promise<void> {
     if (!selectedPreset || selectedPresetReadOnly || !presetOutputDirty) return;
     try {
-      await Service.SavePresetOutput(selectedPreset, presetPolicyDraft, presetCollisionDraft);
+      await Service.SavePresetOutput(selectedPreset, presetPolicyDraft, presetCollisionDraft, presetEmbedDraft);
       await refreshPresets();
       selectPreset(selectedPreset);
       // A saved output block changes what the GUI controls show for this preset.
@@ -666,6 +674,7 @@
     effort: number;
     jpegLossless: boolean;
     policy: string;
+    embedSettings: boolean;
     flags: FlagOverride[];
   }
 
@@ -676,6 +685,7 @@
     effort: number;
     jpegMode: string;
     policy: string;
+    embedSettings: boolean;
     flags: FlagOverride[] | null;
   }): CoreSnapshot {
     const flags = core.flags ?? [];
@@ -685,12 +695,14 @@
     if (core.distance > 0) settings.lossyDistance = core.distance;
     settings.jpegLossless = core.jpegMode !== 'reencode';
     settings.outputPolicy = core.policy || 'alongside';
+    settings.embedSettings = core.embedSettings ?? false;
     expertOverrides = flags.map((flag) => ({ ...flag }));
     return {
       distance: core.distance,
       effort: core.effort,
       jpegLossless: settings.jpegLossless,
       policy: settings.outputPolicy,
+      embedSettings: settings.embedSettings,
       flags,
     };
   }
@@ -715,6 +727,7 @@
       effort: coreSnapshot.effort,
       jpegMode: coreSnapshot.jpegLossless ? 'transcode' : 'reencode',
       policy: coreSnapshot.policy,
+      embedSettings: coreSnapshot.embedSettings,
       flags: coreSnapshot.flags,
     });
     onSettingsChanged();
@@ -930,6 +943,7 @@
       onSetEffort={setEffortValue}
       onSetJpegMode={(lossless) => { settings.jpegLossless = lossless; onSettingsChanged(); }}
       onSetOutputPolicy={(policy) => { settings.outputPolicy = policy; onSettingsChanged(); }}
+      onSetEmbedSettings={(embed) => { settings.embedSettings = embed; onSettingsChanged(); }}
       onStart={() => void startConversion()}
     />
   {:else if view === 'expert'}
@@ -987,6 +1001,7 @@
       outputDirty={presetOutputDirty}
       bind:policyDraft={presetPolicyDraft}
       bind:collisionDraft={presetCollisionDraft}
+      bind:embedDraft={presetEmbedDraft}
       onSelect={selectPreset}
       onCreate={() => void createPreset()}
       onDuplicate={() => void duplicatePreset()}
