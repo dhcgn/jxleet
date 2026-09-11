@@ -4,11 +4,13 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"errors"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/dhcgn/jxleet/internal/app"
@@ -20,6 +22,8 @@ import (
 	"github.com/dhcgn/jxleet/internal/toolchain"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
+	"github.com/wailsapp/wails/v3/pkg/updater"
+	githubprovider "github.com/wailsapp/wails/v3/pkg/updater/providers/github"
 )
 
 // Wails uses Go's `embed` package to embed the frontend files into the binary.
@@ -158,6 +162,30 @@ func main() {
 				AllowsMultipleSelection: true,
 			}).PromptForMultipleSelection()
 		},
+		// App updates are notify-only: these run only for the startup banner
+		// (silent Check, no window) and the user-triggered update window.
+		// wailsApp is assigned below before any binding can fire.
+		CheckAppUpdate: func(ctx context.Context) (app.Update, error) {
+			if wailsApp == nil {
+				return app.Update{}, fmt.Errorf("application is not initialized")
+			}
+			rel, err := wailsApp.Updater.Check(ctx)
+			if err != nil || rel == nil {
+				return app.Update{}, err
+			}
+			latest := strings.TrimPrefix(rel.Version, "v")
+			update := app.Update{Latest: "v" + latest, Available: true}
+			if url, ok := rel.Metadata["github.release.htmlURL"].(string); ok {
+				update.URL = url
+			}
+			return update, nil
+		},
+		InstallAppUpdate: func(ctx context.Context) error {
+			if wailsApp == nil {
+				return fmt.Errorf("application is not initialized")
+			}
+			return wailsApp.Updater.CheckAndInstall(ctx)
+		},
 	})
 
 	wailsApp = application.New(application.Options{
@@ -192,6 +220,15 @@ func main() {
 		window.Show()
 	})
 
+	// App updates are notify-only: the updater is initialized without a
+	// CheckInterval, so nothing is ever checked or downloaded automatically.
+	// Dev builds skip this entirely and never report updates.
+	if version != "" && version != "dev" {
+		if err := initAppUpdater(wailsApp, version); err != nil {
+			log.Printf("updater: %v (app update checks disabled)", err)
+		}
+	}
+
 	// Coalesce handovers from later invocations into this running instance.
 	if server != nil {
 		go server.Serve(func(m ipc.Message) {
@@ -213,6 +250,32 @@ func main() {
 	if err := wailsApp.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// initAppUpdater configures the Wails self-updater against this project's
+// GitHub releases. The release workflow already publishes SHA256SUMS next to
+// the zip, so downloads are checksum-verified with no release-format changes.
+// The default asset matcher picks jxleet_<version>_windows_amd64.zip by
+// platform/arch substring, and Prerelease stays false so beta tags never
+// disturb stable users. The updater expects the version without the leading
+// "v" that release tags carry.
+// Ed25519 signing (updater.Config.PublicKey) is deliberately deferred: it
+// needs a signing step in release.yml first.
+func initAppUpdater(wailsApp *application.App, version string) error {
+	gh, err := githubprovider.New(githubprovider.Config{
+		Repository:    "dhcgn/jxleet",
+		ChecksumAsset: "SHA256SUMS",
+	})
+	if err != nil {
+		return fmt.Errorf("updater: github provider: %w", err)
+	}
+	if err := wailsApp.Updater.Init(updater.Config{
+		CurrentVersion: strings.TrimPrefix(version, "v"),
+		Providers:      []updater.Provider{gh},
+	}); err != nil {
+		return fmt.Errorf("updater: init: %w", err)
+	}
+	return nil
 }
 
 func ensureDefaultBindings(cfg *config.Config, migrateLegacy bool) bool {

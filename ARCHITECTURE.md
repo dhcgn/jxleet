@@ -51,7 +51,7 @@ items are tracked in `AGENTS.md`.
 | Package | Responsibility |
 |---|---|
 | `main.go` | Thin wiring: parse args, single-instance startup, launch the app |
-| `internal/app` | Wails services exposed to the frontend: file intake, conversion control, presets, toolchain status/install, app update check (own GitHub releases, notify-only), history, collision resolution. Emits the `files`, conversion-progress, `collision-prompt` and `toolchain-progress` events |
+| `internal/app` | Wails services exposed to the frontend: file intake, conversion control, presets, toolchain status/install, app update check/install via the Wails updater (notify-only), history, collision resolution. Emits the `files`, conversion-progress, `collision-prompt` and `toolchain-progress` events |
 | `internal/cli` | Strict path/flag parsing for path invocation, `--preset` override, exit codes. No dialogs |
 | `internal/routes` | Route determination, route colours, effort-ladder reference data |
 | `internal/preset` | YAML load/save, schema + version migration, validation, CRUD/import/export, entry-point bindings, read-only defaults |
@@ -232,7 +232,12 @@ inside it. Dark by default, operable from 420 px. CSS stays one global sheet
   pre-releases). Publishes a zip with `jxleet.exe` and a `SHA256SUMS` file to
   a GitHub Release; the version is stamped into the binary via
   `-ldflags -X main.version` by `task build` with `VERSION` set
-- App updates: on start the GUI compares the stamped version against the
-  latest GitHub release (`GetAppUpdate`) and shows a dismissable banner when a
-  newer one exists. Notify-only: dev builds, offline runs and pre-releases
-  never warn, and nothing is ever downloaded automatically
+- App updates: the Wails built-in updater (`pkg/updater` + `providers/github`,
+  initialized in `main.go` without a `CheckInterval`) checks `dhcgn/jxleet`
+  releases with `ChecksumAsset: SHA256SUMS`. On start the GUI runs a silent
+  `Check` (`GetAppUpdate`) and shows a dismissable banner when a newer release
+  exists; the banner's Update button and the Tools view's manual check run
+  `CheckAndInstall`, which opens the framework update window (release notes,
+  progress, checksum verification, helper-mode binary swap on relaunch).
+  Notify-only: dev builds, offline runs and pre-releases never warn, and
+  nothing is ever downloaded without the user asking
