@@ -29,6 +29,7 @@ type Result struct {
 	Stderr   string
 	ExitCode int
 	Duration time.Duration
+	PID      int // OS pid of the child, 0 if it never started
 	Err      error
 }
 
@@ -42,25 +43,41 @@ func (r Result) Success() bool {
 func (r *Runner) Run(ctx context.Context, args []Arg, input, output string) Result {
 	argv := Args(args)
 	argv = append(argv, input, output)
-	return r.exec(ctx, argv)
+	return r.exec(ctx, argv, nil)
+}
+
+// RunWithStart behaves like Run but reports the OS PID via onStart once the
+// child has started, so callers can watch or cancel that specific process.
+func (r *Runner) RunWithStart(ctx context.Context, args []Arg, input, output string, onStart func(pid int)) Result {
+	argv := Args(args)
+	argv = append(argv, input, output)
+	return r.exec(ctx, argv, onStart)
 }
 
 // exec runs the binary with raw arguments and captures its streams.
-func (r *Runner) exec(ctx context.Context, argv []string) Result {
+func (r *Runner) exec(ctx context.Context, argv []string, onStart func(pid int)) Result {
 	start := time.Now()
 	cmd := process.CommandContext(ctx, r.Binary, argv...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err := cmd.Run()
-	res := Result{
-		Args:     argv,
-		Stdout:   stdout.String(),
-		Stderr:   stderr.String(),
-		Duration: time.Since(start),
-		Err:      err,
+	if err := cmd.Start(); err != nil {
+		return Result{Args: argv, Stdout: stdout.String(), Stderr: stderr.String(), Duration: time.Since(start), ExitCode: -1, Err: err}
 	}
+	res := Result{Args: argv}
+	if cmd.Process != nil {
+		res.PID = cmd.Process.Pid
+		if onStart != nil {
+			onStart(res.PID)
+		}
+	}
+
+	err := cmd.Wait()
+	res.Stdout = stdout.String()
+	res.Stderr = stderr.String()
+	res.Duration = time.Since(start)
+	res.Err = err
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		res.ExitCode = exitErr.ExitCode()

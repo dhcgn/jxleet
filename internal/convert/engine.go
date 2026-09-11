@@ -76,6 +76,16 @@ type FileResult struct {
 	Err        error
 	Warning    string // non-fatal note, e.g. a failed jxlinfo sidecar
 	Duration   time.Duration
+	PID        int        // OS pid of the cjxl child, 0 if never started
+	Args       []cjxl.Arg // resolved encoder args for this file (for settings display)
+	StartedAt  time.Time  // when this file's encode started
+}
+
+// FileStarted is emitted when one file's encode begins.
+type FileStarted struct {
+	Input     string
+	PID       int
+	StartedAt time.Time
 }
 
 // Progress is a snapshot of a running conversion.
@@ -112,8 +122,9 @@ type Engine struct {
 
 	// Callbacks are invoked from worker goroutines; keep them fast and
 	// non-blocking. Both are optional.
-	OnFile     func(FileResult)
-	OnProgress func(Progress)
+	OnFile      func(FileResult)
+	OnFileStart func(FileStarted)
+	OnProgress  func(Progress)
 
 	// CollisionHandler is invoked synchronously from a worker when the output
 	// file already exists under the skip-on-collision policy. It may block
@@ -124,6 +135,9 @@ type Engine struct {
 	cond     *sync.Cond
 	pending  []string
 	inflight int
+
+	// fileCancels tracks one cancel func per in-flight file for per-file cancel.
+	fileCancels map[string]context.CancelFunc
 
 	total      int
 	completed  int
@@ -160,7 +174,7 @@ func New(deps Deps, settings Settings) *Engine {
 	if settings.Processes < 1 {
 		settings.Processes = 1
 	}
-	e := &Engine{deps: deps, settings: settings, tp: newThroughput(15)}
+	e := &Engine{deps: deps, settings: settings, tp: newThroughput(15), fileCancels: make(map[string]context.CancelFunc)}
 	e.cond = sync.NewCond(&e.mu)
 	return e
 }
@@ -274,6 +288,19 @@ func (e *Engine) Cancel() {
 	e.mu.Unlock()
 }
 
+// CancelFile cancels one in-flight file; queued and finished files are
+// unaffected. It reports whether the file was in flight.
+func (e *Engine) CancelFile(input string) bool {
+	e.mu.Lock()
+	cancel, ok := e.fileCancels[input]
+	e.mu.Unlock()
+	if !ok {
+		return false
+	}
+	cancel()
+	return true
+}
+
 // Wait blocks until all workers have exited and returns the Summary.
 func (e *Engine) Wait() Summary {
 	e.wg.Wait()
@@ -307,7 +334,16 @@ func (e *Engine) worker() {
 		if !ok {
 			return
 		}
-		res := e.process(e.ctx, path)
+		// One child context per file so CancelFile stops only this file.
+		e.mu.Lock()
+		fileCtx, fileCancel := context.WithCancel(e.ctx)
+		e.fileCancels[path] = fileCancel
+		e.mu.Unlock()
+		res := e.process(fileCtx, path)
+		e.mu.Lock()
+		delete(e.fileCancels, path)
+		e.mu.Unlock()
+		fileCancel()
 		e.finish(res)
 	}
 }
@@ -427,7 +463,21 @@ func (e *Engine) process(ctx context.Context, path string) FileResult {
 	res.Output = plan.Final
 
 	args = e.withThreads(args)
-	runRes := e.deps.Encoder.Run(ctx, args, path, plan.TempPath)
+	res.Args = append([]cjxl.Arg(nil), args...)
+	encodeStart := time.Now()
+	res.StartedAt = encodeStart
+	if e.OnFileStart != nil {
+		e.OnFileStart(FileStarted{Input: path, PID: 0, StartedAt: encodeStart})
+	}
+	runRes := e.runEncode(ctx, args, path, plan.TempPath, func(pid int) {
+		res.PID = pid
+		if e.OnFileStart != nil {
+			e.OnFileStart(FileStarted{Input: path, PID: pid, StartedAt: encodeStart})
+		}
+	})
+	if res.PID == 0 {
+		res.PID = runRes.PID
+	}
 	if !runRes.Success() {
 		_ = os.Remove(plan.TempPath)
 		res.Output = ""
@@ -513,6 +563,20 @@ func (e *Engine) resolveCollision(input, target string) bool {
 		e.mu.Unlock()
 	}
 	return action == CollisionOverwrite || action == CollisionOverwriteAll
+}
+
+// startReporter is implemented by encoders that can report the OS PID.
+type startReporter interface {
+	RunWithStart(ctx context.Context, args []cjxl.Arg, input, output string, onStart func(pid int)) cjxl.Result
+}
+
+// runEncode runs one encode, using the PID-reporting path when the encoder
+// supports it (the real *cjxl.Runner does; test fakes use plain Run).
+func (e *Engine) runEncode(ctx context.Context, args []cjxl.Arg, input, output string, onStart func(pid int)) cjxl.Result {
+	if sr, ok := e.deps.Encoder.(startReporter); ok {
+		return sr.RunWithStart(ctx, args, input, output, onStart)
+	}
+	return e.deps.Encoder.Run(ctx, args, input, output)
 }
 
 // withThreads injects --num_threads when configured and not already set.

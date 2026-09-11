@@ -1,6 +1,6 @@
 import type { FilePreview } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
 
-export type View = 'main' | 'expert' | 'presets' | 'tools' | 'automatic' | 'history';
+export type View = 'main' | 'expert' | 'presets' | 'tools' | 'automatic' | 'history' | 'stats';
 export type RouteMode = 'lossy' | 'lossless';
 
 export interface FileGroup {

@@ -57,6 +57,7 @@ type Service struct {
 	pendingPreset string
 	engine        *convert.Engine
 	activePreset  string
+	seq           int64 // per-file result sequence for duplicate-row keys
 
 	// promptMu serializes output-exists prompts: at most one question is
 	// outstanding; further workers wait for the current decision.
@@ -692,6 +693,7 @@ func (s *Service) InspectJXL(path string) (string, error) {
 
 // FileUpdate is emitted when one file finishes.
 type FileUpdate struct {
+	Seq        int64  `json:"seq"`
 	Input      string `json:"input"`
 	Output     string `json:"output"`
 	Format     string `json:"format"`
@@ -703,6 +705,16 @@ type FileUpdate struct {
 	Cancelled  bool   `json:"cancelled"`
 	Error      string `json:"error"`
 	Warning    string `json:"warning"`
+	PID        int    `json:"pid"`
+	Settings   string `json:"settings"`
+	FlagsSet   bool   `json:"flagsSet"`
+}
+
+// FileStartUpdate is emitted when one file's encode begins.
+type FileStartUpdate struct {
+	Input     string `json:"input"`
+	PID       int    `json:"pid"`
+	StartedAt int64  `json:"startedAt"` // unix seconds
 }
 
 // ProgressUpdate is emitted while a conversion is running.
@@ -795,8 +807,19 @@ func (s *Service) StartConversion(paths []string, options ConversionOptions) err
 	engine.OnProgress = func(progress convert.Progress) {
 		s.emit("progress", progressUpdate(progress))
 	}
+	engine.OnFileStart = func(started convert.FileStarted) {
+		s.emit("conversion-file-start", FileStartUpdate{
+			Input:     started.Input,
+			PID:       started.PID,
+			StartedAt: started.StartedAt.Unix(),
+		})
+	}
 	engine.OnFile = func(result convert.FileResult) {
-		s.emit("conversion-file", fileUpdate(result))
+		s.mu.Lock()
+		s.seq++
+		seq := s.seq
+		s.mu.Unlock()
+		s.emit("conversion-file", fileUpdate(seq, result))
 		s.recordHistory(p.Name, result)
 	}
 	engine.CollisionHandler = s.askCollision
@@ -858,6 +881,18 @@ func (s *Service) CancelConversion() error {
 		return errors.New("no conversion is running")
 	}
 	engine.Cancel()
+	return nil
+}
+
+// CancelFileConversion cancels one in-flight file; queued work continues.
+func (s *Service) CancelFileConversion(input string) error {
+	engine := s.currentEngine()
+	if engine == nil {
+		return errors.New("no conversion is running")
+	}
+	if !engine.CancelFile(input) {
+		return errors.New("file is not running")
+	}
 	return nil
 }
 
@@ -1533,7 +1568,12 @@ func progressUpdate(progress convert.Progress) ProgressUpdate {
 	processed := progress.Completed + progress.Failed + progress.Skipped
 	percent := 0.0
 	if progress.Total > 0 {
-		percent = float64(processed) * 100 / float64(progress.Total)
+		if processed <= 0 {
+			// Count the run start so the bar moves immediately.
+			percent = 10
+		} else {
+			percent = 10 + 90*float64(processed)/float64(progress.Total)
+		}
 	}
 	return ProgressUpdate{
 		Total:      progress.Total,
@@ -1551,8 +1591,9 @@ func progressUpdate(progress convert.Progress) ProgressUpdate {
 	}
 }
 
-func fileUpdate(result convert.FileResult) FileUpdate {
+func fileUpdate(seq int64, result convert.FileResult) FileUpdate {
 	update := FileUpdate{
+		Seq:        seq,
 		Input:      result.Input,
 		Output:     result.Output,
 		Format:     string(result.Format),
@@ -1563,9 +1604,13 @@ func fileUpdate(result convert.FileResult) FileUpdate {
 		SkipReason: result.SkipReason,
 		Cancelled:  result.Cancelled,
 		Warning:    result.Warning,
+		PID:        result.PID,
 	}
 	if result.Err != nil {
 		update.Error = result.Err.Error()
+	}
+	if len(result.Args) > 0 {
+		update.Settings, update.FlagsSet = summarizeFileSettings(result.Route, result.Args)
 	}
 	return update
 }
