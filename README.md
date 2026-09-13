@@ -160,8 +160,11 @@ with different settings for comparison.
 
 <!-- ref:jl:view.queue ref:jl:domain.queue.item ref:jl:tech.tool.resources -->
 
-The **Queue** view runs the staged items back to back, one `cjxl` invocation per
-file with its frozen settings. Global Start, Pause and Cancel sit above the table;
+The **Queue** view runs the staged items in parallel — one `cjxl` invocation per
+file with its frozen settings, as many at once as the process count allows (automatic:
+all cores minus one, capped at 16; adjustable in the Queue header alongside the
+per-process thread count, which defaults to leaving `--num_threads` to `cjxl`). Global
+Start, Pause and Cancel sit above the table;
 every item spans two rows: file, sizes, saving, route and the status (waiting, done
 with needed time, or the failure reason) on top, the child PID with its CPU usage and
 RAM (updated every second) plus the actions below — buttons never wrap. Right-click a row to remove

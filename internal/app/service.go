@@ -768,12 +768,8 @@ func (s *Service) StartConversion(paths []string, options ConversionOptions) err
 		return fmt.Errorf("toolchain is not ready: %w", err)
 	}
 	if hasExpertArguments(p) {
-		flagStatus, err := s.tools.CheckFlags(context.Background(), installed)
-		if err != nil {
-			return fmt.Errorf("read installed cjxl flags: %w", err)
-		}
-		if flagStatus.Locked || len(flagStatus.Added) > 0 || len(flagStatus.Removed) > 0 {
-			return fmt.Errorf("expert flags are locked for cjxl %s; generated flags target %s", installed.Version, flags.GeneratedVersion)
+		if err := s.checkExpertFlags(installed); err != nil {
+			return err
 		}
 	}
 
@@ -799,60 +795,19 @@ func (s *Service) StartConversion(paths []string, options ConversionOptions) err
 			Inspector: jxlinfo.NewRunner(installed.JXLInfoPath), // ref:jl:tech.tool.inspect
 		},
 		convert.Settings{
-			Processes:   options.Processes,
+			Processes:   AutoProcesses(options.Processes),
 			Threads:     options.Threads,
 			Preset:      p,
 			Deletion:    output.DeletionByRoute{},
 			CJXLVersion: installed.Version,
 		},
 	)
-	engine.OnProgress = func(progress convert.Progress) {
-		s.emit("progress", progressUpdate(progress))
-	}
-	engine.OnFileStart = func(started convert.FileStarted) {
-		s.emit("conversion-file-start", FileStartUpdate{
-			Input:     started.Input,
-			PID:       started.PID,
-			StartedAt: started.StartedAt.Unix(),
-		})
-	}
-	engine.OnFile = func(result convert.FileResult) {
-		s.mu.Lock()
-		s.seq++
-		seq := s.seq
-		s.mu.Unlock()
-		s.emit("conversion-file", fileUpdate(seq, result))
-		s.recordHistory(p.Name, result)
-	}
-	engine.CollisionHandler = s.askCollision
+	s.wireEngine(engine, func(convert.FileResult) string { return p.Name })
 	s.engine = engine
 	s.activePreset = p.Name
 	s.mu.Unlock()
 
-	go func() {
-		engine.Start(context.Background())
-		engine.Add(inputs)
-		timer := time.NewTimer(400 * time.Millisecond)
-		<-timer.C
-		engine.CloseInput()
-		summary := engine.Wait()
-
-		s.mu.Lock()
-		if s.engine == engine {
-			s.engine = nil
-			s.activePreset = ""
-		}
-		s.mu.Unlock()
-		s.emit("conversion-done", ConversionSummary{
-			Total:     summary.Total,
-			Completed: summary.Completed,
-			Failed:    summary.Failed,
-			Skipped:   summary.Skipped,
-			Cancelled: summary.Cancelled,
-			BytesIn:   summary.BytesIn,
-			BytesOut:  summary.BytesOut,
-		})
-	}()
+	s.launchEngine(engine, func() { engine.Add(inputs) })
 	return nil
 }
 
@@ -1217,7 +1172,7 @@ func (s *Service) effectivePreset(options ConversionOptions) (preset.Preset, err
 		return preset.Preset{}, errors.New("processes and threads cannot be negative")
 	}
 	if options.Processes == 0 {
-		options.Processes = 1
+		options.Processes = AutoProcesses(0)
 	}
 	if options.UseDistance && (options.Distance < 0 || options.Distance > 25) {
 		return preset.Preset{}, errors.New("distance must be between 0 and 25")

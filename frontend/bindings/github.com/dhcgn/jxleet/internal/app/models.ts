@@ -233,6 +233,14 @@ export interface ProgressUpdate {
 }
 
 /**
+ * QueueItemInput is one staged queue item: a file plus its frozen run options.
+ */
+export interface QueueItemInput {
+    "path": string;
+    "options": ConversionOptions;
+}
+
+/**
  * Status is a small snapshot the frontend can render on start.
  */
 export interface Status {
