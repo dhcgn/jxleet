@@ -217,7 +217,8 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   (`ref:jl:domain.queue.item`) with a frozen copy of the run options and a
   snapshot label (distance with quality, effort, `+flags` hint), so later
   preset edits never touch staged items and the same file may be queued twice
-  with different settings. The Queue view (`ref:jl:view.queue`) executes
+  with different settings. Staging autostarts the run when idle; items staged
+  mid-run wait for the next manual Start. The Queue view (`ref:jl:view.queue`) executes
   staged items back to back — one `cjxl` invocation per file with its frozen
   options — with global start/pause/cancel plus per-item cancel; processing
   rows show the child PID with per-process CPU time and RAM sampled every

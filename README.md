@@ -153,7 +153,8 @@ The Main view is intake only: files list flat in the order they were added, each
 with its route badge and the resolved settings it will be staged with (e.g.
 `D 1.00 (Q 90) · E 7`, with a `+flags` chip when extra cjxl flags apply); Effort
 is a simple slider alongside Distance/Quality. Nothing converts here — **Move to
-queue** stages each listed file with a frozen copy of the current settings, so
+queue** stages each listed file with a frozen copy of the current settings and starts
+the run, so
 later preset edits never touch staged items and the same file may be queued twice
 with different settings for comparison.
 

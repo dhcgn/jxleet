@@ -553,15 +553,29 @@
     commandPreviewRequest += 1;
     errorMessage = '';
     view = 'queue';
+    // Autostart the run unless one is already in progress — newly staged
+    // items then wait for the next manual Start.
+    if (!queueRunning && !run.busy) {
+      void startQueue();
+    }
   }
 
   // Execute staged items back to back, one engine run per file so each keeps
-  // its frozen settings. Failed/cancelled/skipped rows stay for retry; done
-  // rows are left alone.
+  // its frozen settings. Failed/cancelled rows (and skipped rows from a
+  // previous run) retry; done rows are left alone, as are intake-rejected
+  // skips that never started.
   async function startQueue(): Promise<void> {
-    const startable = queue.filter((item) => item.status !== 'done' && item.status !== 'processing');
+    const startable = queue.filter(
+      (item) =>
+        item.status === 'waiting' ||
+        item.status === 'failed' ||
+        item.status === 'cancelled' ||
+        (item.status === 'skipped' && item.startedAt > 0),
+    );
     if (startable.length === 0) {
-      errorMessage = 'Queue is empty — move files to the queue first.';
+      if (queue.length === 0) {
+        errorMessage = 'Queue is empty — move files to the queue first.';
+      }
       return;
     }
     if (queueRunning || run.busy) {
