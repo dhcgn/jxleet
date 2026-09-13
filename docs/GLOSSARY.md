@@ -46,7 +46,7 @@ Views, command-line flags and context-menu entries the user touches.
 | `jl:view.history` | 1 | History view: past conversions newest-first with sizes, savings, routes and presets. |
 | `jl:view.main` | 2 | Main view: flat file intake in added order with route badges, session overrides and the move-to-queue bar. |
 | `jl:view.presets` | 1 | Presets view: preset library with rule summaries, output-policy editing and entry-point bindings. |
-| `jl:view.queue` | 7 | Queue view: session-only staging with frozen per-item settings, global start/pause/cancel, per-process CPU/RAM while running, and successes auto-moving to History. |
+| `jl:view.queue` | 8 | Queue view: session-only staging with frozen per-item settings, global start/pause/cancel, per-process CPU/RAM while running, and successes auto-moving to History. |
 | `jl:view.tools` | 1 | Tools view: installed cjxl/djxl/jxlinfo versions compared against the latest libjxl release. |
 
 ## Technical facts (jl:tech)
