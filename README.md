@@ -137,7 +137,7 @@ Drag files or folders in - native Windows drag-and-drop accepts
 files or folders in every view, and the toolbar keeps separate **Open File** and **Open Folder**
 actions always available. A selected folder contributes only regular files directly
 inside it; subfolders are not traversed, and anything unsupported is skipped rather than
-aborting the batch. If no preset is selected, the files stay in the queue and the window
+aborting the batch. If no preset is selected, the files stay in the intake and the window
 explains that a preset is needed for route classification.
 
 Settings split into **Main** - the essentials - and **Expert**, which exposes the full
@@ -149,13 +149,32 @@ in amber ("settings differ — preset not in effect") and a **Revert** button re
 preset values. Persisting changes happens in the preset YAML itself (Presets → Open in
 Editor). The live preview shows the exact command line that will run.
 
-The Main view makes the current plan explicit: files group by detected type and each group
-header shows the route and the resolved settings it will be processed with (e.g.
-`D 0.3 · E 7`, with a `+flags` chip when extra cjxl flags apply); Effort is a simple slider
-alongside Distance/Quality. While a conversion runs, an inline progress strip with
-pause/cancel and live per-file status keeps the queue visible without leaving the view, and
-finished files show their output size and saving ratio in place - the convert bar totals the
-whole batch.
+The Main view is intake only: files list flat in the order they were added, each
+with its route badge and the resolved settings it will be staged with (e.g.
+`D 1.00 (Q 90) · E 7`, with a `+flags` chip when extra cjxl flags apply); Effort
+is a simple slider alongside Distance/Quality. Nothing converts here — **Move to
+queue** stages each listed file with a frozen copy of the current settings and starts
+the run, so
+later preset edits never touch staged items and the same file may be queued twice
+with different settings for comparison.
+
+<!-- ref:jl:view.queue ref:jl:domain.queue.item ref:jl:tech.tool.resources -->
+
+The **Queue** view runs the staged items back to back, one `cjxl` invocation per
+file with its frozen settings. Global Start, Pause and Cancel sit above the table;
+every item spans two rows: file, sizes, saving, route and the status (waiting, done
+with needed time, or the failure reason) on top, the child PID with its CPU usage and
+RAM (updated every second) plus the actions below — buttons never wrap. Right-click a row to remove
+it, reclaim it back to Main (restoring its snapshot to the session settings), show source
+or JXL in Explorer, open the converted file, clear done or all rows, or cancel just that
+file. Successful conversions are recorded to
+History with their needed time; failed, cancelled and skipped rows stay in the Queue
+for retry and never reach History. The queue is session-only: closing the window with
+pending items warns once and discards them on confirm.
+
+<p align="center">
+  <img src="docs/screenshots/queue.png" alt="The Queue view: staged files with frozen settings, live progress, per-process resources and global controls">
+</p>
 
 <p align="center">
   <img src="docs/screenshots/expert.png" alt="The Expert view: every generated cjxl flag with help tooltips, effort ladder, live command preview">
@@ -405,8 +424,9 @@ back to deletion.
 
 When the target `.jxl` already exists, the preset's `on_collision` decides: `skip` (the safe
 default), `number` a new name, `overwrite` silently. Under `skip`, the GUI asks instead of
-skipping silently: overwrite this file, overwrite all, skip this file, or skip all — presets
-configured for `number` or `overwrite` never prompt.
+skipping silently: overwrite this file, overwrite all, rename this file, rename all, skip
+this file, or skip all — rename keeps the existing file and writes a numbered sibling
+(`photo (1).jxl`); presets configured for `number` or `overwrite` never prompt.
 
 ### Settings in the filename
 
@@ -453,7 +473,7 @@ Every successful conversion is recorded in `%APPDATA%\jxleet\history.jsonl` — 
 line per file, append-only, and tolerant of a torn last line, so a crash mid-write costs
 at most the last entry, never the whole file. The History view lists the entries newest
 first with input and output paths, both sizes, the saving, the route, the preset and the
-timestamp.
+needed time, plus the timestamp.
 
 Click an entry to run `jxlinfo -v` on the stored output and inspect what ended up in the
 file; if the output has since been moved or deleted, the entry says so instead of failing

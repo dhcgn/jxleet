@@ -79,6 +79,19 @@ export interface FilePreview {
 }
 
 /**
+ * FileStartUpdate is emitted when one file's encode begins.
+ */
+export interface FileStartUpdate {
+    "input": string;
+    "pid": number;
+
+    /**
+     * unix seconds
+     */
+    "startedAt": number;
+}
+
+/**
  * FileUpdate is emitted when one file finishes.
  */
 export interface FileUpdate {
@@ -97,6 +110,11 @@ export interface FileUpdate {
     "pid": number;
     "settings": string;
     "flagsSet": boolean;
+
+    /**
+     * needed time for this file
+     */
+    "durationSeconds": number;
 }
 
 /**
@@ -132,6 +150,11 @@ export interface HistoryEntry {
     "preset": string;
     "inputSize": number;
     "outputSize": number;
+
+    /**
+     * needed encode time; 0 for entries written before v0.6
+     */
+    "durationSeconds": number;
 }
 
 /**
@@ -178,6 +201,17 @@ export interface PresetSummary {
     "effort": string;
     "jpegMode": string;
     "rules": PresetRuleSummary[] | null;
+}
+
+/**
+ * ProcessResources is one sampled snapshot of a running cjxl child: CPU
+ * usage in percent and working-set RAM (ref:jl:tech.tool.resources). The
+ * Queue view polls it on a fixed cadence while a row shows processing.
+ */
+export interface ProcessResources {
+    "pid": number;
+    "cpuPercent": number;
+    "memoryBytes": number;
 }
 
 /**

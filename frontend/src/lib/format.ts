@@ -37,3 +37,19 @@ export function compactPath(path: string, maxLength = 80): string {
   const head = Math.max(3, maxLength - tail - 3);
   return `${path.slice(0, head)}...${path.slice(-tail)}`;
 }
+
+// Needed-time display for Queue/History rows: m:ss past a minute, seconds
+// below. Callers render a placeholder when the value is unknown (0/null).
+export function formatDuration(seconds: number): string {
+  if (!seconds || seconds <= 0) return '—';
+  if (seconds < 60) return seconds < 10 ? `${seconds.toFixed(1)}s` : `${Math.round(seconds)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.floor(seconds % 60);
+  return `${minutes}:${remainder.toString().padStart(2, '0')}`;
+}
+
+// History timestamps are "YYYY-MM-DD HH:mm:ss" local time.
+export function formatHistoryAt(when: Date): string {
+  const pad = (value: number): string => value.toString().padStart(2, '0');
+  return `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())} ${pad(when.getHours())}:${pad(when.getMinutes())}:${pad(when.getSeconds())}`;
+}

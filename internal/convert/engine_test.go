@@ -95,6 +95,8 @@ func TestEngineCollisionPromptDecisions(t *testing.T) {
 		{"overwrite", CollisionOverwrite, 2, 2, 0},
 		{"skip-all", CollisionSkipAll, 1, 0, 2},
 		{"overwrite-all", CollisionOverwriteAll, 1, 2, 0},
+		{"rename", CollisionRename, 2, 2, 0},
+		{"rename-all", CollisionRenameAll, 1, 2, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -114,6 +116,31 @@ func TestEngineCollisionPromptDecisions(t *testing.T) {
 				t.Fatalf("handler calls = %d, want %d", calls, tc.wantCalls)
 			}
 		})
+	}
+}
+
+// TestEngineCollisionRenameNumbersOutput verifies a rename answer keeps the
+// existing file and writes the conversion to a numbered sibling.
+func TestEngineCollisionRenameNumbersOutput(t *testing.T) {
+	dir := t.TempDir()
+	input := collidingInput(t, dir, "a.png")
+	var got []FileResult
+	e := New(Deps{Encoder: &fakeEncoder{}}, Settings{Processes: 1, Preset: skipCollisionPreset()})
+	e.CollisionHandler = func(_, _ string) CollisionAction { return CollisionRename }
+	e.OnFile = func(r FileResult) { got = append(got, r) }
+	sum := e.Run(context.Background(), []string{input})
+	if sum.Completed != 1 || sum.Skipped != 0 {
+		t.Fatalf("summary = %+v, want 1 completed", sum)
+	}
+	if len(got) != 1 {
+		t.Fatalf("OnFile called %d times, want 1", len(got))
+	}
+	want := filepath.Join(dir, "a (1).jxl")
+	if got[0].Output != want {
+		t.Errorf("output = %q, want numbered sibling %q", got[0].Output, want)
+	}
+	if content, err := os.ReadFile(filepath.Join(dir, "a.jxl")); err != nil || string(content) != "existing" {
+		t.Errorf("existing output was touched: content=%q err=%v", content, err)
 	}
 }
 

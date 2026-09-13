@@ -694,21 +694,22 @@ func (s *Service) InspectJXL(path string) (string, error) {
 
 // FileUpdate is emitted when one file finishes.
 type FileUpdate struct {
-	Seq        int64  `json:"seq"`
-	Input      string `json:"input"`
-	Output     string `json:"output"`
-	Format     string `json:"format"`
-	Route      string `json:"route"`
-	InputSize  int64  `json:"inputSize"`
-	OutputSize int64  `json:"outputSize"`
-	Skipped    bool   `json:"skipped"`
-	SkipReason string `json:"skipReason"`
-	Cancelled  bool   `json:"cancelled"`
-	Error      string `json:"error"`
-	Warning    string `json:"warning"`
-	PID        int    `json:"pid"`
-	Settings   string `json:"settings"`
-	FlagsSet   bool   `json:"flagsSet"`
+	Seq             int64   `json:"seq"`
+	Input           string  `json:"input"`
+	Output          string  `json:"output"`
+	Format          string  `json:"format"`
+	Route           string  `json:"route"`
+	InputSize       int64   `json:"inputSize"`
+	OutputSize      int64   `json:"outputSize"`
+	Skipped         bool    `json:"skipped"`
+	SkipReason      string  `json:"skipReason"`
+	Cancelled       bool    `json:"cancelled"`
+	Error           string  `json:"error"`
+	Warning         string  `json:"warning"`
+	PID             int     `json:"pid"`
+	Settings        string  `json:"settings"`
+	FlagsSet        bool    `json:"flagsSet"`
+	DurationSeconds float64 `json:"durationSeconds"` // needed time for this file
 }
 
 // FileStartUpdate is emitted when one file's encode begins.
@@ -897,6 +898,70 @@ func (s *Service) CancelFileConversion(input string) error {
 	return nil
 }
 
+// ProcessResources is one sampled snapshot of a running cjxl child: CPU
+// usage in percent and working-set RAM (ref:jl:tech.tool.resources). The
+// Queue view polls it on a fixed cadence while a row shows processing.
+type ProcessResources struct {
+	PID         int     `json:"pid"`
+	CPUPercent  float64 `json:"cpuPercent"`
+	MemoryBytes uint64  `json:"memoryBytes"`
+}
+
+// GetProcessResources snapshots CPU usage and RAM for one cjxl PID. It errors
+// when the process has exited (or never existed); the row then keeps its
+// placeholder.
+func (s *Service) GetProcessResources(pid int) (ProcessResources, error) {
+	res, err := cjxl.GetProcessResources(pid)
+	if err != nil {
+		return ProcessResources{}, err
+	}
+	return ProcessResources{PID: res.PID, CPUPercent: res.CPUPercent, MemoryBytes: res.MemoryBytes}, nil
+}
+
+// ShowInExplorer reveals one path in Explorer (selecting the file, or opening
+// the folder). Used by the Queue row context menu (ref:jl:view.queue).
+func (s *Service) ShowInExplorer(path string) error {
+	absolute, err := filepath.Abs(strings.TrimSpace(path))
+	if err != nil {
+		return fmt.Errorf("resolve explorer path: %w", err)
+	}
+	info, err := os.Stat(absolute)
+	if err != nil {
+		return fmt.Errorf("stat explorer path: %w", err)
+	}
+	var cmd *exec.Cmd
+	if info.IsDir() {
+		cmd = exec.Command("explorer.exe", absolute)
+	} else {
+		cmd = exec.Command("explorer.exe", "/select,", absolute)
+	}
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("open explorer: %w", err)
+	}
+	return cmd.Process.Release()
+}
+
+// OpenConvertedFile opens one converted file with its default application.
+// Used by the Queue row action (ref:jl:view.queue).
+func (s *Service) OpenConvertedFile(path string) error {
+	absolute, err := filepath.Abs(strings.TrimSpace(path))
+	if err != nil {
+		return fmt.Errorf("resolve converted file path: %w", err)
+	}
+	info, err := os.Stat(absolute)
+	if err != nil {
+		return fmt.Errorf("stat converted file path: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return errors.New("converted file path is not a regular file")
+	}
+	cmd := process.CommandContext(context.Background(), "cmd", "/c", "start", "", absolute)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("open converted file: %w", err)
+	}
+	return cmd.Process.Release()
+}
+
 // CollisionPrompt describes one waiting output-exists decision. It is emitted
 // as "collision-prompt" and answered through ResolveCollision.
 type CollisionPrompt struct {
@@ -943,6 +1008,10 @@ func (s *Service) askCollision(input, target string) convert.CollisionAction {
 		return convert.CollisionOverwrite
 	case "overwrite-all":
 		return convert.CollisionOverwriteAll
+	case "rename":
+		return convert.CollisionRename
+	case "rename-all":
+		return convert.CollisionRenameAll
 	case "skip-all":
 		return convert.CollisionSkipAll
 	default:
@@ -951,7 +1020,8 @@ func (s *Service) askCollision(input, target string) convert.CollisionAction {
 }
 
 // ResolveCollision answers the outstanding output-exists prompt. Actions are
-// "overwrite", "overwrite-all", "skip" and "skip-all".
+// "overwrite", "overwrite-all", "rename", "rename-all", "skip" and "skip-all".
+// Rename keeps the existing file and writes a numbered sibling ("photo (1).jxl").
 func (s *Service) ResolveCollision(action string) {
 	s.mu.Lock()
 	q := s.promptPending
@@ -960,7 +1030,7 @@ func (s *Service) ResolveCollision(action string) {
 		return
 	}
 	switch action {
-	case "overwrite", "overwrite-all", "skip", "skip-all":
+	case "overwrite", "overwrite-all", "rename", "rename-all", "skip", "skip-all":
 		q.reply <- action
 	}
 }
@@ -1038,13 +1108,14 @@ func (s *Service) GetToolchainStatus() (ToolchainStatus, error) {
 
 // HistoryEntry is one successful conversion shown by the History view.
 type HistoryEntry struct {
-	At         string `json:"at"`
-	Input      string `json:"input"`
-	Output     string `json:"output"`
-	Route      string `json:"route"`
-	Preset     string `json:"preset"`
-	InputSize  int64  `json:"inputSize"`
-	OutputSize int64  `json:"outputSize"`
+	At              string  `json:"at"`
+	Input           string  `json:"input"`
+	Output          string  `json:"output"`
+	Route           string  `json:"route"`
+	Preset          string  `json:"preset"`
+	InputSize       int64   `json:"inputSize"`
+	OutputSize      int64   `json:"outputSize"`
+	DurationSeconds float64 `json:"durationSeconds"` // needed encode time; 0 for entries written before v0.6
 }
 
 // recordHistory appends a successful conversion to the persistent history.
@@ -1055,13 +1126,14 @@ func (s *Service) recordHistory(presetName string, result convert.FileResult) {
 	}
 	store := history.New(s.paths.HistoryFile)
 	if err := store.Append(history.Entry{
-		At:         time.Now(),
-		Input:      result.Input,
-		Output:     result.Output,
-		Route:      result.Route.String(),
-		Preset:     presetName,
-		InputSize:  result.InputSize,
-		OutputSize: result.OutputSize,
+		At:              time.Now(),
+		Input:           result.Input,
+		Output:          result.Output,
+		Route:           result.Route.String(),
+		Preset:          presetName,
+		InputSize:       result.InputSize,
+		OutputSize:      result.OutputSize,
+		DurationSeconds: result.Duration.Seconds(),
 	}); err != nil {
 		s.emit("conversion-error", "history: "+err.Error())
 	}
@@ -1077,13 +1149,14 @@ func (s *Service) GetHistoryEntries() ([]HistoryEntry, error) {
 	for i := len(entries) - 1; i >= 0; i-- {
 		e := entries[i]
 		result = append(result, HistoryEntry{
-			At:         e.At.Local().Format("2006-01-02 15:04:05"),
-			Input:      e.Input,
-			Output:     e.Output,
-			Route:      e.Route,
-			Preset:     e.Preset,
-			InputSize:  e.InputSize,
-			OutputSize: e.OutputSize,
+			At:              e.At.Local().Format("2006-01-02 15:04:05"),
+			Input:           e.Input,
+			Output:          e.Output,
+			Route:           e.Route,
+			Preset:          e.Preset,
+			InputSize:       e.InputSize,
+			OutputSize:      e.OutputSize,
+			DurationSeconds: e.DurationSeconds,
 		})
 	}
 	return result, nil
@@ -1594,18 +1667,19 @@ func progressUpdate(progress convert.Progress) ProgressUpdate {
 
 func fileUpdate(seq int64, result convert.FileResult) FileUpdate {
 	update := FileUpdate{
-		Seq:        seq,
-		Input:      result.Input,
-		Output:     result.Output,
-		Format:     string(result.Format),
-		Route:      result.Route.String(),
-		InputSize:  result.InputSize,
-		OutputSize: result.OutputSize,
-		Skipped:    result.Skipped,
-		SkipReason: result.SkipReason,
-		Cancelled:  result.Cancelled,
-		Warning:    result.Warning,
-		PID:        result.PID,
+		Seq:             seq,
+		Input:           result.Input,
+		Output:          result.Output,
+		Format:          string(result.Format),
+		Route:           result.Route.String(),
+		InputSize:       result.InputSize,
+		OutputSize:      result.OutputSize,
+		Skipped:         result.Skipped,
+		SkipReason:      result.SkipReason,
+		Cancelled:       result.Cancelled,
+		Warning:         result.Warning,
+		PID:             result.PID,
+		DurationSeconds: result.Duration.Seconds(),
 	}
 	if result.Err != nil {
 		update.Error = result.Err.Error()

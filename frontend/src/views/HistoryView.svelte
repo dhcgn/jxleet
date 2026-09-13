@@ -1,7 +1,7 @@
 <!-- jl:view.history=History view: past conversions newest-first with sizes, savings, routes and presets. -->
 <script lang="ts">
   import type { HistoryEntry } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
-  import { compactPath, formatBytes, formatDelta, savedPct } from '../lib/format';
+  import { compactPath, formatBytes, formatDelta, formatDuration, savedPct } from '../lib/format';
   import { routeClass } from '../lib/routes';
   import JxlInfoPanel from '../components/JxlInfoPanel.svelte';
 
@@ -34,8 +34,9 @@
             <col class="gf-hug" />
             <col class="gf-hug" />
             <col class="gf-hug" />
+            <col class="gf-hug" />
           </colgroup>
-          <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Original</th><th style="text-align:right">JXL</th><th style="text-align:right">Saved</th></tr></thead>
+          <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Original</th><th style="text-align:right">JXL</th><th style="text-align:right">Saved</th><th style="text-align:right">Needed</th></tr></thead>
           <tbody>
             {#each entries as entry (entry.at + entry.output)}
               <tr
@@ -49,6 +50,7 @@
                 <td class="num">{formatBytes(entry.inputSize)}</td>
                 <td class="num">{formatBytes(entry.outputSize)}</td>
                 <td class="num"><span class="delta-chip" class:neg={savedPct(entry.inputSize, entry.outputSize) < 0}>{formatDelta(entry.inputSize, entry.outputSize)}</span></td>
+                <td class="num">{entry.durationSeconds > 0 ? formatDuration(entry.durationSeconds) : '—'}</td>
               </tr>
             {/each}
           </tbody>

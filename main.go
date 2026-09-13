@@ -44,6 +44,7 @@ func init() {
 	application.RegisterEvent[[]string]("files")
 	application.RegisterEvent[app.ProgressUpdate]("progress")
 	application.RegisterEvent[app.FileUpdate]("conversion-file")
+	application.RegisterEvent[app.FileStartUpdate]("conversion-file-start")
 	application.RegisterEvent[app.ConversionSummary]("conversion-done")
 	application.RegisterEvent[string]("conversion-error")
 	application.RegisterEvent[string]("preset")
@@ -52,6 +53,16 @@ func init() {
 	// Emitted when the file-table context menu picks "Clear table"; the
 	// queue state lives in the frontend, which clears itself on receipt.
 	application.RegisterEvent[string]("clear-table")
+	// Queue-row context menu picks; the queue lives in the frontend, which
+	// removes/reclaims/reveals/cancels the row carrying the menu data.
+	application.RegisterEvent[string]("queue-remove")
+	application.RegisterEvent[string]("queue-reclaim")
+	application.RegisterEvent[string]("queue-show")
+	application.RegisterEvent[string]("queue-show-output")
+	application.RegisterEvent[string]("queue-open")
+	application.RegisterEvent[string]("queue-clear-done")
+	application.RegisterEvent[string]("queue-clear-all")
+	application.RegisterEvent[string]("queue-cancel")
 }
 
 func main() {
@@ -240,6 +251,35 @@ func main() {
 		}
 	})
 	wailsApp.ContextMenu.Add("file-row", rowMenu)
+	// Queue rows (QueueView.svelte opts in via --custom-contextmenu, carrying
+	// the queue id as data). Queue state lives in the frontend, so every
+	// action is forwarded as an event the frontend owns (ref:jl:view.queue).
+	queueMenu := wailsApp.ContextMenu.New()
+	queueMenu.Add("Remove item").OnClick(func(ctx *application.Context) {
+		wailsApp.Event.Emit("queue-remove", ctx.ContextMenuData())
+	})
+	queueMenu.Add("Reclaim to Main").OnClick(func(ctx *application.Context) {
+		wailsApp.Event.Emit("queue-reclaim", ctx.ContextMenuData())
+	})
+	queueMenu.Add("Show source in Explorer").OnClick(func(ctx *application.Context) {
+		wailsApp.Event.Emit("queue-show", ctx.ContextMenuData())
+	})
+	queueMenu.Add("Show JXL in Explorer").OnClick(func(ctx *application.Context) {
+		wailsApp.Event.Emit("queue-show-output", ctx.ContextMenuData())
+	})
+	queueMenu.Add("Open converted file").OnClick(func(ctx *application.Context) {
+		wailsApp.Event.Emit("queue-open", ctx.ContextMenuData())
+	})
+	queueMenu.Add("Clear all done").OnClick(func(_ *application.Context) {
+		wailsApp.Event.Emit("queue-clear-done", "")
+	})
+	queueMenu.Add("Clear all").OnClick(func(_ *application.Context) {
+		wailsApp.Event.Emit("queue-clear-all", "")
+	})
+	queueMenu.Add("Cancel this file").OnClick(func(ctx *application.Context) {
+		wailsApp.Event.Emit("queue-cancel", ctx.ContextMenuData())
+	})
+	wailsApp.ContextMenu.Add("queue-row", queueMenu)
 
 	// App updates are notify-only: the updater is initialized without a
 	// CheckInterval, so nothing is ever checked or downloaded automatically.

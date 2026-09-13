@@ -21,8 +21,9 @@
     Update,
   } from '../bindings/github.com/dhcgn/jxleet/internal/app';
   import type { RouteMode, View } from './lib/types';
+  import type { QueueItem } from './lib/types';
   import { distanceFromQuality, qualityFromDistance } from './lib/quality';
-  import { formatBytes, formatRate } from './lib/format';
+  import { formatBytes, formatHistoryAt, formatRate } from './lib/format';
   import { sameFlags } from './lib/flags';
   import AutomaticView from './views/AutomaticView.svelte';
   import StatsView from './views/StatsView.svelte';
@@ -31,6 +32,7 @@
   import PresetsView from './views/PresetsView.svelte';
   import ExpertView from './views/ExpertView.svelte';
   import MainView from './views/MainView.svelte';
+  import QueueView from './views/QueueView.svelte';
 
 
   let view = $state<View>('main');
@@ -44,19 +46,16 @@
   let inputPaths = $state<string[]>([]);
   let files = $state<FilePreview[]>([]);
   let results = $state<FileUpdate[]>([]);
-  // Settings fingerprints of the runs that produced results, per input path.
-  // A list (not one value) so converting the same file again with different
-  // settings appends a comparable row instead of overwriting the previous one.
-  let fingerprintByInput = $state<Record<string, string[]>>({});
-  // Fingerprint of the in-flight run, tagging results as they arrive.
-  let runFingerprint = '';
-  // In-flight files by input path, from conversion-file-start events. Used for
-  // PID display, elapsed timers and per-file cancel. Cleared per file on its
-  // conversion-file event and wholesale when a run finishes.
-  let inFlightByInput = $state<Record<string, { pid: number; startedAt: number }>>({});
+  // Session-only queue staging (ref:jl:view.queue): each item carries a frozen
+  // copy of the run options, so later preset edits never touch staged items.
+  let queue = $state<QueueItem[]>([]);
+  let queueSeq = 0;
+  let queueRunning = $state(false);
+  let queueCurrentId: string | null = null;
+  let queueCancelRequested = false;
+  let queueWaiter: (() => void) | null = null;
 
   // Grouped state: each object is one prop for a view component.
-  let meta = $state({ selection: '', output: '', error: '', loading: false });
   let cmdPreview = $state<{ previews: CommandPreview[]; error: string }>({ previews: [], error: '' });
   let run = $state<{ busy: boolean; summary: ConversionSummary | null }>({ busy: false, summary: null });
   let tools = $state<{
@@ -84,7 +83,6 @@
   });
 
   // Request counters and timers are not reactive state.
-  let metadataRequest = 0;
   let previewRequest = 0;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let commandPreviewRequest = 0;
@@ -127,31 +125,9 @@
   );
   let quality = $derived(Math.round(qualityFromDistance(settings.distance)));
   let outOfRange = $derived(routeMode !== 'lossless' && (settings.distance < 0.5 || settings.distance > 3));
-  let canConvert = $derived(inputPaths.length > 0 && files.length > 0 && presetName !== '' && !run.busy && !tools.installing);
-  let resultByInput = $derived.by(() => {
-    const map = new Map<string, FileUpdate[]>();
-    for (const result of results) {
-      const list = map.get(result.input) ?? [];
-      list.push(result);
-      map.set(result.input, list);
-    }
-    return map;
-  });
-  // Files that still need conversion: no result yet, failed/cancelled (retry),
-  // or never converted with the current settings. Fingerprints accumulate per
-  // input so a repeat run with different settings appends a new row while an
-  // identical repeat stays excluded.
-  let pendingPaths = $derived(
-    files
-      .filter((file) => {
-        const list = resultByInput.get(file.path) ?? [];
-        if (list.length === 0) return true;
-        const latest = list[list.length - 1];
-        if (latest.error !== '' || latest.cancelled) return true;
-        return !(fingerprintByInput[file.path] ?? []).includes(currentFingerprint);
-      })
-      .map((file) => file.path),
-  );
+  let canQueue = $derived(inputPaths.length > 0 && files.length > 0 && presetName !== '' && !tools.installing);
+  let queueOpen = $derived(queue.filter((item) => item.status === 'waiting' || item.status === 'processing').length);
+  let queueDoneCount = $derived(queue.filter((item) => item.status === 'done').length);
   let activePresetSummary = $derived(presets.find((preset) => preset.name === presetName) ?? null);
 
   let presetChanged = $derived.by(() => {
@@ -198,9 +174,10 @@
       if (event?.data) {
         progress = event.data as ProgressUpdate;
         run.busy = true;
-        // The queue is shown inline in the Main/Expert views; only coalesced
-        // external invocations use the compact window.
-        if (progress.coalesced > 1) {
+        // The queue runs in the Queue view; only coalesced external
+        // invocations use the compact window. Never yank the user out of an
+        // active queue run.
+        if (progress.coalesced > 1 && !queueRunning) {
           view = 'automatic';
         } else if (view === 'presets' || view === 'tools') {
           view = 'main';
@@ -211,21 +188,33 @@
       if (event?.data) {
         const update = event.data as FileUpdate;
         results = [...results, update];
-        const seen = fingerprintByInput[update.input] ?? [];
-        if (!seen.includes(runFingerprint)) fingerprintByInput[update.input] = [...seen, runFingerprint];
-        delete inFlightByInput[update.input];
-        if (!update.error && !update.skipped && !update.cancelled && update.inputSize >= 0) {
+        const succeeded = update.error === '' && !update.skipped && !update.cancelled;
+        if (succeeded && update.inputSize >= 0) {
           sessionStats = {
             count: sessionStats.count + 1,
             saved: sessionStats.saved + (update.inputSize - update.outputSize),
           };
         }
+        // Queue runs stage one item at a time; route its result back to the
+        // processing row. Anything else is an external/coalesced arrival.
+        if (queueRunning && queueCurrentId) {
+          const item = queue.find((entry) => entry.id === queueCurrentId && entry.path === update.input && entry.status === 'processing');
+          if (item) {
+            fillQueueResult(item, update);
+            if (succeeded) prependHistory(item, update);
+            resolveQueueWaiter();
+          }
+        }
       }
     });
     const offFileStart = Events.On('conversion-file-start', (event: any) => {
       const data = event?.data as { input?: string; pid?: number; startedAt?: number } | undefined;
-      if (data?.input) {
-        inFlightByInput[data.input] = { pid: data.pid ?? 0, startedAt: Date.now() };
+      if (data?.input && queueRunning && queueCurrentId) {
+        const item = queue.find((entry) => entry.id === queueCurrentId && entry.path === data.input && entry.status === 'processing');
+        if (item) {
+          item.pid = data.pid ?? 0;
+          item.startedAt = Date.now();
+        }
       }
     });
     // Native file-table context menu ("Clear table"); ignored mid-run like the
@@ -239,10 +228,15 @@
       }
     });
     const offDone = Events.On('conversion-done', (event: any) => {
+      // Queue runs stage one item per engine run; the loop owns run state and
+      // only needs the waiter released. External runs settle here.
+      if (queueRunning) {
+        resolveQueueWaiter();
+        return;
+      }
       run.summary = event?.data as ConversionSummary;
       progress = { ...progress, paused: false, percent: 100 };
       run.busy = false;
-      inFlightByInput = {};
       collisionPrompt = null; // a cancelled run resolves outstanding prompts itself
       if (run.summary?.cancelled) {
         errorMessage = '! cancelled by user';
@@ -254,6 +248,35 @@
     const offCollision = Events.On('collision-prompt', (event: any) => {
       if (event?.data) collisionPrompt = event.data as CollisionPrompt;
     });
+    // Queue-row context menu picks (main.go "queue-row" menu); the queue is
+    // frontend session state, so these resolve against the row id directly.
+    const offQueueRemove = Events.On('queue-remove', (event: any) => removeItem(String(event?.data ?? '')));
+    const offQueueReclaim = Events.On('queue-reclaim', (event: any) => reclaimItem(String(event?.data ?? '')));
+    const offQueueShow = Events.On('queue-show', (event: any) => showItem(String(event?.data ?? '')));
+    const offQueueShowOutput = Events.On('queue-show-output', (event: any) => showOutput(String(event?.data ?? '')));
+    const offQueueOpen = Events.On('queue-open', (event: any) => openConverted(String(event?.data ?? '')));
+    const offQueueCancel = Events.On('queue-cancel', (event: any) => cancelQueueItem(String(event?.data ?? '')));
+    const offQueueClearDone = Events.On('queue-clear-done', () => clearDone());
+    const offQueueClearAll = Events.On('queue-clear-all', () => void clearQueueAll());
+    // Fixed 1 s cadence for per-process CPU/RAM (ref:jl:tech.tool.resources):
+    // rows keep their placeholder before the PID exists and after exit.
+    const resourceTimer = setInterval(() => {
+      if (!queueRunning) return;
+      for (const item of queue) {
+        if (item.status !== 'processing' || item.pid <= 0) continue;
+        const id = item.id;
+        const pid = item.pid;
+        void Service.GetProcessResources(pid)
+          .then((res) => {
+            const current = queue.find((entry) => entry.id === id && entry.status === 'processing' && entry.pid === res.pid);
+            if (current) {
+              current.cpuPercent = res.cpuPercent;
+              current.memoryBytes = Number(res.memoryBytes);
+            }
+          })
+          .catch(() => {});
+      }
+    }, 1000);
 
     void load();
     return () => {
@@ -267,6 +290,15 @@
       offError();
       offToolchainProgress();
       offCollision();
+      offQueueRemove();
+      offQueueReclaim();
+      offQueueShow();
+      offQueueShowOutput();
+      offQueueOpen();
+      offQueueCancel();
+      offQueueClearDone();
+      offQueueClearAll();
+      clearInterval(resourceTimer);
     };
   });
 
@@ -316,27 +348,14 @@
     }
   }
 
-  // Fingerprint of the output-affecting settings. Processes/threads are
-  // excluded: they don't change the output bytes.
-  function optionsFingerprint(o: ConversionOptions): string {
-    return JSON.stringify({
-      preset: o.preset,
-      jpegMode: o.jpegMode,
-      distance: o.distance,
-      useDistance: o.useDistance,
-      useQuality: o.useQuality,
-      effort: o.effort,
-      useEffort: o.useEffort,
-      outputPolicy: o.outputPolicy,
-      embedSettings: o.embedSettings,
-      useEmbedSettings: o.useEmbedSettings,
-      jxlInfoSidecar: o.jxlInfoSidecar,
-      useJxlInfoSidecar: o.useJxlInfoSidecar,
-      expertFlags: o.expertFlags,
-    });
+  // Frozen snapshot label for one staged file: distance with quality in
+  // brackets, effort, and a hint when extra cjxl flags apply
+  // (ref:jl:domain.queue.item).
+  function snapshotLabel(file: FilePreview): string {
+    if (file.route === 'Transcode') return 'lossless (reversible)';
+    const q = Math.round(qualityFromDistance(settings.distance));
+    return `D ${settings.distance.toFixed(2)} (Q ${q}) · E ${settings.effort}`;
   }
-
-  let currentFingerprint = $derived(optionsFingerprint(currentOptions()));
 
   function currentOptions(): ConversionOptions {
     return {
@@ -405,18 +424,13 @@
     const incoming = paths.filter((path) => path.trim() !== '');
     if (incoming.length === 0) return;
     if (!run.busy) {
-      // Adding files after a finished run keeps existing results; only the
-      // pending files (no result, or failed/cancelled) are converted next.
       run.summary = null;
-      meta.selection = '';
-      meta.output = '';
-      meta.error = '';
-      meta.loading = false;
-      metadataRequest += 1;
     }
     const next = [...inputPaths, ...incoming];
     inputPaths = [...new Set(next)];
     errorMessage = '';
+    // Drops and picks land in the Main intake, so show it — except inside the
+    // compact automatic window, which owns external coalesced runs.
     if (view !== 'automatic') {
       view = 'main';
     }
@@ -445,42 +459,295 @@
   // absolute paths through WindowFilesDropped -> AddPaths -> the "files" event.
   // WebView2 never exposes paths on JS DataTransfer, so no JS drop handler exists.
 
-  async function startConversion(): Promise<void> {
-    const runPaths = pendingPaths;
-    if (runPaths.length === 0) {
-      errorMessage = 'Nothing to convert — all files are already done.';
+  function resolveQueueWaiter(): void {
+    const waiter = queueWaiter;
+    queueWaiter = null;
+    waiter?.();
+  }
+
+  function waitForQueueItem(): Promise<void> {
+    return new Promise((resolve) => {
+      queueWaiter = resolve;
+    });
+  }
+
+  function fillQueueResult(item: QueueItem, update: FileUpdate): void {
+    item.output = update.output;
+    item.outputSize = update.outputSize;
+    item.durationSeconds = update.durationSeconds ?? 0;
+    item.warning = update.warning ?? '';
+    if (update.error !== '') {
+      item.status = 'failed';
+      item.error = update.error;
+    } else if (update.skipped) {
+      item.status = 'skipped';
+      item.skipped = true;
+      item.skipReason = update.skipReason;
+    } else if (update.cancelled) {
+      item.status = 'cancelled';
+      item.cancelled = true;
+    } else {
+      item.status = 'done';
+      item.error = '';
+    }
+  }
+
+  // Successes auto-move to History: the backend already persisted the entry,
+  // this mirrors it into the loaded view so no reload is needed.
+  function prependHistory(item: QueueItem, update: FileUpdate): void {
+    if (!history.loaded) return;
+    history.entries = [
+      {
+        at: formatHistoryAt(new Date()),
+        input: update.input,
+        output: update.output,
+        route: update.route,
+        preset: item.preset,
+        inputSize: update.inputSize,
+        outputSize: update.outputSize,
+        durationSeconds: update.durationSeconds ?? 0,
+      },
+      ...history.entries,
+    ];
+  }
+
+  // Stage every listed file with a frozen copy of the current settings. The
+  // same file may be queued twice with different settings — each staging is
+  // its own comparable row (ref:jl:domain.queue.item).
+  function moveToQueue(): void {
+    if (files.length === 0) {
+      errorMessage = 'Nothing to stage — add files first.';
       return;
     }
     if (presetName === '') {
-      errorMessage = 'Select a preset in the toolbar before converting.';
+      errorMessage = 'Select a preset in the toolbar before staging.';
       return;
     }
-    if (settings.outputPolicy === 'replace') {
-      const preview = await refreshPreview();
-      if (preview === null) return;
-      const irreversible = preview.filter((file) => file.route === 'Reencode' || (file.route === 'Encode' && settings.distance > 0)).length;
-      if (irreversible > 0 && !window.confirm(`Replace the originals for ${irreversible} irreversible file${irreversible === 1 ? '' : 's'}? They will be sent to the recycle bin after verification.`)) {
-        return;
+    const options = currentOptions();
+    for (const file of files) {
+      queueSeq += 1;
+      queue.push({
+        id: `q${Date.now()}-${queueSeq}`,
+        path: file.path,
+        name: file.name,
+        size: file.size,
+        format: file.format,
+        route: file.route,
+        addedAt: Date.now(),
+        preset: presetName,
+        snapshot: snapshotLabel(file),
+        flagsSet: file.flagsSet,
+        options: { ...options, expertFlags: [...(options.expertFlags ?? [])] },
+        status: file.skip ? 'skipped' : 'waiting',
+        pid: 0,
+        startedAt: 0,
+        output: '',
+        outputSize: 0,
+        error: '',
+        warning: '',
+        skipped: file.skip,
+        skipReason: file.skip ? file.reason : '',
+        cancelled: false,
+        durationSeconds: 0,
+        cpuPercent: null,
+        memoryBytes: null,
+      });
+    }
+    inputPaths = [];
+    files = [];
+    previewRequest += 1;
+    cmdPreview.previews = [];
+    cmdPreview.error = '';
+    commandPreviewRequest += 1;
+    errorMessage = '';
+    view = 'queue';
+    // Autostart the run unless one is already in progress — newly staged
+    // items then wait for the next manual Start.
+    if (!queueRunning && !run.busy) {
+      void startQueue();
+    }
+  }
+
+  // Execute staged items back to back, one engine run per file so each keeps
+  // its frozen settings. Failed/cancelled rows (and skipped rows from a
+  // previous run) retry; done rows are left alone, as are intake-rejected
+  // skips that never started.
+  async function startQueue(): Promise<void> {
+    const startable = queue.filter(
+      (item) =>
+        item.status === 'waiting' ||
+        item.status === 'failed' ||
+        item.status === 'cancelled' ||
+        (item.status === 'skipped' && item.startedAt > 0),
+    );
+    if (startable.length === 0) {
+      if (queue.length === 0) {
+        errorMessage = 'Queue is empty — move files to the queue first.';
+      }
+      return;
+    }
+    if (queueRunning || run.busy) {
+      errorMessage = 'A conversion is already running.';
+      return;
+    }
+    const irreversible = startable.filter(
+      (item) => item.options.outputPolicy === 'replace' && (item.route === 'Reencode' || (item.route === 'Encode' && item.options.distance > 0)),
+    ).length;
+    if (irreversible > 0 && !window.confirm(`Replace the originals for ${irreversible} irreversible file${irreversible === 1 ? '' : 's'}? They will be sent to the recycle bin after verification.`)) {
+      return;
+    }
+    queueRunning = true;
+    queueCancelRequested = false;
+    run.busy = true;
+    run.summary = null;
+    errorMessage = '';
+    view = 'queue';
+    for (const item of startable) {
+      if (item.status !== 'waiting') {
+        item.status = 'waiting';
+        item.error = '';
+        item.warning = '';
+        item.skipReason = '';
+        item.skipped = false;
+        item.cancelled = false;
+        item.output = '';
+        item.outputSize = 0;
+        item.durationSeconds = 0;
+        item.pid = 0;
       }
     }
-    run.busy = true;
-    errorMessage = '';
-    meta.selection = '';
-    meta.output = '';
-    meta.error = '';
-    meta.loading = false;
-    metadataRequest += 1;
-    run.summary = null;
-    progress = { ...progress, total: runPaths.length, completed: 0, failed: 0, skipped: 0, inFlight: 0, percent: 10, paused: false };
-    inFlightByInput = {};
-    const options = currentOptions();
-    runFingerprint = optionsFingerprint(options);
+    const ordered = queue.filter((item) => item.status === 'waiting');
+    for (const item of ordered) {
+      if (queueCancelRequested) break;
+      item.status = 'processing';
+      item.startedAt = Date.now();
+      item.pid = 0;
+      item.cpuPercent = null;
+      item.memoryBytes = null;
+      queueCurrentId = item.id;
+      try {
+        await Service.StartConversion([item.path], item.options);
+      } catch (error) {
+        item.status = 'failed';
+        item.error = errorText(error);
+        queueCurrentId = null;
+        continue;
+      }
+      await waitForQueueItem();
+      queueCurrentId = null;
+    }
+    queueRunning = false;
+    run.busy = false;
+    progress = { ...progress, paused: false, percent: 100 };
+  }
+
+  async function cancelQueue(): Promise<void> {
+    queueCancelRequested = true;
     try {
-      await Service.StartConversion(runPaths, options);
+      await Service.CancelConversion();
     } catch (error) {
-      run.busy = false;
       errorMessage = errorText(error);
     }
+  }
+
+  async function cancelQueueItem(id: string): Promise<void> {
+    const item = queue.find((entry) => entry.id === id);
+    if (!item || item.status !== 'processing') return;
+    try {
+      await Service.CancelFileConversion(item.path);
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  function removeItem(id: string): void {
+    const item = queue.find((entry) => entry.id === id);
+    if (!item) return;
+    if (item.status === 'processing') {
+      errorMessage = 'Stop the file before removing it from the queue.';
+      return;
+    }
+    queue = queue.filter((entry) => entry.id !== id);
+  }
+
+  // Reclaim restores the file to the Main intake and applies its frozen
+  // snapshot to the session settings, then drops the queue entry.
+  function reclaimItem(id: string): void {
+    const item = queue.find((entry) => entry.id === id);
+    if (!item) return;
+    if (item.status === 'processing') {
+      errorMessage = 'Stop the file before reclaiming it to Main.';
+      return;
+    }
+    settings.distance = item.options.distance;
+    if (settings.distance === 0) {
+      routeMode = 'lossless';
+    } else {
+      routeMode = 'lossy';
+      settings.lossyDistance = settings.distance;
+    }
+    settings.effort = item.options.effort;
+    settings.jpegLossless = item.options.jpegMode !== 'reencode';
+    settings.outputPolicy = item.options.outputPolicy || 'alongside';
+    settings.embedSettings = item.options.embedSettings;
+    settings.jxlInfoSidecar = item.options.jxlInfoSidecar;
+    expertOverrides = [...(item.options.expertFlags ?? [])];
+    queue = queue.filter((entry) => entry.id !== id);
+    errorMessage = '';
+    view = 'main';
+    acceptPaths([item.path]);
+    onSettingsChanged();
+  }
+
+  async function showItem(id: string): Promise<void> {
+    const item = queue.find((entry) => entry.id === id);
+    if (!item) return;
+    try {
+      await Service.ShowInExplorer(item.path);
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  async function showOutput(id: string): Promise<void> {
+    const item = queue.find((entry) => entry.id === id);
+    if (!item || item.status !== 'done' || !item.output) return;
+    try {
+      await Service.ShowInExplorer(item.output);
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  async function openConverted(id: string): Promise<void> {
+    const item = queue.find((entry) => entry.id === id);
+    if (!item || item.status !== 'done' || !item.output) return;
+    try {
+      await Service.OpenConvertedFile(item.output);
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  function clearDone(): void {
+    queue = queue.filter((item) => item.status !== 'done');
+  }
+
+  // Clear all drops every staged item whatever its state. A running item is
+  // cancelled first; the loop exits once the engine settles (conversion-done
+  // always releases the waiter).
+  async function clearQueueAll(): Promise<void> {
+    if (queue.length === 0) return;
+    if (queueRunning) {
+      queueCancelRequested = true;
+      try {
+        await Service.CancelConversion();
+      } catch (error) {
+        errorMessage = errorText(error);
+      }
+    }
+    queue = [];
+    queueCurrentId = null;
   }
 
   async function togglePause(): Promise<void> {
@@ -498,14 +765,6 @@
   async function cancelConversion(): Promise<void> {
     try {
       await Service.CancelConversion();
-    } catch (error) {
-      errorMessage = errorText(error);
-    }
-  }
-
-  async function cancelFile(input: string): Promise<void> {
-    try {
-      await Service.CancelFileConversion(input);
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -688,6 +947,7 @@
     return 'contextMenu';
   }
 
+  // Clears the Main intake only; staged queue items and run records stay.
   function clearAll(): void {
     inputPaths = [];
     files = [];
@@ -695,17 +955,6 @@
     cmdPreview.previews = [];
     cmdPreview.error = '';
     commandPreviewRequest += 1;
-    results = [];
-    fingerprintByInput = {};
-    inFlightByInput = {};
-    runFingerprint = '';
-    meta.selection = '';
-    meta.output = '';
-    meta.error = '';
-    meta.loading = false;
-    metadataRequest += 1;
-    run.summary = null;
-    progress = { ...progress, total: 0, completed: 0, failed: 0, skipped: 0, percent: 0 };
     view = 'main';
   }
 
@@ -888,29 +1137,6 @@
     onSettingsChanged();
   }
 
-  async function selectResult(result: FileUpdate): Promise<void> {
-    meta.selection = String(result.seq);
-    meta.output = '';
-    meta.error = '';
-    meta.loading = true;
-    const request = ++metadataRequest;
-    if (result.error || result.skipped || result.cancelled || !result.output) {
-      meta.error = result.error || result.skipReason || (result.cancelled ? 'Conversion was cancelled.' : 'No JXL output was produced for this result.');
-      meta.loading = false;
-      return;
-    }
-    try {
-      const output = await Service.InspectJXL(result.output);
-      if (request !== metadataRequest) return;
-      meta.output = output;
-    } catch (error) {
-      if (request !== metadataRequest) return;
-      meta.error = errorText(error);
-    } finally {
-      if (request === metadataRequest) meta.loading = false;
-    }
-  }
-
   function errorText(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
   }
@@ -928,6 +1154,12 @@
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') {
     event.preventDefault();
     void openFile();
+  }
+}} onbeforeunload={(event) => {
+  // Session-only staging: closing with pending items warns once and discards
+  // them on confirm (ref:jl:view.queue).
+  if (queue.some((item) => item.status === 'waiting' || item.status === 'processing')) {
+    event.preventDefault();
   }
 }} />
 
@@ -952,6 +1184,7 @@
     </div>
     <button class="btn ghost" onclick={() => { view = 'presets'; }}>Presets</button>
     <button class="btn ghost" onclick={() => { view = 'tools'; }}>Tools</button>
+    <button class="btn ghost" onclick={() => { view = 'queue'; }}>Queue{#if queueOpen > 0} ({queueOpen}){/if}</button>
     <button class="btn ghost" onclick={openHistory}>History</button>
     <button class="btn ghost" onclick={() => { view = 'stats'; }}>Stats</button>
     <span class="spacer"></span>
@@ -1003,6 +1236,8 @@
       <div class="collision-actions">
         <button class="btn primary" style="background:var(--p-encode)" data-testid="collision-overwrite" onclick={() => resolveCollision('overwrite')}>Overwrite</button>
         <button class="btn" data-testid="collision-overwrite-all" onclick={() => resolveCollision('overwrite-all')}>Overwrite all</button>
+        <button class="btn" data-testid="collision-rename" onclick={() => resolveCollision('rename')} title="Keep the existing file and write a numbered sibling">Rename</button>
+        <button class="btn" data-testid="collision-rename-all" onclick={() => resolveCollision('rename-all')} title="Keep existing files and number all colliding outputs">Rename all</button>
         <button class="btn" data-testid="collision-skip" onclick={() => resolveCollision('skip')}>Skip file</button>
         <button class="btn" data-testid="collision-skip-all" onclick={() => resolveCollision('skip-all')}>Skip all</button>
       </div>
@@ -1014,11 +1249,6 @@
   {:else if view === 'main'}
     <MainView
       files={files}
-      results={results}
-      meta={meta}
-      run={run}
-      progress={progress}
-      inFlight={inFlightByInput}
       settings={settings}
       routeMode={routeMode}
       quality={quality}
@@ -1026,16 +1256,11 @@
       presetName={presetName}
       appStatus={appStatus}
       tools={tools}
-      canConvert={canConvert}
-      pendingCount={pendingPaths.length}
+      canQueue={canQueue}
       onOpenFile={() => void openFile()}
       onOpenFolder={() => void openFolder()}
-      onTogglePause={() => void togglePause()}
-      onCancel={() => void cancelConversion()}
-      onCancelFile={(input) => void cancelFile(input)}
       onInstallToolchain={() => void installToolchain()}
       onGoToPresets={() => { view = 'presets'; }}
-      onSelectResult={(result) => void selectResult(result)}
       onClearAll={clearAll}
       onSetDistance={setDistanceValue}
       onSetQuality={setQualityValue}
@@ -1044,7 +1269,28 @@
       onSetOutputPolicy={(policy) => { settings.outputPolicy = policy; onSettingsChanged(); }}
       onSetEmbedSettings={(embed) => { settings.embedSettings = embed; onSettingsChanged(); }}
       onSetJxlInfoSidecar={(sidecar) => { settings.jxlInfoSidecar = sidecar; onSettingsChanged(); }}
-      onStart={() => void startConversion()}
+      onMoveToQueue={moveToQueue}
+    />
+  {:else if view === 'queue'}
+    <QueueView
+      items={queue}
+      queueRunning={queueRunning}
+      paused={progress.paused}
+      presetName={presetName}
+      processes={settings.processes}
+      threads={settings.threads}
+      approvalInput={collisionPrompt?.input ?? null}
+      onStart={() => void startQueue()}
+      onTogglePause={() => void togglePause()}
+      onCancel={() => void cancelQueue()}
+      onRemove={removeItem}
+      onReclaim={reclaimItem}
+      onShow={(id) => void showItem(id)}
+      onShowOutput={(id) => void showOutput(id)}
+      onOpen={(id) => void openConverted(id)}
+      onCancelFile={(id) => void cancelQueueItem(id)}
+      onClearDone={clearDone}
+      onClearAll={() => void clearQueueAll()}
     />
   {:else if view === 'expert'}
     <ExpertView
@@ -1058,8 +1304,7 @@
       flagDefinitions={flagDefinitions}
       expertOverrides={expertOverrides}
       flagsLocked={Boolean(tools.status?.flagsLocked)}
-      canConvert={canConvert}
-      pendingCount={pendingPaths.length}
+      canQueue={canQueue}
       filesCount={files.length}
       onSetRouteMode={setRouteMode}
       onSetEffort={setEffortValue}
@@ -1068,7 +1313,7 @@
       onResetFlags={resetExpertFlags}
       onSetFlagValue={setExpertFlagValue}
       onSetFlagEnabled={setExpertFlagEnabled}
-      onStart={() => void startConversion()}
+      onMoveToQueue={moveToQueue}
     />
   {:else if view === 'automatic'}
     <AutomaticView
@@ -1151,6 +1396,8 @@
       <span class="up">Update available</span>
     {:else if files.length > 0}
       <span>{files.length} files - {formatBytes(totalSize)}</span>
+    {:else if queue.length > 0}
+      <span>{queueDoneCount}/{queue.length} queued{queueOpen > 0 ? ` · ${queueOpen} open` : ''}</span>
     {:else}
       <span>Queue empty</span>
     {/if}

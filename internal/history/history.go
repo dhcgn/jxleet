@@ -18,13 +18,14 @@ import (
 
 // Entry is one successful conversion.
 type Entry struct {
-	At         time.Time `json:"at"`
-	Input      string    `json:"input"`
-	Output     string    `json:"output"`
-	Route      string    `json:"route"`
-	Preset     string    `json:"preset"`
-	InputSize  int64     `json:"inputSize"`
-	OutputSize int64     `json:"outputSize"`
+	At              time.Time `json:"at"`
+	Input           string    `json:"input"`
+	Output          string    `json:"output"`
+	Route           string    `json:"route"`
+	Preset          string    `json:"preset"`
+	InputSize       int64     `json:"inputSize"`
+	OutputSize      int64     `json:"outputSize"`
+	DurationSeconds float64   `json:"durationSeconds"` // needed encode time; 0 for entries written before v0.6
 }
 
 // Store appends and reads entries from a single JSONL file.

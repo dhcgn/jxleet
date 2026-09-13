@@ -133,6 +133,15 @@ export function GetPresetCore(name: string): $CancellablePromise<$models.PresetC
 }
 
 /**
+ * GetProcessResources snapshots CPU usage and RAM for one cjxl PID. It errors
+ * when the process has exited (or never existed); the row then keeps its
+ * placeholder.
+ */
+export function GetProcessResources(pid: number): $CancellablePromise<$models.ProcessResources> {
+    return $Call.ByID(3216637868, pid);
+}
+
+/**
  * GetProgress returns the current progress snapshot, or an empty snapshot when
  * no conversion is running.
  */
@@ -156,7 +165,8 @@ export function GetToolchainStatus(): $CancellablePromise<$models.ToolchainStatu
 }
 
 /**
- * InspectJXL returns verbose metadata for one existing JPEG XL file.
+ * InspectJXL returns verbose metadata for one existing JPEG XL file
+ * (ref:jl:tech.tool.inspect).
  */
 export function InspectJXL(path: string): $CancellablePromise<string> {
     return $Call.ByID(3229468240, path);
@@ -183,6 +193,14 @@ export function ListCJXLFlags(): $CancellablePromise<$models.FlagInfo[] | null> 
  */
 export function ListPresets(): $CancellablePromise<$models.PresetSummary[] | null> {
     return $Call.ByID(2651436498);
+}
+
+/**
+ * OpenConvertedFile opens one converted file with its default application.
+ * Used by the Queue row action (ref:jl:view.queue).
+ */
+export function OpenConvertedFile(path: string): $CancellablePromise<void> {
+    return $Call.ByID(2959388494, path);
 }
 
 /**
@@ -269,7 +287,8 @@ export function RenamePreset(name: string, newName: string): $CancellablePromise
 
 /**
  * ResolveCollision answers the outstanding output-exists prompt. Actions are
- * "overwrite", "overwrite-all", "skip" and "skip-all".
+ * "overwrite", "overwrite-all", "rename", "rename-all", "skip" and "skip-all".
+ * Rename keeps the existing file and writes a numbered sibling ("photo (1).jxl").
  */
 export function ResolveCollision(action: string): $CancellablePromise<void> {
     return $Call.ByID(1261619658, action);
@@ -297,6 +316,14 @@ export function SavePresetOutput(name: string, policy: string, collision: string
  */
 export function SetBinding(entryPoint: string, presetName: string): $CancellablePromise<void> {
     return $Call.ByID(2914141111, entryPoint, presetName);
+}
+
+/**
+ * ShowInExplorer reveals one path in Explorer (selecting the file, or opening
+ * the folder). Used by the Queue row context menu (ref:jl:view.queue).
+ */
+export function ShowInExplorer(path: string): $CancellablePromise<void> {
+    return $Call.ByID(1992016875, path);
 }
 
 /**

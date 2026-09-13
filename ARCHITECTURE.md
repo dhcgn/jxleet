@@ -151,8 +151,10 @@ no recycle bin exists (network shares, some removable media) replace is refused.
 
 Name collisions follow the preset's `on_collision` (`skip` / `number` /
 `overwrite`). Under `skip` the GUI prompts per collision (overwrite, overwrite
-all, skip, skip all): the engine takes a `CollisionHandler` (nil keeps silent
-skip), sticky answers short-circuit later prompts, and the service serializes
+all, rename, rename all, skip, skip all — rename re-prepares with the numbering
+policy): the engine takes a `CollisionHandler` (nil keeps silent
+skip), sticky answers short-circuit later prompts for the rest of the run
+only — stopping or cancelling the run forgets them. The service serializes
 one outstanding prompt via the `collision-prompt` event with
 `ResolveCollision`/`GetPendingCollision`.
 
@@ -202,22 +204,42 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
 `frontend/src` is split into three layers:
 
 - **`App.svelte`** — the controller: grouped `$state` objects (`settings`,
-  `meta`, `run`, `tools`, `history`, `cmdPreview` plus the queue), deriveds,
-  all actions and the Wails event wiring, and the shell (toolbar, preset
-  strip, banners, statusbar, view switch).
-- **`views/`** — one component per view (Main, Expert, Presets, Tools,
+  `meta`, `run`, `tools`, `history`, `cmdPreview` plus the intake and the
+  session-only queue), deriveds, all actions and the Wails event wiring, and
+  the shell (toolbar, preset strip, banners, statusbar, view switch).
+- **`views/`** — one component per view (Main, Expert, Queue, Presets, Tools,
   History, Automatic, Stats). Each declares an explicit `Props` interface: state in
   via props, changes back via `onXxx` callback props; slider edits always go
   through callbacks because they must fire `onSettingsChanged()`. The two
   preset drafts in PresetsView are `$bindable` props. Single-consumer
-  deriveds (file groups, flag sections, route counts) live in the view that
-  renders them. The Main view keys result rows by per-run `seq` so converting
-  one file twice shows two comparable rows (each labelled with its settings);
-  an in-flight file gets a full-width busy row with PID, an elapsed timer past
-  10 s and a cancel button. Right-click menus are native Wails context menus
+  deriveds live in the view that renders them. The Main view is intake only:
+  a flat file list in added order with route badges and counts, no grouping
+  by action and no inline conversion. Main and Expert stage files via
+  **Move to queue**: each listed file becomes one queue item
+  (`ref:jl:domain.queue.item`) with a frozen copy of the run options and a
+  snapshot label (distance with quality, effort, `+flags` hint), so later
+  preset edits never touch staged items and the same file may be queued twice
+  with different settings. Staging autostarts the run when idle; items staged
+  mid-run wait for the next manual Start. The Queue view (`ref:jl:view.queue`) executes
+  staged items back to back — one `cjxl` invocation per file with its frozen
+  options — with global start/pause/cancel plus per-item cancel; every item spans
+  two rows (data with status-only on top; PID with per-process CPU usage and RAM
+  plus the nowrap actions below), polled every
+  second (`ref:jl:tech.tool.resources`, placeholder before the PID exists or
+  after exit), and done rows show final size, ratio and needed time. Both rows
+  are tinted per state (processing pulses gently; waiting, approval, unsupported,
+  done, failed, cancelled and skipped each have their own static wash).
+  Successes are recorded to History (with needed time); failed, cancelled and
+  skipped rows stay in the Queue for retry and never reach History. Reclaim
+  moves a row back to the Main intake and applies its snapshot to the session
+  settings. Right-click menus are native Wails context menus
   registered in `main.go` (`file-table` → Clear via a `clear-table` event the
   frontend owns, `file-row` → per-file cancel with the input path as menu
-  data). Stats is a static mock (no backend
+  data, `queue-row` → remove/reclaim/show source/show JXL/open/clear done/
+  clear all/cancel forwarded as `queue-*` events the frontend owns with the
+  queue id as menu data). Closing with
+  waiting or processing items warns once via `beforeunload` and discards them
+  on confirm. Stats is a static mock (no backend
   calls) until wired to real run data.
 - **`components/`** — reusable widgets (EffortLadder, QualitySliders,
   CommandPreview, JxlInfoPanel); **`lib/`** — pure modules (effort ladder

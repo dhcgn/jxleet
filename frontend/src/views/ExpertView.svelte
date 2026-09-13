@@ -19,8 +19,7 @@
     flagDefinitions: FlagInfo[];
     expertOverrides: FlagOverride[];
     flagsLocked: boolean;
-    canConvert: boolean;
-    pendingCount: number;
+    canQueue: boolean;
     filesCount: number;
     onSetRouteMode(mode: RouteMode): void;
     onSetEffort(value: number): void;
@@ -29,7 +28,7 @@
     onResetFlags(): void;
     onSetFlagValue(key: string, value: string): void;
     onSetFlagEnabled(key: string, enabled: boolean): void;
-    onStart(): void;
+    onMoveToQueue(): void;
   }
   let {
     routeMode,
@@ -42,8 +41,7 @@
     flagDefinitions,
     expertOverrides,
     flagsLocked,
-    canConvert,
-    pendingCount,
+    canQueue,
     filesCount,
     onSetRouteMode,
     onSetEffort,
@@ -52,7 +50,7 @@
     onResetFlags,
     onSetFlagValue,
     onSetFlagEnabled,
-    onStart,
+    onMoveToQueue,
   }: Props = $props();
 
   let flagSections = $derived.by(() => {
@@ -182,7 +180,7 @@
           {/each}
         </div>
       </div>
-      <button class="btn primary convert-action" style="background:var(--p-encode);padding:11px" onclick={onStart} disabled={!canConvert}>Convert {pendingCount || filesCount} files</button>
+      <button class="btn primary convert-action" style="background:var(--p-encode);padding:11px" onclick={onMoveToQueue} disabled={!canQueue}>Move {filesCount} file{filesCount === 1 ? '' : 's'} to queue</button>
     </div>
   </div>
 </div>

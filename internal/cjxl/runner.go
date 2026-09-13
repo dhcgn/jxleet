@@ -51,6 +51,7 @@ func (r *Runner) Run(ctx context.Context, args []Arg, input, output string) Resu
 
 // RunWithStart behaves like Run but reports the OS PID via onStart once the
 // child has started, so callers can watch or cancel that specific process.
+// jl:tech.tool.resources=Per-process CPU usage and working-set RAM of a running cjxl child, sampled on a fixed cadence while its row shows processing.
 func (r *Runner) RunWithStart(ctx context.Context, args []Arg, input, output string, onStart func(pid int)) Result {
 	argv := Args(args)
 	argv = append(argv, input, output)

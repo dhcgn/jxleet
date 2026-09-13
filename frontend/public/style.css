@@ -1517,6 +1517,13 @@ tr.na .dot.on {
   width: 1%;
 }
 
+/* Queue status column: roomier than content-hug (about 60% wider than short
+   states like "waiting") so reasons like "unsupported format" fit, while the
+   File column keeps the leftover space. */
+.group-files col.gf-queue-status {
+  width: 16ch;
+}
+
 .group-files td {
   max-width: none;
 }
@@ -1533,6 +1540,64 @@ tr.na .dot.on {
 
 .group-files .status-cell {
   white-space: normal;
+}
+
+/* Queue item rows: data row on top, action row below — no divider between the
+   two rows of one item, and the actions never wrap. */
+.group-files tr.queue-row-top td {
+  border-bottom: 0;
+  padding-bottom: 2px;
+}
+
+.group-files tr.queue-row-top + tr td {
+  padding-top: 2px;
+}
+
+/* Queue row states: tinted backgrounds per item state; waiting and
+   processing pulse gently, everything else is static. */
+@keyframes q-pulse {
+  0%, 100% { background-color: var(--q-tint-soft); }
+  50% { background-color: var(--q-tint); }
+}
+
+.group-files tr.q-waiting td {
+  background-color: rgba(143, 168, 200, 0.1);
+}
+
+.group-files tr.q-processing td {
+  --q-tint: rgba(70, 168, 196, 0.18);
+  --q-tint-soft: rgba(70, 168, 196, 0.08);
+  animation: q-pulse 2s ease-in-out infinite;
+}
+
+.group-files tr.q-approval td {
+  --q-tint: rgba(224, 163, 62, 0.28);
+  --q-tint-soft: rgba(224, 163, 62, 0.08);
+  animation: q-pulse 1s ease-in-out infinite;
+}
+
+.group-files tr.q-unsupported td {
+  background-color: rgba(105, 114, 124, 0.12);
+}
+
+.group-files tr.q-done td {
+  background-color: rgba(79, 178, 134, 0.1);
+}
+
+.group-files tr.q-failed td {
+  background-color: rgba(224, 90, 80, 0.12);
+}
+
+.group-files tr.q-cancelled td,
+.group-files tr.q-skipped td {
+  background-color: rgba(105, 114, 124, 0.07);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .group-files tr.q-processing td,
+  .group-files tr.q-approval td {
+    animation: none;
+  }
 }
 
 /* In-flight file: one full-width busy row carrying PID, elapsed and cancel. */
