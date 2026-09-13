@@ -31,7 +31,7 @@ export interface QueueItem {
   skipReason: string;
   cancelled: boolean;
   durationSeconds: number;
-  cpuTimeSeconds: number | null;
+  cpuPercent: number | null;
   memoryBytes: number | null;
 }
 

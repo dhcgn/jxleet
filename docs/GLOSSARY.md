@@ -63,7 +63,7 @@ Implementation facts that surface in the UI — toolchain, IPC, recycle bin.
 | `jl:tech.tool.flags` | 1 | Accepted flags come from the installed cjxl's own --help snapshot; unknown flags refuse the run. |
 | `jl:tech.tool.hidden-window` | 0 | Tool children spawn with no visible console window. |
 | `jl:tech.tool.inspect` | 4 | jxlinfo -v output for one .jxl, shown in drill-down and saved as sidecar. |
-| `jl:tech.tool.resources` | 6 | Per-process CPU time and working-set RAM of a running cjxl child, sampled on a fixed cadence while its row shows processing. |
+| `jl:tech.tool.resources` | 6 | Per-process CPU usage and working-set RAM of a running cjxl child, sampled on a fixed cadence while its row shows processing. |
 | `jl:tech.toolchain.managed` | 2 | libjxl binaries fetched from the official release asset jxl-x64-windows-static.zip and integrity-verified. |
 | `jl:tech.update.notify-only` | 1 | App and toolchain updates are notify-only; nothing downloads without the user asking. |
 

@@ -898,16 +898,16 @@ func (s *Service) CancelFileConversion(input string) error {
 	return nil
 }
 
-// ProcessResources is one sampled snapshot of a running cjxl child: cumulative
-// CPU time and working-set RAM (ref:jl:tech.tool.resources). The Queue view
-// polls it on a fixed cadence while a row shows processing.
+// ProcessResources is one sampled snapshot of a running cjxl child: CPU
+// usage in percent and working-set RAM (ref:jl:tech.tool.resources). The
+// Queue view polls it on a fixed cadence while a row shows processing.
 type ProcessResources struct {
-	PID            int     `json:"pid"`
-	CPUTimeSeconds float64 `json:"cpuTimeSeconds"`
-	MemoryBytes    uint64  `json:"memoryBytes"`
+	PID         int     `json:"pid"`
+	CPUPercent  float64 `json:"cpuPercent"`
+	MemoryBytes uint64  `json:"memoryBytes"`
 }
 
-// GetProcessResources snapshots CPU time and RAM for one cjxl PID. It errors
+// GetProcessResources snapshots CPU usage and RAM for one cjxl PID. It errors
 // when the process has exited (or never existed); the row then keeps its
 // placeholder.
 func (s *Service) GetProcessResources(pid int) (ProcessResources, error) {
@@ -915,7 +915,7 @@ func (s *Service) GetProcessResources(pid int) (ProcessResources, error) {
 	if err != nil {
 		return ProcessResources{}, err
 	}
-	return ProcessResources{PID: res.PID, CPUTimeSeconds: res.CPUTimeSeconds, MemoryBytes: res.MemoryBytes}, nil
+	return ProcessResources{PID: res.PID, CPUPercent: res.CPUPercent, MemoryBytes: res.MemoryBytes}, nil
 }
 
 // ShowInExplorer reveals one path in Explorer (selecting the file, or opening

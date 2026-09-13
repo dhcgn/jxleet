@@ -270,7 +270,7 @@
           .then((res) => {
             const current = queue.find((entry) => entry.id === id && entry.status === 'processing' && entry.pid === res.pid);
             if (current) {
-              current.cpuTimeSeconds = res.cpuTimeSeconds;
+              current.cpuPercent = res.cpuPercent;
               current.memoryBytes = Number(res.memoryBytes);
             }
           })
@@ -549,7 +549,7 @@
         skipReason: file.skip ? file.reason : '',
         cancelled: false,
         durationSeconds: 0,
-        cpuTimeSeconds: null,
+        cpuPercent: null,
         memoryBytes: null,
       });
     }
@@ -622,7 +622,7 @@
       item.status = 'processing';
       item.startedAt = Date.now();
       item.pid = 0;
-      item.cpuTimeSeconds = null;
+      item.cpuPercent = null;
       item.memoryBytes = null;
       queueCurrentId = item.id;
       try {

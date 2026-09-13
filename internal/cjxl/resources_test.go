@@ -23,8 +23,16 @@ func TestGetProcessResourcesCurrentProcess(t *testing.T) {
 	if res.MemoryBytes == 0 {
 		t.Error("memory = 0, want the working set of a running test process")
 	}
-	if res.CPUTimeSeconds < 0 {
-		t.Errorf("cpu time = %v, want >= 0", res.CPUTimeSeconds)
+	if res.CPUPercent < 0 || res.CPUPercent > 100 {
+		t.Errorf("cpu = %v, want a 0-100 usage percent", res.CPUPercent)
+	}
+	// A second call windows against the first and must stay in range too.
+	res2, err := GetProcessResources(os.Getpid())
+	if err != nil {
+		t.Fatalf("GetProcessResources(self) again: %v", err)
+	}
+	if res2.CPUPercent < 0 || res2.CPUPercent > 100 {
+		t.Errorf("cpu = %v, want a 0-100 usage percent", res2.CPUPercent)
 	}
 }
 

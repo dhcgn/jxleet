@@ -112,13 +112,13 @@
     }
   }
 
-  // Second-row process line, e.g. "PID 6092 · 47.3s CPU · 368 MB · 0:46" —
+  // Second-row process line, e.g. "PID 6092 · 47.3% CPU · 368 MB · 0:46" —
   // just "PID 6092" while resources are still unknown, empty before the PID.
   function processText(item: QueueItem): string {
     if (item.status !== 'processing' || item.pid <= 0) return '';
     let text = `PID ${item.pid}`;
-    if (item.cpuTimeSeconds != null && item.memoryBytes != null) {
-      text += ` · ${item.cpuTimeSeconds.toFixed(1)}s CPU · ${formatBytes(item.memoryBytes)}`;
+    if (item.cpuPercent != null && item.memoryBytes != null) {
+      text += ` · ${item.cpuPercent.toFixed(1)}% CPU · ${formatBytes(item.memoryBytes)}`;
     }
     const elapsed = elapsedText(item);
     if (elapsed !== '') text += ` · ${elapsed}`;

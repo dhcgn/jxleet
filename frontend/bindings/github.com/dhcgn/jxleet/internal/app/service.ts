@@ -133,7 +133,7 @@ export function GetPresetCore(name: string): $CancellablePromise<$models.PresetC
 }
 
 /**
- * GetProcessResources snapshots CPU time and RAM for one cjxl PID. It errors
+ * GetProcessResources snapshots CPU usage and RAM for one cjxl PID. It errors
  * when the process has exited (or never existed); the row then keeps its
  * placeholder.
  */

@@ -223,7 +223,7 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   mid-run wait for the next manual Start. The Queue view (`ref:jl:view.queue`) executes
   staged items back to back — one `cjxl` invocation per file with its frozen
   options — with global start/pause/cancel plus per-item cancel; every item spans
-  two rows (data with status-only on top; PID with per-process CPU time and RAM
+  two rows (data with status-only on top; PID with per-process CPU usage and RAM
   plus the nowrap actions below), polled every
   second (`ref:jl:tech.tool.resources`, placeholder before the PID exists or
   after exit), and done rows show final size, ratio and needed time. Both rows

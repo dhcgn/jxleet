@@ -204,13 +204,13 @@ export interface PresetSummary {
 }
 
 /**
- * ProcessResources is one sampled snapshot of a running cjxl child: cumulative
- * CPU time and working-set RAM (ref:jl:tech.tool.resources). The Queue view
- * polls it on a fixed cadence while a row shows processing.
+ * ProcessResources is one sampled snapshot of a running cjxl child: CPU
+ * usage in percent and working-set RAM (ref:jl:tech.tool.resources). The
+ * Queue view polls it on a fixed cadence while a row shows processing.
  */
 export interface ProcessResources {
     "pid": number;
-    "cpuTimeSeconds": number;
+    "cpuPercent": number;
     "memoryBytes": number;
 }
 
