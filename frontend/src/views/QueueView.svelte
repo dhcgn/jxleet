@@ -22,6 +22,7 @@
     onOpen(id: string): void;
     onCancelFile(id: string): void;
     onClearDone(): void;
+    onClearAll(): void;
   }
   let {
     items,
@@ -40,6 +41,7 @@
     onOpen,
     onCancelFile,
     onClearDone,
+    onClearAll,
   }: Props = $props();
 
   let openCount = $derived(items.filter((item) => item.status === 'waiting' || item.status === 'processing').length);
@@ -67,19 +69,14 @@
     return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
   }
 
-  function resourcesText(item: QueueItem): string {
-    if (item.status !== 'processing' || item.pid <= 0 || item.cpuTimeSeconds == null || item.memoryBytes == null) return '—';
-    return `${item.cpuTimeSeconds.toFixed(1)}s CPU · ${formatBytes(item.memoryBytes)}`;
-  }
-
   function statusText(item: QueueItem): string {
     switch (item.status) {
       case 'waiting':
         return 'waiting';
       case 'processing':
-        return item.pid > 0 ? `PID ${item.pid}` : 'starting…';
+        return 'processing';
       case 'done':
-        return item.warning ? `done ⚠` : 'done';
+        return item.durationSeconds > 0 ? `done ${formatDuration(item.durationSeconds)}` : 'done';
       case 'failed':
         return item.error || 'failed';
       case 'cancelled':
@@ -89,6 +86,19 @@
       default:
         return item.status;
     }
+  }
+
+  // Second-row process line, e.g. "PID 6092 · 47.3s CPU · 368 MB · 0:46" —
+  // just "PID 6092" while resources are still unknown, empty before the PID.
+  function processText(item: QueueItem): string {
+    if (item.status !== 'processing' || item.pid <= 0) return '';
+    let text = `PID ${item.pid}`;
+    if (item.cpuTimeSeconds != null && item.memoryBytes != null) {
+      text += ` · ${item.cpuTimeSeconds.toFixed(1)}s CPU · ${formatBytes(item.memoryBytes)}`;
+    }
+    const elapsed = elapsedText(item);
+    if (elapsed !== '') text += ` · ${elapsed}`;
+    return text;
   }
 </script>
 
@@ -105,6 +115,9 @@
       {:else}
         {#if doneCount > 0}
           <button class="btn ghost" onclick={onClearDone}>Clear done</button>
+        {/if}
+        {#if items.length > 0}
+          <button class="btn ghost" data-testid="clear-all-queue" onclick={onClearAll} title="Remove every staged item, whatever its state">Clear all</button>
         {/if}
         <button class="btn primary convert-action" style="background:var(--p-encode);padding:11px" data-testid="start-queue" onclick={onStart} disabled={startable === 0}>
           {retryCount > 0 && queueDone > 0 ? `Retry ${retryCount} · Start ${startable}` : `Start ${startable} file${startable === 1 ? '' : 's'}`}
@@ -146,19 +159,15 @@
               </td>
               <td class="status-cell" class:success={item.status === 'done'} class:error={item.status === 'failed'} title={item.warning || item.error || undefined}>
                 {statusText(item)}{item.warning ? ' ⚠' : ''}
-                <div class="mono-mini">
-                  {#if item.status === 'processing'}
-                    {resourcesText(item)}
-                    {#if elapsedText(item) !== ''} · {elapsedText(item)}{/if}
-                  {:else if item.status === 'done'}
-                    {formatDuration(item.durationSeconds)}
-                  {/if}
-                </div>
               </td>
             </tr>
             <tr style="--custom-contextmenu: queue-row; --custom-contextmenu-data: {item.id}; --default-contextmenu: hide">
               <td colspan={6}>
-                <div style="display:flex;gap:6px;flex-wrap:nowrap;white-space:nowrap">
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;white-space:nowrap">
+                  {#if processText(item) !== ''}
+                    <span class="mono-mini">{processText(item)}</span>
+                  {/if}
+                  <span class="spacer"></span>
                   {#if item.status === 'processing'}
                     <button class="btn" onclick={() => onCancelFile(item.id)}>Cancel file</button>
                   {:else}

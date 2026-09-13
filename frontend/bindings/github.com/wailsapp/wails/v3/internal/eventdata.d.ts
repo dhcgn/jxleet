@@ -22,6 +22,7 @@ declare module "@wailsio/runtime" {
             "preset": string;
             "progress": app$0.ProgressUpdate;
             "queue-cancel": string;
+            "queue-clear-all": string;
             "queue-clear-done": string;
             "queue-open": string;
             "queue-reclaim": string;

@@ -257,6 +257,7 @@
     const offQueueOpen = Events.On('queue-open', (event: any) => openConverted(String(event?.data ?? '')));
     const offQueueCancel = Events.On('queue-cancel', (event: any) => cancelQueueItem(String(event?.data ?? '')));
     const offQueueClearDone = Events.On('queue-clear-done', () => clearDone());
+    const offQueueClearAll = Events.On('queue-clear-all', () => void clearQueueAll());
     // Fixed 10 s cadence for per-process CPU/RAM (ref:jl:tech.tool.resources):
     // rows keep their placeholder before the PID exists and after exit.
     const resourceTimer = setInterval(() => {
@@ -296,6 +297,7 @@
       offQueueOpen();
       offQueueCancel();
       offQueueClearDone();
+      offQueueClearAll();
       clearInterval(resourceTimer);
     };
   });
@@ -427,9 +429,9 @@
     const next = [...inputPaths, ...incoming];
     inputPaths = [...new Set(next)];
     errorMessage = '';
-    // External arrivals during a queue run coalesce into the running engine;
-    // they still land in the Main intake, but never yank the view.
-    if (view !== 'automatic' && view !== 'queue') {
+    // Drops and picks land in the Main intake, so show it — except inside the
+    // compact automatic window, which owns external coalesced runs.
+    if (view !== 'automatic') {
       view = 'main';
     }
     void refreshPreview();
@@ -729,6 +731,23 @@
 
   function clearDone(): void {
     queue = queue.filter((item) => item.status !== 'done');
+  }
+
+  // Clear all drops every staged item whatever its state. A running item is
+  // cancelled first; the loop exits once the engine settles (conversion-done
+  // always releases the waiter).
+  async function clearQueueAll(): Promise<void> {
+    if (queue.length === 0) return;
+    if (queueRunning) {
+      queueCancelRequested = true;
+      try {
+        await Service.CancelConversion();
+      } catch (error) {
+        errorMessage = errorText(error);
+      }
+    }
+    queue = [];
+    queueCurrentId = null;
   }
 
   async function togglePause(): Promise<void> {
@@ -1270,6 +1289,7 @@
       onOpen={(id) => void openConverted(id)}
       onCancelFile={(id) => void cancelQueueItem(id)}
       onClearDone={clearDone}
+      onClearAll={() => void clearQueueAll()}
     />
   {:else if view === 'expert'}
     <ExpertView

@@ -61,6 +61,7 @@ func init() {
 	application.RegisterEvent[string]("queue-show-output")
 	application.RegisterEvent[string]("queue-open")
 	application.RegisterEvent[string]("queue-clear-done")
+	application.RegisterEvent[string]("queue-clear-all")
 	application.RegisterEvent[string]("queue-cancel")
 }
 
@@ -271,6 +272,9 @@ func main() {
 	})
 	queueMenu.Add("Clear all done").OnClick(func(_ *application.Context) {
 		wailsApp.Event.Emit("queue-clear-done", "")
+	})
+	queueMenu.Add("Clear all").OnClick(func(_ *application.Context) {
+		wailsApp.Event.Emit("queue-clear-all", "")
 	})
 	queueMenu.Add("Cancel this file").OnClick(func(ctx *application.Context) {
 		wailsApp.Event.Emit("queue-cancel", ctx.ContextMenuData())

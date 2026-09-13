@@ -223,8 +223,9 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   with different settings. Staging autostarts the run when idle; items staged
   mid-run wait for the next manual Start. The Queue view (`ref:jl:view.queue`) executes
   staged items back to back — one `cjxl` invocation per file with its frozen
-  options — with global start/pause/cancel plus per-item cancel; processing
-  rows show the child PID with per-process CPU time and RAM sampled every
+  options — with global start/pause/cancel plus per-item cancel; every item spans
+  two rows (data with status-only on top; PID with per-process CPU time and RAM
+  plus the nowrap actions below), sampled every
   10 s (`ref:jl:tech.tool.resources`, placeholder before the PID exists or
   after exit), and done rows show final size, ratio and needed time.
   Successes are recorded to History (with needed time); failed, cancelled and
@@ -233,8 +234,9 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   settings. Right-click menus are native Wails context menus
   registered in `main.go` (`file-table` → Clear via a `clear-table` event the
   frontend owns, `file-row` → per-file cancel with the input path as menu
-  data, `queue-row` → remove/reclaim/show source/show JXL/open/clear-done/cancel
-  forwarded as `queue-*` events the frontend owns with the queue id as menu data). Closing with
+  data, `queue-row` → remove/reclaim/show source/show JXL/open/clear done/
+  clear all/cancel forwarded as `queue-*` events the frontend owns with the
+  queue id as menu data). Closing with
   waiting or processing items warns once via `beforeunload` and discards them
   on confirm. Stats is a static mock (no backend
   calls) until wired to real run data.
