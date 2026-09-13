@@ -665,7 +665,8 @@ func (s *Service) PreviewPaths(paths []string, options ConversionOptions) ([]Fil
 	return result, nil
 }
 
-// InspectJXL returns verbose metadata for one existing JPEG XL file.
+// InspectJXL returns verbose metadata for one existing JPEG XL file
+// (ref:jl:tech.tool.inspect).
 func (s *Service) InspectJXL(path string) (string, error) {
 	absolute, err := filepath.Abs(strings.TrimSpace(path))
 	if err != nil {
@@ -792,9 +793,9 @@ func (s *Service) StartConversion(paths []string, options ConversionOptions) err
 
 	engine := convert.New(
 		convert.Deps{
-			Encoder:   cjxl.NewRunner(installed.CJXLPath),
-			Verifier:  djxl.NewVerifier(installed.DJXLPath),
-			Inspector: jxlinfo.NewRunner(installed.JXLInfoPath),
+			Encoder:   cjxl.NewRunner(installed.CJXLPath),       // ref:jl:tech.tool.encode
+			Verifier:  djxl.NewVerifier(installed.DJXLPath),     // ref:jl:domain.output.verify
+			Inspector: jxlinfo.NewRunner(installed.JXLInfoPath), // ref:jl:tech.tool.inspect
 		},
 		convert.Settings{
 			Processes:   options.Processes,

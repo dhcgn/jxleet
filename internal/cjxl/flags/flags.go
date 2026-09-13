@@ -84,6 +84,7 @@ func (s *Set) Lookup(token string) (Flag, bool) {
 // Validate reports an error if key is not a known cjxl flag token. Preset
 // argument keys are validated with this before a run so an unknown flag stops
 // the run rather than being passed to cjxl.
+// jl:tech.tool.flags=Accepted flags come from the installed cjxl's own --help snapshot; unknown flags refuse the run.
 func (s *Set) Validate(key string) error {
 	if _, ok := s.byToken[key]; ok {
 		return nil

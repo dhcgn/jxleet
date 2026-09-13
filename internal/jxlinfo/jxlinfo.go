@@ -12,6 +12,7 @@ import (
 )
 
 // Runner executes a specific jxlinfo binary.
+// jl:tech.libjxl.jxlinfo=libjxl's metadata inspection binary; jxleet shows its output in drill-down and sidecars.
 type Runner struct {
 	Binary string
 }
@@ -22,6 +23,7 @@ func NewRunner(binary string) *Runner {
 }
 
 // Inspect returns the verbose metadata emitted for a JPEG XL file.
+// jl:tech.tool.inspect=jxlinfo -v output for one .jxl, shown in drill-down and saved as sidecar.
 func (r *Runner) Inspect(ctx context.Context, path string) (string, error) {
 	if strings.TrimSpace(r.Binary) == "" {
 		return "", errors.New("jxlinfo: binary path is empty")

@@ -2,6 +2,7 @@
 // of `cjxl --help -v -v -v -v`. It is invoked via `go generate` from the flags
 // package. With cjxl on PATH no arguments are needed; pass -input to parse a
 // captured help file instead (used for tests and offline development).
+// The snapshot drives preset validation (ref:jl:tech.tool.flags).
 package main
 
 import (

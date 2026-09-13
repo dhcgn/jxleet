@@ -45,9 +45,9 @@ const (
 
 // Deps are the external collaborators the engine needs.
 type Deps struct {
-	Encoder   Encoder
-	Verifier  output.Verifier // required for the replace policy; may be nil otherwise
-	Inspector Inspector       // required for the jxlinfo-sidecar flag; may be nil otherwise
+	Encoder   Encoder         // one cjxl run per file (ref:jl:tech.tool.encode)
+	Verifier  output.Verifier // required for the replace policy; may be nil otherwise (ref:jl:domain.output.verify)
+	Inspector Inspector       // required for the jxlinfo-sidecar flag; may be nil otherwise (ref:jl:tech.tool.inspect)
 }
 
 // Settings configure a run. Processes and Threads are independent: Processes is

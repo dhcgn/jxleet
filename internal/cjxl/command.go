@@ -12,7 +12,8 @@ type Arg struct {
 	Valueless bool
 }
 
-// Command assembles the full argv for a single conversion:
+// Command assembles the full argv for a single conversion
+// (ref:jl:tech.tool.encode, args per ref:jl:domain.preset.args-verbatim):
 //
 //	binary [options...] input output
 //

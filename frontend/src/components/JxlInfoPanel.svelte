@@ -1,3 +1,4 @@
+<!-- ref:jl:tech.tool.inspect -->
 <script lang="ts">
   interface Props {
     label: string;

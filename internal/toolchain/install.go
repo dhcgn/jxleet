@@ -89,6 +89,8 @@ func (m *Manager) installArchive(ctx context.Context, release Release, archivePa
 	}
 
 	toolsDir := m.ToolsDir(release.Version)
+	// The three managed tool binaries (ref:jl:tech.toolchain.managed):
+	// encoder (ref:jl:tech.libjxl.cjxl), decoder, inspector (ref:jl:tech.libjxl.jxlinfo).
 	for _, name := range []string{"cjxl.exe", "djxl.exe", "jxlinfo.exe"} {
 		dst := filepath.Join(toolsDir, name)
 		landed, err := fileflow.Move(binaries[name], dst)

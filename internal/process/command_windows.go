@@ -12,6 +12,7 @@ import (
 
 // CommandContext starts a child process without creating a visible console
 // window.
+// jl:tech.tool.hidden-window=Tool children spawn with no visible console window.
 func CommandContext(ctx context.Context, name string, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
