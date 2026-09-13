@@ -1,3 +1,4 @@
+<!-- ref:jl:tech.tool.encode -->
 <script lang="ts">
   import type { CommandPreview } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
 

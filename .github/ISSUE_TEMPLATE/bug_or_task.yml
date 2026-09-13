@@ -1,0 +1,21 @@
+name: Bug or task
+description: Report a bug or propose a task
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Use [`jl:` glossary keys](https://github.com/dhcgn/jxleet/blob/main/docs/GLOSSARY.md)
+        where a defined term exists (e.g. `jl:domain.route.transcode`,
+        `jl:domain.output.replace`). No mandatory field — just the hint.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      placeholder: "What happened, or what should change? Name the jl: keys involved."
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      placeholder: "Preset, route, input format, app/toolchain version - whatever applies."

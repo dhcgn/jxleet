@@ -2,6 +2,8 @@
 // filters with cjxl arguments; the arguments are passed to cjxl verbatim (see
 // README "Presets"). Presets are one YAML file each under
 // %APPDATA%\jxleet\presets\.
+// jl:domain.preset=A preset pairs file filters with cjxl arguments in one YAML file.
+// jl:domain.preset.args-verbatim=Preset args are passed to cjxl exactly as written, with no wrapper vocabulary.
 package preset
 
 import "github.com/dhcgn/jxleet/internal/cjxl"
@@ -13,6 +15,8 @@ const CurrentVersion = 1
 type Policy string
 
 // The output policies a preset can select (see README "Output policies").
+// jl:domain.output.alongside=Result written next to the original; the default policy.
+// jl:domain.output.subfolder=Result written into ./<subfolder>/ relative to the source.
 const (
 	PolicyAlongside Policy = "alongside" // next to the original (default)
 	PolicySubfolder Policy = "subfolder" // into ./<subfolder>/
@@ -23,6 +27,7 @@ const (
 type Collision string
 
 // How a preset handles an output path that already exists.
+// jl:domain.output.collision=What happens when the target .jxl already exists: skip, number a new name, or overwrite.
 const (
 	CollisionSkip      Collision = "skip"
 	CollisionNumber    Collision = "number"
@@ -36,16 +41,20 @@ type Output struct {
 	OnCollision Collision `yaml:"on_collision,omitempty"`
 	// EmbedSettings appends the encoding settings to the output filename
 	// (e.g. photo.d1.00-e7-cjxl0.11.1.jxl). False when unset.
+	// jl:domain.output.embed-settings=Distance, effort and cjxl version appended to the output name (photo.d1.00-e7-cjxl0.11.1.jxl).
 	EmbedSettings bool `yaml:"embed_settings,omitempty"`
 	// JXLInfoSidecar writes the verbose jxlinfo output as a sidecar file next
 	// to the converted file (<output>.jxlinfo.txt), always overwriting.
 	// False when unset.
+	// jl:domain.output.jxlinfo-sidecar=Verbose jxlinfo -v output written as <output>.jxlinfo.txt next to the result, always overwriting.
 	JXLInfoSidecar bool `yaml:"jxlinfo_sidecar,omitempty"`
 }
 
 // Rule pairs a set of format filters with an ordered list of cjxl arguments.
 // Match entries are format names (see routes.Format) or "*". Args preserve the
 // order written in the YAML file so the command preview is deterministic.
+// jl:domain.preset.rule=Rules evaluate top to bottom and the first match wins.
+// jl:domain.preset.rule-fallback=Trailing "*" rule; without it unmatched files are skipped and reported.
 type Rule struct {
 	Match []string
 	Args  []cjxl.Arg

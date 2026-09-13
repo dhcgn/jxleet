@@ -6,6 +6,9 @@ package config
 type EntryPoint string
 
 // The three entry points, as stored in Config.Bindings.
+// jl:domain.binding.gui=GUI entry point; runs with the preset bound to the window.
+// jl:domain.binding.cli=Command-line entry point; runs with the CLI-bound preset, --preset overrides it for one call.
+// jl:domain.binding.explorer-context=Explorer context-menu entry point; runs with the context-menu-bound preset named in the menu.
 const (
 	EntryGUI         EntryPoint = "gui"
 	EntryCLI         EntryPoint = "cli"
@@ -19,6 +22,7 @@ type Config struct {
 
 	// Bindings maps each entry point to the name of the preset it uses. A
 	// missing or empty value means the entry point is unbound and must not run.
+	// Each value names a preset file (ref:jl:domain.preset).
 	Bindings map[EntryPoint]string `yaml:"bindings"`
 
 	// RouteColors overrides the default per-route colours used across the UI.

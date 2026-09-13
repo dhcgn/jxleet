@@ -1,3 +1,4 @@
+<!-- jl:view.expert=Expert view: full generated cjxl flag surface with help tooltips, effort ladder and command preview. -->
 <script lang="ts">
   import type { CommandPreview, FlagInfo, FlagOverride } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
   import { flagLabel, hiddenExpertFlags, isLinkedFlagKey } from '../lib/flags';

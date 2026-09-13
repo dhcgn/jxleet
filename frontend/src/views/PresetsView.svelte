@@ -1,3 +1,4 @@
+<!-- jl:view.presets=Presets view: preset library with rule summaries, output-policy editing and entry-point bindings. -->
 <script lang="ts">
   import type { Bindings, PresetSummary } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
 

@@ -23,6 +23,7 @@ var menuRoots = []string{
 
 // Register installs the menu for the current user without administrator
 // privileges. The preset name is displayed in the menu and passed to jxleet.
+// jl:view.context-menu=Per-user Explorer context-menu entry carrying the bound preset's name; no admin rights needed.
 func Register(executable, preset string) error {
 	if strings.TrimSpace(preset) == "" {
 		return errors.New("shellext: context-menu preset is required")

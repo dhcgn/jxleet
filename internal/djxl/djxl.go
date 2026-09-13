@@ -76,7 +76,7 @@ func (r *Runner) Version(ctx context.Context) (string, error) {
 }
 
 // Verifier decodes .jxl files to prove they are valid. It satisfies the
-// output.Verifier interface.
+// output.Verifier interface (ref:jl:domain.output.verify).
 type Verifier struct {
 	Runner *Runner
 }

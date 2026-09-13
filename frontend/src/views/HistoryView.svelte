@@ -1,3 +1,4 @@
+<!-- jl:view.history=History view: past conversions newest-first with sizes, savings, routes and presets. -->
 <script lang="ts">
   import type { HistoryEntry } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
   import { compactPath, formatBytes, formatDelta, savedPct } from '../lib/format';

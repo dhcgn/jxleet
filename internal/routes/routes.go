@@ -2,6 +2,7 @@
 // three routes, and the route follows from the input format times the active
 // preset — it is not a fixed property of the file (see README "The three
 // routes").
+// jl:domain.route=Route = input format x active preset rule; never a property of the file alone.
 package routes
 
 // Format is an input image format that cjxl accepts. jxleet adds none and
@@ -32,12 +33,15 @@ const (
 	RouteSkip Route = iota
 	// RouteTranscode repacks a JPEG losslessly (--lossless_jpeg=1). Reversible:
 	// djxl restores the original JPEG byte for byte.
+	// jl:domain.route.transcode=JPEG repacked losslessly with --lossless_jpeg=1; djxl restores the original byte for byte.
 	RouteTranscode
 	// RouteReencode decodes and re-encodes (JPEG with --lossless_jpeg=0, or any
 	// JXL input). Not reversible.
+	// jl:domain.route.reencode=JPEG with --lossless_jpeg=0, or any JXL input, decoded and re-encoded; not reversible.
 	RouteReencode
 	// RouteEncode encodes from pixels (PNG, GIF, EXR, NetPBM, PFM, PGX).
 	// Lossless only at distance 0.
+	// jl:domain.route.encode=PNG, APNG, GIF, EXR, NetPBM, PFM or PGX encoded from pixels; lossless only at -d 0.
 	RouteEncode
 )
 

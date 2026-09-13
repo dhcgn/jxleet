@@ -85,6 +85,8 @@ readable.
 
 ## The three routes
 
+<!-- ref:jl:domain.route ref:jl:domain.route.transcode ref:jl:domain.route.reencode ref:jl:domain.route.encode -->
+
 Every file takes one of three routes. The route follows from the input format **times your
 preset** — a JPEG can take either of the first two, and which one it takes is your decision,
 not a property of the file.
@@ -106,6 +108,8 @@ once.
 
 ## Install
 
+<!-- ref:jl:domain.binding.gui ref:jl:domain.binding.cli ref:jl:domain.binding.explorer-context -->
+
 Download the latest release, unzip, run `jxleet.exe`. No installer, nothing written outside
 your user profile.
 
@@ -126,6 +130,8 @@ intent. On first start the read-only `default-gui`, `default-cli`, and
 jxleet refuses to run only when a binding is missing or invalid.
 
 ### 1. The window
+
+<!-- ref:jl:view.main ref:jl:view.expert -->
 
 Drag files or folders in - native Windows drag-and-drop accepts
 files or folders in every view, and the toolbar keeps separate **Open File** and **Open Folder**
@@ -200,6 +206,8 @@ because a menu item that can replace your files should say what it does before y
 > menu requires a packaged app with a COM handler, which jxleet does not ship.
 
 ## Presets
+
+<!-- ref:jl:domain.preset ref:jl:domain.preset.args-verbatim ref:jl:domain.preset.rule ref:jl:domain.preset.rule-fallback ref:jl:view.presets -->
 
 A preset is a YAML file. It pairs **file filters** with **`cjxl` arguments** — and those
 arguments are passed through verbatim. jxleet does not invent a settings vocabulary that
@@ -336,6 +344,8 @@ sizes or effort change mid-run.
 
 ## Distance, quality and effort
 
+<!-- ref:jl:domain.quality.distance ref:jl:domain.quality.effort -->
+
 jxleet is an expert tool and does not hide these. All three are `cjxl` concepts; what
 follows is a summary, and `cjxl -v -v -v -v --help` remains the authority.
 
@@ -372,6 +382,8 @@ The ladder follows that document; the ladder data, its provenance and the update
 are documented in [`frontend/src/lib/effort.md`](frontend/src/lib/effort.md).
 
 ## Output policies
+
+<!-- ref:jl:domain.output.alongside ref:jl:domain.output.subfolder ref:jl:domain.output.replace ref:jl:domain.output.verify ref:jl:domain.output.recycle-bin ref:jl:domain.output.collision ref:jl:domain.output.embed-settings ref:jl:domain.output.jxlinfo-sidecar -->
 
 | Policy | Behaviour |
 |---|---|
@@ -416,6 +428,8 @@ checkbox and the Presets view persists the preset value.
 
 ## The managed toolchain
 
+<!-- ref:jl:tech.toolchain.managed ref:jl:tech.update.notify-only ref:jl:view.tools -->
+
 jxleet does not bundle libjxl. It manages it.
 
 <p align="center">
@@ -432,6 +446,8 @@ updater window with the release notes and installs only on your confirmation; a 
 check lives in the Tools view. Downloading and replacing the binary stays your call.
 
 ## History
+
+<!-- ref:jl:domain.history ref:jl:view.history -->
 
 Every successful conversion is recorded in `%APPDATA%\jxleet\history.jsonl` — one JSON
 line per file, append-only, and tolerant of a torn last line, so a crash mid-write costs

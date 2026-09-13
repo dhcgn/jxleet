@@ -12,6 +12,7 @@ import (
 )
 
 // Runner executes a specific cjxl binary.
+// jl:tech.libjxl.cjxl=libjxl's encoder binary; the sole writer of every .jxl byte jxleet produces.
 type Runner struct {
 	// Binary is the path to cjxl.exe.
 	Binary string
@@ -40,6 +41,8 @@ func (r Result) Success() bool {
 
 // Run encodes input to output with the given options, honouring ctx for
 // cancellation. The returned Result is always populated; check Result.Success.
+// Options come from the preset rule (ref:jl:domain.preset.args-verbatim).
+// jl:tech.tool.encode=One cjxl invocation per file from the rule's verbatim args; cancellable per process.
 func (r *Runner) Run(ctx context.Context, args []Arg, input, output string) Result {
 	argv := Args(args)
 	argv = append(argv, input, output)
