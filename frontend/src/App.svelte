@@ -253,8 +253,10 @@
     const offQueueRemove = Events.On('queue-remove', (event: any) => removeItem(String(event?.data ?? '')));
     const offQueueReclaim = Events.On('queue-reclaim', (event: any) => reclaimItem(String(event?.data ?? '')));
     const offQueueShow = Events.On('queue-show', (event: any) => showItem(String(event?.data ?? '')));
+    const offQueueShowOutput = Events.On('queue-show-output', (event: any) => showOutput(String(event?.data ?? '')));
     const offQueueOpen = Events.On('queue-open', (event: any) => openConverted(String(event?.data ?? '')));
     const offQueueCancel = Events.On('queue-cancel', (event: any) => cancelQueueItem(String(event?.data ?? '')));
+    const offQueueClearDone = Events.On('queue-clear-done', () => clearDone());
     // Fixed 10 s cadence for per-process CPU/RAM (ref:jl:tech.tool.resources):
     // rows keep their placeholder before the PID exists and after exit.
     const resourceTimer = setInterval(() => {
@@ -290,8 +292,10 @@
       offQueueRemove();
       offQueueReclaim();
       offQueueShow();
+      offQueueShowOutput();
       offQueueOpen();
       offQueueCancel();
+      offQueueClearDone();
       clearInterval(resourceTimer);
     };
   });
@@ -698,6 +702,16 @@
     if (!item) return;
     try {
       await Service.ShowInExplorer(item.path);
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  async function showOutput(id: string): Promise<void> {
+    const item = queue.find((entry) => entry.id === id);
+    if (!item || item.status !== 'done' || !item.output) return;
+    try {
+      await Service.ShowInExplorer(item.output);
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -1252,6 +1266,7 @@
       onRemove={removeItem}
       onReclaim={reclaimItem}
       onShow={(id) => void showItem(id)}
+      onShowOutput={(id) => void showOutput(id)}
       onOpen={(id) => void openConverted(id)}
       onCancelFile={(id) => void cancelQueueItem(id)}
       onClearDone={clearDone}

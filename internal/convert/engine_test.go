@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -141,6 +142,27 @@ func TestEngineCollisionRenameNumbersOutput(t *testing.T) {
 	}
 	if content, err := os.ReadFile(filepath.Join(dir, "a.jxl")); err != nil || string(content) != "existing" {
 		t.Errorf("existing output was touched: content=%q err=%v", content, err)
+	}
+}
+
+// TestEngineStickyCollisionSeed verifies a session-remembered *-all answer
+// applies without asking: no handler is set, yet collisions are renamed.
+func TestEngineStickyCollisionSeed(t *testing.T) {
+	dir := t.TempDir()
+	inputs := []string{collidingInput(t, dir, "a.png"), collidingInput(t, dir, "b.png")}
+	var got []FileResult
+	e := New(Deps{Encoder: &fakeEncoder{}}, Settings{Processes: 1, Preset: skipCollisionPreset()})
+	e.SetStickyCollision(CollisionRenameAll)
+	e.OnFile = func(r FileResult) { got = append(got, r) }
+	sum := e.Run(context.Background(), inputs)
+	if sum.Completed != 2 || sum.Skipped != 0 {
+		t.Fatalf("summary = %+v, want 2 completed", sum)
+	}
+	for _, r := range got {
+		stem := r.Output[:len(r.Output)-len(filepath.Ext(r.Output))]
+		if !strings.HasSuffix(stem, " (1)") {
+			t.Errorf("output = %q, want numbered sibling", r.Output)
+		}
 	}
 }
 

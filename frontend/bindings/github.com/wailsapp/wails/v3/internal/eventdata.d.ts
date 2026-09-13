@@ -22,10 +22,12 @@ declare module "@wailsio/runtime" {
             "preset": string;
             "progress": app$0.ProgressUpdate;
             "queue-cancel": string;
+            "queue-clear-done": string;
             "queue-open": string;
             "queue-reclaim": string;
             "queue-remove": string;
             "queue-show": string;
+            "queue-show-output": string;
             "toolchain-progress": app$0.ToolchainProgress;
         }
     }

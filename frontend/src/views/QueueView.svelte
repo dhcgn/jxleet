@@ -18,6 +18,7 @@
     onRemove(id: string): void;
     onReclaim(id: string): void;
     onShow(id: string): void;
+    onShowOutput(id: string): void;
     onOpen(id: string): void;
     onCancelFile(id: string): void;
     onClearDone(): void;
@@ -35,6 +36,7 @@
     onRemove,
     onReclaim,
     onShow,
+    onShowOutput,
     onOpen,
     onCancelFile,
     onClearDone,
@@ -164,7 +166,10 @@
                       <button class="btn" onclick={() => onOpen(item.id)} title="Open the converted file with its default application">Open JXL</button>
                     {/if}
                     <button class="btn ghost" onclick={() => onReclaim(item.id)} title="Back to Main intake with this snapshot">Reclaim</button>
-                    <button class="btn ghost" onclick={() => onShow(item.id)} title="Reveal in Explorer">Show</button>
+                    <button class="btn ghost" onclick={() => onShow(item.id)} title="Reveal the source file in Explorer">Show Source</button>
+                    {#if item.status === 'done' && item.output}
+                      <button class="btn ghost" onclick={() => onShowOutput(item.id)} title="Reveal the converted file in Explorer">Show JXL</button>
+                    {/if}
                     <button class="btn ghost" onclick={() => onRemove(item.id)} title="Remove from queue">Remove</button>
                   {/if}
                 </div>

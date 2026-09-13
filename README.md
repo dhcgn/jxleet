@@ -165,8 +165,9 @@ file with its frozen settings. Global Start, Pause and Cancel sit above the tabl
 every row mirrors the History layout — file, sizes, saving, route, preset and the
 needed time, with placeholders until known. A processing row shows the child PID
 with its CPU time and RAM, sampled every 10 seconds. Right-click a row to remove
-it, reclaim it back to Main (restoring its snapshot to the session settings), reveal
-it in Explorer, open the converted file, or cancel just that file. Successful conversions are recorded to
+it, reclaim it back to Main (restoring its snapshot to the session settings), show source
+or JXL in Explorer, open the converted file, clear all done rows, or cancel just that file.
+Successful conversions are recorded to
 History with their needed time; failed, cancelled and skipped rows stay in the Queue
 for retry and never reach History. The queue is session-only: closing the window with
 pending items warns once and discards them on confirm.
