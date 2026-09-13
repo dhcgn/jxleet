@@ -34,6 +34,7 @@
             <col class="gf-hug" />
             <col class="gf-hug" />
             <col class="gf-hug" />
+            <col class="gf-hug" />
           </colgroup>
           <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Original</th><th style="text-align:right">JXL</th><th style="text-align:right">Saved</th><th style="text-align:right">Needed</th></tr></thead>
           <tbody>
