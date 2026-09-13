@@ -84,7 +84,7 @@
       case '--lossless_jpeg':
         return settings.jpegLossless ? '1' : '0';
       case '--num_threads':
-        return settings.threads.toString();
+        return settings.threads > 0 ? settings.threads.toString() : 'cjxl default';
       default:
         return '';
     }

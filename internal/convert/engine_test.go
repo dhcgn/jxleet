@@ -144,6 +144,71 @@ func TestEngineCollisionRenameNumbersOutput(t *testing.T) {
 	}
 }
 
+// TestEngineRunItemsPerItemPreset verifies one engine run over work items
+// with different presets: each file is encoded with its own args and reports
+// its preset name, so mixed queue batches run fully parallel.
+func TestEngineRunItemsPerItemPreset(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.png")
+	b := filepath.Join(dir, "b.png")
+	pngFile(t, a)
+	pngFile(t, b)
+	presetFor := func(name, distance string) preset.Preset {
+		p := encodePreset()
+		p.Name = name
+		p.Rules = []preset.Rule{{Match: []string{"*"}, Args: []cjxl.Arg{{Key: "-d", Value: distance}, {Key: "-e", Value: "7"}}}}
+		return p
+	}
+	var mu sync.Mutex
+	got := map[string]FileResult{}
+	e := New(Deps{Encoder: &fakeEncoder{}}, Settings{Processes: 2, Preset: encodePreset()})
+	e.OnFile = func(r FileResult) {
+		mu.Lock()
+		got[r.Input] = r
+		mu.Unlock()
+	}
+	sum := e.RunItems(context.Background(), []WorkItem{
+		{Path: a, Preset: presetFor("near", "0.5")},
+		{Path: b, Preset: presetFor("far", "2.0")},
+	})
+	if sum.Completed != 2 || sum.Failed != 0 || sum.Skipped != 0 {
+		t.Fatalf("summary = %+v, want 2 completed", sum)
+	}
+	if got[a].PresetName != "near" || got[b].PresetName != "far" {
+		t.Fatalf("preset names = %q/%q, want near/far", got[a].PresetName, got[b].PresetName)
+	}
+	if settingsOf(got[a]) == settingsOf(got[b]) {
+		t.Fatalf("both files encoded with identical settings %q, want per-item args", settingsOf(got[a]))
+	}
+}
+
+// TestEngineRunItemsFallbackPreset verifies a work item without its own preset
+// uses the run's Settings.Preset.
+func TestEngineRunItemsFallbackPreset(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.png")
+	pngFile(t, a)
+	var got []FileResult
+	e := New(Deps{Encoder: &fakeEncoder{}}, Settings{Processes: 1, Preset: encodePreset()})
+	e.OnFile = func(r FileResult) { got = append(got, r) }
+	sum := e.RunItems(context.Background(), []WorkItem{{Path: a}})
+	if sum.Completed != 1 {
+		t.Fatalf("summary = %+v, want 1 completed", sum)
+	}
+	if len(got) != 1 || got[0].PresetName != "t" {
+		t.Fatalf("preset name = %+v, want t", got)
+	}
+}
+
+func settingsOf(r FileResult) string {
+	for _, arg := range r.Args {
+		if arg.Key == "-d" || arg.Key == "--distance" {
+			return arg.Value
+		}
+	}
+	return ""
+}
+
 func TestEngineBasicBatch(t *testing.T) {
 	dir := t.TempDir()
 	var inputs []string

@@ -10,12 +10,15 @@
     queueRunning: boolean;
     paused: boolean;
     presetName: string;
-    processes: number;
-    threads: number;
+    processes: number; // 0 = automatic
+    threads: number; // 0 = leave --num_threads to the preset / cjxl
+    cpuCount: number;
     approvalInput: string | null;
     onStart(): void;
     onTogglePause(): void;
     onCancel(): void;
+    onSetProcesses(value: number): void;
+    onSetThreads(value: number): void;
     onRemove(id: string): void;
     onReclaim(id: string): void;
     onShow(id: string): void;
@@ -32,10 +35,13 @@
     presetName,
     processes,
     threads,
+    cpuCount,
     approvalInput,
     onStart,
     onTogglePause,
     onCancel,
+    onSetProcesses,
+    onSetThreads,
     onRemove,
     onReclaim,
     onShow,
@@ -124,6 +130,11 @@
     if (elapsed !== '') text += ` · ${elapsed}`;
     return text;
   }
+  // Display resolution of the automatic process count; the backend owns the
+  // truth for actual runs (AutoProcesses), this mirrors it for the label.
+  let autoProcesses = $derived(Math.max(1, Math.min(cpuCount - 1, 16)));
+  let processOptions = $derived(cpuCount > 0 ? Array.from({ length: cpuCount }, (_, index) => index + 1) : []);
+  const threadOptions = [1, 2, 4, 8, 16, 32];
 </script>
 
 <div class="body">
@@ -131,7 +142,21 @@
     <div class="run-head">
       <span class="badge b-reencode">{queueRunning ? (paused ? 'Paused' : 'Running') : 'Queue'}</span>
       <span class="run-count">{queueDone} of {queueTotal}{openCount > 0 ? ` · ${openCount} open` : ''}</span>
-      <span class="mini">{presetName || 'preset'} - {processes} processes - {threads} threads</span>
+      <span class="mini">{presetName || 'preset'}</span>
+      <label class="mini" for="queue-processes">Processes</label>
+      <select id="queue-processes" value={processes} onchange={(event) => onSetProcesses(Number((event.currentTarget as HTMLSelectElement).value))} disabled={queueRunning} title="Parallel cjxl processes; Auto uses all cores minus one">
+        <option value={0}>Auto{cpuCount > 0 ? ` (${autoProcesses})` : ''}</option>
+        {#each processOptions as count}
+          <option value={count}>{count}</option>
+        {/each}
+      </select>
+      <label class="mini" for="queue-threads">Threads</label>
+      <select id="queue-threads" value={threads} onchange={(event) => onSetThreads(Number((event.currentTarget as HTMLSelectElement).value))} disabled={queueRunning} title="Threads per cjxl process; Auto leaves --num_threads to the preset / cjxl default">
+        <option value={0}>Auto</option>
+        {#each threadOptions as count}
+          <option value={count}>{count}</option>
+        {/each}
+      </select>
       <span class="spacer"></span>
       {#if queueRunning}
         <button class="btn" onclick={onTogglePause}>{paused ? 'Resume' : 'Pause'}</button>

@@ -21,14 +21,14 @@ User-visible domain language — routes, presets, output policies, quality.
 | `jl:domain.output.recycle-bin` | 1 | Originals move to the recycle bin, never hard-delete; replace is refused where no bin exists. |
 | `jl:domain.output.replace` | 1 | Write a temp file in the target directory, decode-verify it (byte-identical JPEG check on the transcode route), rename into place, then move the original to the recycle bin. Never hard-deletes; any failure leaves the original untouched. |
 | `jl:domain.output.subfolder` | 1 | Result written into ./<subfolder>/ relative to the source. |
-| `jl:domain.output.verify` | 5 | Temp .jxl is decode-verified (byte-identical JPEG check on the transcode route) before the original is touched. |
+| `jl:domain.output.verify` | 6 | Temp .jxl is decode-verified (byte-identical JPEG check on the transcode route) before the original is touched. |
 | `jl:domain.preset` | 2 | A preset pairs file filters with cjxl arguments in one YAML file. |
 | `jl:domain.preset.args-verbatim` | 3 | Preset args are passed to cjxl exactly as written, with no wrapper vocabulary. |
 | `jl:domain.preset.rule` | 1 | Rules evaluate top to bottom and the first match wins. |
 | `jl:domain.preset.rule-fallback` | 1 | Trailing "*" rule; without it unmatched files are skipped and reported. |
 | `jl:domain.quality.distance` | 1 | Distance (-d) is the single stored quality value; quality (-q) is a display transform only. |
 | `jl:domain.quality.effort` | 1 | Effort (-e) 1-10 trades encoding time for file size; default 7 (squirrel). |
-| `jl:domain.queue.item` | 5 | One staged file with a frozen settings snapshot (distance with quality, effort, extra-flags hint); later preset edits never touch it, and the same file may be queued twice with different settings. |
+| `jl:domain.queue.item` | 6 | One staged file with a frozen settings snapshot (distance with quality, effort, extra-flags hint); later preset edits never touch it, and the same file may be queued twice with different settings. |
 | `jl:domain.route` | 3 | Route = input format x active preset rule; never a property of the file alone. |
 | `jl:domain.route.encode` | 1 | PNG, APNG, GIF, EXR, NetPBM, PFM or PGX encoded from pixels; lossless only at -d 0. |
 | `jl:domain.route.reencode` | 1 | JPEG with --lossless_jpeg=0, or any JXL input, decoded and re-encoded; not reversible. |
@@ -59,10 +59,10 @@ Implementation facts that surface in the UI — toolchain, IPC, recycle bin.
 | `jl:tech.ipc.handover` | 0 | Later invocations hand their paths over a named pipe to the first process and exit within milliseconds. |
 | `jl:tech.libjxl.cjxl` | 1 | libjxl's encoder binary; the sole writer of every .jxl byte jxleet produces. |
 | `jl:tech.libjxl.jxlinfo` | 1 | libjxl's metadata inspection binary; jxleet shows its output in drill-down and sidecars. |
-| `jl:tech.tool.encode` | 4 | One cjxl invocation per file from the rule's verbatim args; cancellable per process. |
+| `jl:tech.tool.encode` | 5 | One cjxl invocation per file from the rule's verbatim args; cancellable per process. |
 | `jl:tech.tool.flags` | 1 | Accepted flags come from the installed cjxl's own --help snapshot; unknown flags refuse the run. |
 | `jl:tech.tool.hidden-window` | 0 | Tool children spawn with no visible console window. |
-| `jl:tech.tool.inspect` | 4 | jxlinfo -v output for one .jxl, shown in drill-down and saved as sidecar. |
+| `jl:tech.tool.inspect` | 5 | jxlinfo -v output for one .jxl, shown in drill-down and saved as sidecar. |
 | `jl:tech.tool.resources` | 6 | Per-process CPU usage and working-set RAM of a running cjxl child, sampled on a fixed cadence while its row shows processing. |
 | `jl:tech.toolchain.managed` | 2 | libjxl binaries fetched from the official release asset jxl-x64-windows-static.zip and integrity-verified. |
 | `jl:tech.update.notify-only` | 1 | App and toolchain updates are notify-only; nothing downloads without the user asking. |

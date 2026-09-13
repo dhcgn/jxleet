@@ -109,6 +109,13 @@ export function GetBindings(): $CancellablePromise<$models.Bindings> {
 }
 
 /**
+ * GetCPUCount reports logical processor cores for the parallelism display.
+ */
+export function GetCPUCount(): $CancellablePromise<number> {
+    return $Call.ByID(1267151159);
+}
+
+/**
  * GetHistoryEntries returns all recorded conversions, newest first.
  */
 export function GetHistoryEntries(): $CancellablePromise<$models.HistoryEntry[] | null> {
@@ -332,6 +339,18 @@ export function ShowInExplorer(path: string): $CancellablePromise<void> {
  */
 export function StartConversion(paths: string[] | null, options: $models.ConversionOptions): $CancellablePromise<void> {
     return $Call.ByID(448384482, paths, options);
+}
+
+/**
+ * StartQueueRun starts one asynchronous run over staged items, each encoded
+ * with its own frozen options on a shared worker pool sized by AutoProcesses.
+ * Progress arrives through Wails events so the UI remains responsive. Unlike
+ * StartConversion it never coalesces into a running engine — the frontend only
+ * calls it when idle, and a live engine is refused rather than joined, so
+ * frozen per-item settings cannot leak into another run.
+ */
+export function StartQueueRun(items: $models.QueueItemInput[] | null): $CancellablePromise<void> {
+    return $Call.ByID(3830522042, items);
 }
 
 /**
