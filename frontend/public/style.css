@@ -1571,7 +1571,9 @@ tr.na .dot.on {
 }
 
 .group-files tr.q-approval td {
-  background-color: rgba(224, 163, 62, 0.14);
+  --q-tint: rgba(224, 163, 62, 0.28);
+  --q-tint-soft: rgba(224, 163, 62, 0.08);
+  animation: q-pulse 1s ease-in-out infinite;
 }
 
 .group-files tr.q-unsupported td {
@@ -1592,7 +1594,8 @@ tr.na .dot.on {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .group-files tr.q-processing td {
+  .group-files tr.q-processing td,
+  .group-files tr.q-approval td {
     animation: none;
   }
 }
