@@ -10,6 +10,17 @@ libjxl tools.
 
 - `README.md` — product specification, with a screenshot per view.
 - `ARCHITECTURE.md` — how the system is built. Read before structural work.
+- `docs/GLOSSARY.md` — normative project vocabulary (`jl:` keys, generated
+  from source comments via `go generate ./...`; chapters in
+  `docs/GLOSSARY.topics.yaml`). Agents and contributors SHOULD use a `jl:` key
+  in issues / PRs / discussions whenever a defined term exists, and point at
+  one with `ref:<key>` from source comments or Markdown prose. A `ref:` with
+  no definition fails generation (Broken references section) — fix by defining
+  the key or correcting the reference. When a term is
+  ambiguous, ask first, then fix the glossary description — never silently
+  redefine a term. There is deliberately no CI gate on prose wording.
+  New term? Define it once in code at the file that implements it, and use
+  `ref:` everywhere else including docs (see the `glossary-create` skill).
 
 ## Current state
 Core complete: routes engine (transcode/reencode/encode), YAML presets with

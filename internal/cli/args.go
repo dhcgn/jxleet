@@ -1,6 +1,7 @@
 // Package cli parses jxleet's small command-line surface. Path arguments are
 // intentionally accepted in any mix of files and folders; the GUI/engine owns
 // one-level folder expansion and conversion.
+// jl:view.cli=Command-line path invocation using the CLI-bound preset, with --preset for a one-call override.
 package cli
 
 import (

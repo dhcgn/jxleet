@@ -1,5 +1,6 @@
 import type { RouteMode } from './types';
 
+// jl:domain.quality.distance=Distance (-d) is the single stored quality value; quality (-q) is a display transform only.
 // Port of libjxl JxlEncoderDistanceFromQuality (lib/jxl/encode.cc) — the
 // authority for how -q maps to -d.
 export function distanceFromQuality(quality: number): number {

@@ -11,6 +11,7 @@ import (
 
 // Verifier decodes a freshly written .jxl to prove it is valid before the
 // original is ever touched. It is implemented by the djxl package.
+// jl:domain.output.verify=Temp .jxl is decode-verified (byte-identical JPEG check on the transcode route) before the original is touched.
 type Verifier interface {
 	// Readable returns nil if the .jxl decodes successfully.
 	Readable(ctx context.Context, jxlPath string) error
@@ -20,7 +21,8 @@ type Verifier interface {
 }
 
 // FinalizeOptions controls how a written temp file is committed to its final
-// location.
+// location. The decode check is ref:jl:domain.output.verify.
+// jl:domain.output.recycle-bin=Originals move to the recycle bin, never hard-delete; replace is refused where no bin exists.
 type FinalizeOptions struct {
 	Route routes.Route
 	// Verifier proves the temp .jxl is valid. It must be set for the replace
@@ -40,6 +42,16 @@ type FinalizeOptions struct {
 // following the safe order for the replace policy: verify the result, move it
 // into place, and only then send the original to the recycle bin. On any failure
 // the original is left recoverable and the temp file is cleaned up.
+//
+// ---
+// jl:Key: jl:domain.output.replace
+// jl:Description: >
+//
+//	Write a temp file in the target directory, decode-verify it (byte-identical
+//	JPEG check on the transcode route), rename into place, then move the original
+//	to the recycle bin. Never hard-deletes; any failure leaves the original untouched.
+//
+// ---
 func Finalize(ctx context.Context, plan Plan, opt FinalizeOptions) error {
 	if plan.Skip {
 		return nil

@@ -1,10 +1,24 @@
 # Architecture
 
+<!-- jl:domain.glossary=Versioned project vocabulary in jl: source comments, generated into docs/GLOSSARY.md; normative for naming. -->
+
 **jxleet** is a Windows front end for libjxl's `cjxl`. It encodes nothing itself:
 it decides which files to hand over, assembles the argument list, runs the process,
 verifies the result, and reports what came back. This document describes how the
 system is built. `README.md` is the product specification; current scope and open
 items are tracked in `AGENTS.md`.
+
+## Glossary
+
+User-visible names are fixed by the project glossary (`jl:` keys in
+`docs/GLOSSARY.md`, chapters in `docs/GLOSSARY.topics.yaml`). Definitions live
+as `jl:` comments in the source next to the code they describe; the markdown
+is generated via `go generate ./...` (`internal/glossary`), and a test fails
+the check gate when it is stale. Contributors and agents use a `jl:` key
+whenever a defined term exists — e.g. every file takes one
+`ref:jl:domain.route`, never a bare format name. A `ref:` with no matching
+definition is written into a Broken references section and fails generation,
+so dangling pointers cannot merge silently.
 
 ## Stack
 

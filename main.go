@@ -35,6 +35,7 @@ var assets embed.FS
 
 // version is stamped at release time via -ldflags "-X main.version=v1.2.3";
 // local and CI builds report "dev".
+// jl:build.release-contract=Releases ship jxleet.exe + SHA256SUMS in a versioned zip; downloads verify checksums and pre-releases stay out of the update feed.
 var version = "dev"
 
 func init() {

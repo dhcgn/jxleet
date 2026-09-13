@@ -1,0 +1,15 @@
+# Glossary chapter order + descriptions for docs/GLOSSARY.md.
+# Add a facet here before defining jl:<facet>.* keys. Order is chapter order.
+topics:
+  - key: jl:domain
+    title: Domain concepts
+    description: User-visible domain language — routes, presets, output policies, quality.
+  - key: jl:view
+    title: Views and actions
+    description: Views, command-line flags and context-menu entries the user touches.
+  - key: jl:tech
+    title: Technical facts
+    description: Implementation facts that surface in the UI — toolchain, IPC, recycle bin.
+  - key: jl:build
+    title: Build and release
+    description: Release contract, updater feed and CI gates. Reserved, thin in v1.

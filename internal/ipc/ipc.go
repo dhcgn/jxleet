@@ -15,6 +15,7 @@ import (
 )
 
 // Message is the handover payload sent from a secondary process to the owner.
+// jl:tech.ipc.handover=Later invocations hand their paths over a named pipe to the first process and exit within milliseconds.
 type Message struct {
 	// Paths are the files/folders the secondary process was asked to convert.
 	Paths []string `json:"paths"`
@@ -32,6 +33,7 @@ const (
 // owner by creating the pipe; if an owner already exists it hands msg over and
 // reports handedOver=true (the caller should exit). If the existing owner is
 // unreachable (crashed or hung) it takes over by becoming the owner itself.
+// jl:tech.ipc.coalescing=Arriving batches coalesce into a single run: one window, one progress bar.
 func Acquire(msg Message, timeout time.Duration) (server *Server, handedOver bool, err error) {
 	name, err := PipeName()
 	if err != nil {

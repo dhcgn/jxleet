@@ -1,3 +1,4 @@
+<!-- jl:view.main=Main view: file queue grouped by type with route badges, session overrides and the convert bar. -->
 <script lang="ts">
   import type { ConversionSummary, FilePreview, FileUpdate, ProgressUpdate, Status, ToolchainProgress, ToolchainStatus } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
   import { onMount } from 'svelte';

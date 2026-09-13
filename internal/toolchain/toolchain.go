@@ -2,6 +2,8 @@
 // Releases come from the official libjxl GitHub repository and are installed
 // as immutable, versioned tool directories with an atomically replaced pointer
 // to the active version.
+// jl:tech.toolchain.managed=libjxl binaries fetched from the official release asset jxl-x64-windows-static.zip and integrity-verified.
+// jl:tech.update.notify-only=App and toolchain updates are notify-only; nothing downloads without the user asking.
 package toolchain
 
 import (

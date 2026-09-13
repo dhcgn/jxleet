@@ -1,3 +1,4 @@
+<!-- jl:view.tools=Tools view: installed cjxl/djxl/jxlinfo versions compared against the latest libjxl release. -->
 <script lang="ts">
   import type { Bindings, ToolchainProgress, ToolchainStatus, Update } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
   import { formatBytes } from '../lib/format';

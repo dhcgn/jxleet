@@ -1,3 +1,4 @@
+// jl:domain.quality.effort=Effort (-e) 1-10 trades encoding time for file size; default 7 (squirrel).
 export const effortNames = [
   'lightning',
   'thunder',

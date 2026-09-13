@@ -1,6 +1,7 @@
 // Package history persists a per-session-independent record of successful
 // conversions as an append-only JSONL file. One JSON object per line keeps
 // appends cheap (no rewrite of the file) and tolerates a torn last line.
+// jl:domain.history=Every successful conversion appended as one JSON line to history.jsonl.
 package history
 
 import (
