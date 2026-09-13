@@ -1553,6 +1553,53 @@ tr.na .dot.on {
   padding-top: 2px;
 }
 
+/* Queue row states: tinted backgrounds per item state; waiting and
+   processing pulse gently, everything else is static. */
+@keyframes q-pulse {
+  0%, 100% { background-color: var(--q-tint-soft); }
+  50% { background-color: var(--q-tint); }
+}
+
+.group-files tr.q-waiting td {
+  --q-tint: rgba(143, 168, 200, 0.16);
+  --q-tint-soft: rgba(143, 168, 200, 0.07);
+  animation: q-pulse 2.6s ease-in-out infinite;
+}
+
+.group-files tr.q-processing td {
+  --q-tint: rgba(70, 168, 196, 0.18);
+  --q-tint-soft: rgba(70, 168, 196, 0.08);
+  animation: q-pulse 2s ease-in-out infinite;
+}
+
+.group-files tr.q-approval td {
+  background-color: rgba(224, 163, 62, 0.14);
+}
+
+.group-files tr.q-unsupported td {
+  background-color: rgba(105, 114, 124, 0.12);
+}
+
+.group-files tr.q-done td {
+  background-color: rgba(79, 178, 134, 0.1);
+}
+
+.group-files tr.q-failed td {
+  background-color: rgba(224, 90, 80, 0.12);
+}
+
+.group-files tr.q-cancelled td,
+.group-files tr.q-skipped td {
+  background-color: rgba(105, 114, 124, 0.07);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .group-files tr.q-waiting td,
+  .group-files tr.q-processing td {
+    animation: none;
+  }
+}
+
 /* In-flight file: one full-width busy row carrying PID, elapsed and cancel. */
 .live-row {
   display: flex;

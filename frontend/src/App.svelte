@@ -1279,6 +1279,7 @@
       presetName={presetName}
       processes={settings.processes}
       threads={settings.threads}
+      approvalInput={collisionPrompt?.input ?? null}
       onStart={() => void startQueue()}
       onTogglePause={() => void togglePause()}
       onCancel={() => void cancelQueue()}

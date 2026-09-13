@@ -12,6 +12,7 @@
     presetName: string;
     processes: number;
     threads: number;
+    approvalInput: string | null;
     onStart(): void;
     onTogglePause(): void;
     onCancel(): void;
@@ -31,6 +32,7 @@
     presetName,
     processes,
     threads,
+    approvalInput,
     onStart,
     onTogglePause,
     onCancel,
@@ -85,6 +87,28 @@
         return item.skipReason || 'skipped';
       default:
         return item.status;
+    }
+  }
+
+  // Row tint per item state; a collision prompt waiting on this file wins
+  // over the processing tint.
+  function rowClass(item: QueueItem): string {
+    if (item.status === 'processing' && approvalInput && approvalInput === item.path) return 'q-approval';
+    switch (item.status) {
+      case 'waiting':
+        return 'q-waiting';
+      case 'processing':
+        return 'q-processing';
+      case 'done':
+        return 'q-done';
+      case 'failed':
+        return 'q-failed';
+      case 'cancelled':
+        return 'q-cancelled';
+      case 'skipped':
+        return item.skipReason === 'unsupported format' ? 'q-unsupported' : 'q-skipped';
+      default:
+        return '';
     }
   }
 
@@ -144,7 +168,7 @@
         <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Original</th><th style="text-align:right">JXL</th><th style="text-align:right">Saved</th><th>Status</th></tr></thead>
         <tbody>
           {#each items as item (item.id)}
-            <tr class="queue-row-top" style="--custom-contextmenu: queue-row; --custom-contextmenu-data: {item.id}; --default-contextmenu: hide" title={item.path}>
+            <tr class="queue-row-top {rowClass(item)}" style="--custom-contextmenu: queue-row; --custom-contextmenu-data: {item.id}; --default-contextmenu: hide" title={item.path}>
               <td class="fn" title={item.path}>
                 {item.name}
                 <div class="mono-mini" title={item.flagsSet ? `${item.snapshot} + extra flags` : item.snapshot}>{item.snapshot}{#if item.flagsSet} +flags{/if}{#if processText(item) !== ''} | Status: {processText(item)}{/if}</div>
@@ -161,7 +185,7 @@
                 {statusText(item)}{item.warning ? ' ⚠' : ''}
               </td>
             </tr>
-            <tr style="--custom-contextmenu: queue-row; --custom-contextmenu-data: {item.id}; --default-contextmenu: hide">
+            <tr class={rowClass(item)} style="--custom-contextmenu: queue-row; --custom-contextmenu-data: {item.id}; --default-contextmenu: hide">
               <td colspan={6}>
                 <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;white-space:nowrap">
                   <span class="spacer"></span>

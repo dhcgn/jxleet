@@ -227,7 +227,9 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   two rows (data with status-only on top; PID with per-process CPU time and RAM
   plus the nowrap actions below), polled every
   second (`ref:jl:tech.tool.resources`, placeholder before the PID exists or
-  after exit), and done rows show final size, ratio and needed time.
+  after exit), and done rows show final size, ratio and needed time. Both rows
+  are tinted per state (waiting/processing pulse gently; approval, unsupported,
+  done, failed, cancelled and skipped each have their own wash).
   Successes are recorded to History (with needed time); failed, cancelled and
   skipped rows stay in the Queue for retry and never reach History. Reclaim
   moves a row back to the Main intake and applies its snapshot to the session
