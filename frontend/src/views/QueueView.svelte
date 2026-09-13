@@ -133,14 +133,14 @@
       <div class="empty">Queue is empty. Add files in Main, tune the settings, then “Move to queue”.</div>
     {:else}
       <table class="files group-files" data-testid="queue-table">
-        <colgroup>
-          <col class="gf-file" />
-          <col class="gf-hug" />
-          <col class="gf-hug" />
-          <col class="gf-hug" />
-          <col class="gf-hug" />
-          <col class="gf-status" />
-        </colgroup>
+          <colgroup>
+            <col class="gf-file" />
+            <col class="gf-hug" />
+            <col class="gf-hug" />
+            <col class="gf-hug" />
+            <col class="gf-hug" />
+            <col class="gf-queue-status" />
+          </colgroup>
         <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Original</th><th style="text-align:right">JXL</th><th style="text-align:right">Saved</th><th>Status</th></tr></thead>
         <tbody>
           {#each items as item (item.id)}

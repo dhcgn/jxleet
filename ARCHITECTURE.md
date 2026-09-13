@@ -225,8 +225,8 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   staged items back to back — one `cjxl` invocation per file with its frozen
   options — with global start/pause/cancel plus per-item cancel; every item spans
   two rows (data with status-only on top; PID with per-process CPU time and RAM
-  plus the nowrap actions below), sampled every
-  10 s (`ref:jl:tech.tool.resources`, placeholder before the PID exists or
+  plus the nowrap actions below), polled every
+  second (`ref:jl:tech.tool.resources`, placeholder before the PID exists or
   after exit), and done rows show final size, ratio and needed time.
   Successes are recorded to History (with needed time); failed, cancelled and
   skipped rows stay in the Queue for retry and never reach History. Reclaim

@@ -1517,6 +1517,13 @@ tr.na .dot.on {
   width: 1%;
 }
 
+/* Queue status column: roomier than content-hug (about 60% wider than short
+   states like "waiting") so reasons like "unsupported format" fit, while the
+   File column keeps the leftover space. */
+.group-files col.gf-queue-status {
+  width: 16ch;
+}
+
 .group-files td {
   max-width: none;
 }

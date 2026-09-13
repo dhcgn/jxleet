@@ -258,7 +258,7 @@
     const offQueueCancel = Events.On('queue-cancel', (event: any) => cancelQueueItem(String(event?.data ?? '')));
     const offQueueClearDone = Events.On('queue-clear-done', () => clearDone());
     const offQueueClearAll = Events.On('queue-clear-all', () => void clearQueueAll());
-    // Fixed 10 s cadence for per-process CPU/RAM (ref:jl:tech.tool.resources):
+    // Fixed 1 s cadence for per-process CPU/RAM (ref:jl:tech.tool.resources):
     // rows keep their placeholder before the PID exists and after exit.
     const resourceTimer = setInterval(() => {
       if (!queueRunning) return;
@@ -276,7 +276,7 @@
           })
           .catch(() => {});
       }
-    }, 10000);
+    }, 1000);
 
     void load();
     return () => {

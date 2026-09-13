@@ -164,7 +164,7 @@ The **Queue** view runs the staged items back to back, one `cjxl` invocation per
 file with its frozen settings. Global Start, Pause and Cancel sit above the table;
 every item spans two rows: file, sizes, saving, route and the status (waiting, done
 with needed time, or the failure reason) on top, the child PID with its CPU time and
-RAM plus the actions below — buttons never wrap. Right-click a row to remove
+RAM (updated every second) plus the actions below — buttons never wrap. Right-click a row to remove
 it, reclaim it back to Main (restoring its snapshot to the session settings), show source
 or JXL in Explorer, open the converted file, clear done or all rows, or cancel just that
 file. Successful conversions are recorded to
