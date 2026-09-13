@@ -295,18 +295,6 @@ func (e *Engine) Cancel() {
 	e.mu.Unlock()
 }
 
-// SetStickyCollision seeds the run with a session-remembered *-all answer,
-// so the first collision applies it without asking. A later prompt answer
-// still overrides it for the rest of the run.
-func (e *Engine) SetStickyCollision(action CollisionAction) {
-	switch action {
-	case CollisionSkipAll, CollisionOverwriteAll, CollisionRenameAll:
-		e.mu.Lock()
-		e.collisionAll = action
-		e.mu.Unlock()
-	}
-}
-
 // CancelFile cancels one in-flight file; queued and finished files are
 // unaffected. It reports whether the file was in flight.
 func (e *Engine) CancelFile(input string) bool {

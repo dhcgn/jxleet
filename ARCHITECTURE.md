@@ -153,9 +153,8 @@ Name collisions follow the preset's `on_collision` (`skip` / `number` /
 `overwrite`). Under `skip` the GUI prompts per collision (overwrite, overwrite
 all, rename, rename all, skip, skip all — rename re-prepares with the numbering
 policy): the engine takes a `CollisionHandler` (nil keeps silent
-skip), sticky answers short-circuit later prompts, and the service remembers a
-*-all answer for the session (seeding later runs; a single answer clears it).
-The service serializes
+skip), sticky answers short-circuit later prompts for the rest of the run
+only — stopping or cancelling the run forgets them. The service serializes
 one outstanding prompt via the `collision-prompt` event with
 `ResolveCollision`/`GetPendingCollision`.
 

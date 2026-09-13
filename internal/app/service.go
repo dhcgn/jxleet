@@ -59,12 +59,6 @@ type Service struct {
 	activePreset  string
 	seq           int64 // per-file result sequence for duplicate-row keys
 
-	// stickyCollision remembers a *-all collision answer for the session, so
-	// later runs reuse it without asking again. A single (non-all) answer
-	// clears it, handing control back to per-collision prompts.
-	stickyCollision    convert.CollisionAction
-	hasStickyCollision bool
-
 	// promptMu serializes output-exists prompts: at most one question is
 	// outstanding; further workers wait for the current decision.
 	promptMu      sync.Mutex
@@ -831,9 +825,6 @@ func (s *Service) StartConversion(paths []string, options ConversionOptions) err
 		s.recordHistory(p.Name, result)
 	}
 	engine.CollisionHandler = s.askCollision
-	if s.hasStickyCollision {
-		engine.SetStickyCollision(s.stickyCollision)
-	}
 	s.engine = engine
 	s.activePreset = p.Name
 	s.mu.Unlock()
@@ -1012,33 +1003,20 @@ func (s *Service) askCollision(input, target string) convert.CollisionAction {
 	s.promptPending = nil
 	s.mu.Unlock()
 
-	var action convert.CollisionAction
 	switch answer {
 	case "overwrite":
-		action = convert.CollisionOverwrite
+		return convert.CollisionOverwrite
 	case "overwrite-all":
-		action = convert.CollisionOverwriteAll
+		return convert.CollisionOverwriteAll
 	case "rename":
-		action = convert.CollisionRename
+		return convert.CollisionRename
 	case "rename-all":
-		action = convert.CollisionRenameAll
+		return convert.CollisionRenameAll
 	case "skip-all":
-		action = convert.CollisionSkipAll
+		return convert.CollisionSkipAll
 	default:
-		action = convert.CollisionSkip
+		return convert.CollisionSkip
 	}
-
-	// A *-all answer is remembered for the session and seeded into later
-	// runs; a single answer clears the memory again.
-	s.mu.Lock()
-	switch action {
-	case convert.CollisionSkipAll, convert.CollisionOverwriteAll, convert.CollisionRenameAll:
-		s.stickyCollision, s.hasStickyCollision = action, true
-	default:
-		s.hasStickyCollision = false
-	}
-	s.mu.Unlock()
-	return action
 }
 
 // ResolveCollision answers the outstanding output-exists prompt. Actions are
