@@ -59,6 +59,9 @@ is green.
 - The README introduces every view with a screenshot from `docs/screenshots/`
   (embedded as HTML `<img>`, not markdown). A change that adds or reworks a view
   refreshes its screenshot and the README in the same change.
+- For visually oriented tasks, inspect the reference screenshots in `docs/screenshots/`.
+  Capture the current view before development and the updated view afterward to
+  validate the intended result.
 - The README carries a **beta** notice — keep it until 1.0.
 - Make surgical, complete changes; don't fix unrelated code.
 - Only comment code that needs clarification.
