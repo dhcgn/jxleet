@@ -166,7 +166,7 @@ every row mirrors the History layout — file, sizes, saving, route, preset and 
 needed time, with placeholders until known. A processing row shows the child PID
 with its CPU time and RAM, sampled every 10 seconds. Right-click a row to remove
 it, reclaim it back to Main (restoring its snapshot to the session settings), reveal
-it in Explorer, or cancel just that file. Successful conversions are recorded to
+it in Explorer, open the converted file, or cancel just that file. Successful conversions are recorded to
 History with their needed time; failed, cancelled and skipped rows stay in the Queue
 for retry and never reach History. The queue is session-only: closing the window with
 pending items warns once and discards them on confirm.
@@ -423,8 +423,9 @@ back to deletion.
 
 When the target `.jxl` already exists, the preset's `on_collision` decides: `skip` (the safe
 default), `number` a new name, `overwrite` silently. Under `skip`, the GUI asks instead of
-skipping silently: overwrite this file, overwrite all, skip this file, or skip all — presets
-configured for `number` or `overwrite` never prompt.
+skipping silently: overwrite this file, overwrite all, rename this file, rename all, skip
+this file, or skip all — rename keeps the existing file and writes a numbered sibling
+(`photo (1).jxl`); presets configured for `number` or `overwrite` never prompt.
 
 ### Settings in the filename
 

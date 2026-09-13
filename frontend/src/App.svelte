@@ -253,6 +253,7 @@
     const offQueueRemove = Events.On('queue-remove', (event: any) => removeItem(String(event?.data ?? '')));
     const offQueueReclaim = Events.On('queue-reclaim', (event: any) => reclaimItem(String(event?.data ?? '')));
     const offQueueShow = Events.On('queue-show', (event: any) => showItem(String(event?.data ?? '')));
+    const offQueueOpen = Events.On('queue-open', (event: any) => openConverted(String(event?.data ?? '')));
     const offQueueCancel = Events.On('queue-cancel', (event: any) => cancelQueueItem(String(event?.data ?? '')));
     // Fixed 10 s cadence for per-process CPU/RAM (ref:jl:tech.tool.resources):
     // rows keep their placeholder before the PID exists and after exit.
@@ -289,6 +290,7 @@
       offQueueRemove();
       offQueueReclaim();
       offQueueShow();
+      offQueueOpen();
       offQueueCancel();
       clearInterval(resourceTimer);
     };
@@ -696,6 +698,16 @@
     if (!item) return;
     try {
       await Service.ShowInExplorer(item.path);
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  async function openConverted(id: string): Promise<void> {
+    const item = queue.find((entry) => entry.id === id);
+    if (!item || item.status !== 'done' || !item.output) return;
+    try {
+      await Service.OpenConvertedFile(item.output);
     } catch (error) {
       errorMessage = errorText(error);
     }
@@ -1191,6 +1203,8 @@
       <div class="collision-actions">
         <button class="btn primary" style="background:var(--p-encode)" data-testid="collision-overwrite" onclick={() => resolveCollision('overwrite')}>Overwrite</button>
         <button class="btn" data-testid="collision-overwrite-all" onclick={() => resolveCollision('overwrite-all')}>Overwrite all</button>
+        <button class="btn" data-testid="collision-rename" onclick={() => resolveCollision('rename')} title="Keep the existing file and write a numbered sibling">Rename</button>
+        <button class="btn" data-testid="collision-rename-all" onclick={() => resolveCollision('rename-all')} title="Keep existing files and number all colliding outputs">Rename all</button>
         <button class="btn" data-testid="collision-skip" onclick={() => resolveCollision('skip')}>Skip file</button>
         <button class="btn" data-testid="collision-skip-all" onclick={() => resolveCollision('skip-all')}>Skip all</button>
       </div>
@@ -1238,6 +1252,7 @@
       onRemove={removeItem}
       onReclaim={reclaimItem}
       onShow={(id) => void showItem(id)}
+      onOpen={(id) => void openConverted(id)}
       onCancelFile={(id) => void cancelQueueItem(id)}
       onClearDone={clearDone}
     />

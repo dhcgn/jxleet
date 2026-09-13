@@ -58,6 +58,7 @@ func init() {
 	application.RegisterEvent[string]("queue-remove")
 	application.RegisterEvent[string]("queue-reclaim")
 	application.RegisterEvent[string]("queue-show")
+	application.RegisterEvent[string]("queue-open")
 	application.RegisterEvent[string]("queue-cancel")
 }
 
@@ -259,6 +260,9 @@ func main() {
 	})
 	queueMenu.Add("Show in Explorer").OnClick(func(ctx *application.Context) {
 		wailsApp.Event.Emit("queue-show", ctx.ContextMenuData())
+	})
+	queueMenu.Add("Open converted file").OnClick(func(ctx *application.Context) {
+		wailsApp.Event.Emit("queue-open", ctx.ContextMenuData())
 	})
 	queueMenu.Add("Cancel this file").OnClick(func(ctx *application.Context) {
 		wailsApp.Event.Emit("queue-cancel", ctx.ContextMenuData())

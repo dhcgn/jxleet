@@ -18,6 +18,7 @@
     onRemove(id: string): void;
     onReclaim(id: string): void;
     onShow(id: string): void;
+    onOpen(id: string): void;
     onCancelFile(id: string): void;
     onClearDone(): void;
   }
@@ -34,6 +35,7 @@
     onRemove,
     onReclaim,
     onShow,
+    onOpen,
     onCancelFile,
     onClearDone,
   }: Props = $props();
@@ -158,6 +160,9 @@
                   {#if item.status === 'processing'}
                     <button class="btn" onclick={() => onCancelFile(item.id)}>Cancel file</button>
                   {:else}
+                    {#if item.status === 'done' && item.output}
+                      <button class="btn" onclick={() => onOpen(item.id)} title="Open the converted file with its default application">Open JXL</button>
+                    {/if}
                     <button class="btn ghost" onclick={() => onReclaim(item.id)} title="Back to Main intake with this snapshot">Reclaim</button>
                     <button class="btn ghost" onclick={() => onShow(item.id)} title="Reveal in Explorer">Show</button>
                     <button class="btn ghost" onclick={() => onRemove(item.id)} title="Remove from queue">Remove</button>

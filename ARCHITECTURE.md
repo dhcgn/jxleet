@@ -151,7 +151,8 @@ no recycle bin exists (network shares, some removable media) replace is refused.
 
 Name collisions follow the preset's `on_collision` (`skip` / `number` /
 `overwrite`). Under `skip` the GUI prompts per collision (overwrite, overwrite
-all, skip, skip all): the engine takes a `CollisionHandler` (nil keeps silent
+all, rename, rename all, skip, skip all — rename re-prepares with the numbering
+policy): the engine takes a `CollisionHandler` (nil keeps silent
 skip), sticky answers short-circuit later prompts, and the service serializes
 one outstanding prompt via the `collision-prompt` event with
 `ResolveCollision`/`GetPendingCollision`.
@@ -230,7 +231,7 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   settings. Right-click menus are native Wails context menus
   registered in `main.go` (`file-table` → Clear via a `clear-table` event the
   frontend owns, `file-row` → per-file cancel with the input path as menu
-  data, `queue-row` → remove/reclaim/show/cancel forwarded as `queue-*`
+  data, `queue-row` → remove/reclaim/show/open/cancel forwarded as `queue-*`
   events the frontend owns with the queue id as menu data). Closing with
   waiting or processing items warns once via `beforeunload` and discards them
   on confirm. Stats is a static mock (no backend

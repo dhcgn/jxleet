@@ -941,6 +941,27 @@ func (s *Service) ShowInExplorer(path string) error {
 	return cmd.Process.Release()
 }
 
+// OpenConvertedFile opens one converted file with its default application.
+// Used by the Queue row action (ref:jl:view.queue).
+func (s *Service) OpenConvertedFile(path string) error {
+	absolute, err := filepath.Abs(strings.TrimSpace(path))
+	if err != nil {
+		return fmt.Errorf("resolve converted file path: %w", err)
+	}
+	info, err := os.Stat(absolute)
+	if err != nil {
+		return fmt.Errorf("stat converted file path: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return errors.New("converted file path is not a regular file")
+	}
+	cmd := process.CommandContext(context.Background(), "cmd", "/c", "start", "", absolute)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("open converted file: %w", err)
+	}
+	return cmd.Process.Release()
+}
+
 // CollisionPrompt describes one waiting output-exists decision. It is emitted
 // as "collision-prompt" and answered through ResolveCollision.
 type CollisionPrompt struct {
@@ -987,6 +1008,10 @@ func (s *Service) askCollision(input, target string) convert.CollisionAction {
 		return convert.CollisionOverwrite
 	case "overwrite-all":
 		return convert.CollisionOverwriteAll
+	case "rename":
+		return convert.CollisionRename
+	case "rename-all":
+		return convert.CollisionRenameAll
 	case "skip-all":
 		return convert.CollisionSkipAll
 	default:
@@ -995,7 +1020,8 @@ func (s *Service) askCollision(input, target string) convert.CollisionAction {
 }
 
 // ResolveCollision answers the outstanding output-exists prompt. Actions are
-// "overwrite", "overwrite-all", "skip" and "skip-all".
+// "overwrite", "overwrite-all", "rename", "rename-all", "skip" and "skip-all".
+// Rename keeps the existing file and writes a numbered sibling ("photo (1).jxl").
 func (s *Service) ResolveCollision(action string) {
 	s.mu.Lock()
 	q := s.promptPending
@@ -1004,7 +1030,7 @@ func (s *Service) ResolveCollision(action string) {
 		return
 	}
 	switch action {
-	case "overwrite", "overwrite-all", "skip", "skip-all":
+	case "overwrite", "overwrite-all", "rename", "rename-all", "skip", "skip-all":
 		q.reply <- action
 	}
 }

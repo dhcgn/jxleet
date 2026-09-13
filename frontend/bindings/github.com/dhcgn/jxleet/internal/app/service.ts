@@ -196,6 +196,14 @@ export function ListPresets(): $CancellablePromise<$models.PresetSummary[] | nul
 }
 
 /**
+ * OpenConvertedFile opens one converted file with its default application.
+ * Used by the Queue row action (ref:jl:view.queue).
+ */
+export function OpenConvertedFile(path: string): $CancellablePromise<void> {
+    return $Call.ByID(2959388494, path);
+}
+
+/**
  * OpenFiles opens the native multi-file picker.
  */
 export function OpenFiles(): $CancellablePromise<string[] | null> {
@@ -279,7 +287,8 @@ export function RenamePreset(name: string, newName: string): $CancellablePromise
 
 /**
  * ResolveCollision answers the outstanding output-exists prompt. Actions are
- * "overwrite", "overwrite-all", "skip" and "skip-all".
+ * "overwrite", "overwrite-all", "rename", "rename-all", "skip" and "skip-all".
+ * Rename keeps the existing file and writes a numbered sibling ("photo (1).jxl").
  */
 export function ResolveCollision(action: string): $CancellablePromise<void> {
     return $Call.ByID(1261619658, action);

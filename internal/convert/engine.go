@@ -41,6 +41,11 @@ const (
 	CollisionOverwrite
 	// CollisionOverwriteAll overwrites now and all later collisions without asking.
 	CollisionOverwriteAll
+	// CollisionRename keeps the existing output and writes this file to a
+	// numbered sibling ("photo (1).jxl") for this file only.
+	CollisionRename
+	// CollisionRenameAll numbers now and all later collisions without asking.
+	CollisionRenameAll
 )
 
 // Deps are the external collaborators the engine needs.
@@ -149,8 +154,9 @@ type Engine struct {
 	bytesOut   int64
 	coalesced  int
 
-	// collisionAll is set by CollisionSkipAll/CollisionOverwriteAll answers and
-	// short-circuits later prompts for the rest of the run.
+	// collisionAll is set by CollisionSkipAll/CollisionOverwriteAll/
+	// CollisionRenameAll answers and short-circuits later prompts for the
+	// rest of the run.
 	collisionAll CollisionAction
 
 	paused      bool
@@ -443,10 +449,18 @@ func (e *Engine) process(ctx context.Context, path string) FileResult {
 	}
 	if plan.Skip {
 		// plan.Skip only arises from the output-exists collision branch, so an
-		// "overwrite" answer simply re-prepares with the overwrite policy.
-		if e.resolveCollision(path, plan.Final) {
-			retry := eff
+		// "overwrite" answer re-prepares with the overwrite policy and a
+		// "rename" answer re-prepares with the numbering policy.
+		retry := eff
+		switch e.resolveCollision(path, plan.Final) {
+		case CollisionOverwrite, CollisionOverwriteAll:
 			retry.OnCollision = preset.CollisionOverwrite
+		case CollisionRename, CollisionRenameAll:
+			retry.OnCollision = preset.CollisionNumber
+		default:
+			retry.OnCollision = preset.CollisionSkip
+		}
+		if retry.OnCollision != preset.CollisionSkip {
 			plan, err = output.PrepareWithSuffix(path, retry, suffix)
 			if err != nil {
 				res.Err = err
@@ -540,30 +554,32 @@ func (e *Engine) writeSidecar(ctx context.Context, res *FileResult, plan output.
 	}
 }
 
-// resolveCollision decides an output-exists collision and reports whether the
-// existing target should be overwritten. Sticky answers (skip-all /
-// overwrite-all) short-circuit later collisions without calling the handler.
-func (e *Engine) resolveCollision(input, target string) bool {
+// resolveCollision decides an output-exists collision and reports the chosen
+// action. Sticky answers (skip-all / overwrite-all / rename-all)
+// short-circuit later collisions without calling the handler.
+func (e *Engine) resolveCollision(input, target string) CollisionAction {
 	e.mu.Lock()
 	sticky := e.collisionAll
 	cancelled := e.cancelled
 	e.mu.Unlock()
 	switch sticky {
 	case CollisionSkipAll:
-		return false
+		return CollisionSkip
 	case CollisionOverwriteAll:
-		return true
+		return CollisionOverwrite
+	case CollisionRenameAll:
+		return CollisionRename
 	}
 	if cancelled || e.CollisionHandler == nil {
-		return false
+		return CollisionSkip
 	}
 	action := e.CollisionHandler(input, target)
-	if action == CollisionSkipAll || action == CollisionOverwriteAll {
+	if action == CollisionSkipAll || action == CollisionOverwriteAll || action == CollisionRenameAll {
 		e.mu.Lock()
 		e.collisionAll = action
 		e.mu.Unlock()
 	}
-	return action == CollisionOverwrite || action == CollisionOverwriteAll
+	return action
 }
 
 // startReporter is implemented by encoders that can report the OS PID.
