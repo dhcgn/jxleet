@@ -127,7 +127,7 @@
         <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Original</th><th style="text-align:right">JXL</th><th style="text-align:right">Saved</th><th>Status</th></tr></thead>
         <tbody>
           {#each items as item (item.id)}
-            <tr style="--custom-contextmenu: queue-row; --custom-contextmenu-data: {item.id}; --default-contextmenu: hide" title={item.path}>
+            <tr class="queue-row-top" style="--custom-contextmenu: queue-row; --custom-contextmenu-data: {item.id}; --default-contextmenu: hide" title={item.path}>
               <td class="fn" title={item.path}>
                 {item.name}
                 <div class="mono-mini" title={item.flagsSet ? `${item.snapshot} + extra flags` : item.snapshot}>{item.snapshot}{#if item.flagsSet} +flags{/if}</div>
@@ -150,7 +150,11 @@
                     {formatDuration(item.durationSeconds)}
                   {/if}
                 </div>
-                <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
+              </td>
+            </tr>
+            <tr style="--custom-contextmenu: queue-row; --custom-contextmenu-data: {item.id}; --default-contextmenu: hide">
+              <td colspan={6}>
+                <div style="display:flex;gap:6px;flex-wrap:nowrap;white-space:nowrap">
                   {#if item.status === 'processing'}
                     <button class="btn" onclick={() => onCancelFile(item.id)}>Cancel file</button>
                   {:else}

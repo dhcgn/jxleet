@@ -1535,6 +1535,17 @@ tr.na .dot.on {
   white-space: normal;
 }
 
+/* Queue item rows: data row on top, action row below — no divider between the
+   two rows of one item, and the actions never wrap. */
+.group-files tr.queue-row-top td {
+  border-bottom: 0;
+  padding-bottom: 2px;
+}
+
+.group-files tr.queue-row-top + tr td {
+  padding-top: 2px;
+}
+
 /* In-flight file: one full-width busy row carrying PID, elapsed and cancel. */
 .live-row {
   display: flex;
