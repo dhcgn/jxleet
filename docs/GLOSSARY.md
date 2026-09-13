@@ -28,6 +28,7 @@ User-visible domain language — routes, presets, output policies, quality.
 | `jl:domain.preset.rule-fallback` | 1 | Trailing "*" rule; without it unmatched files are skipped and reported. |
 | `jl:domain.quality.distance` | 1 | Distance (-d) is the single stored quality value; quality (-q) is a display transform only. |
 | `jl:domain.quality.effort` | 1 | Effort (-e) 1-10 trades encoding time for file size; default 7 (squirrel). |
+| `jl:domain.queue.item` | 5 | One staged file with a frozen settings snapshot (distance with quality, effort, extra-flags hint); later preset edits never touch it, and the same file may be queued twice with different settings. |
 | `jl:domain.route` | 3 | Route = input format x active preset rule; never a property of the file alone. |
 | `jl:domain.route.encode` | 1 | PNG, APNG, GIF, EXR, NetPBM, PFM or PGX encoded from pixels; lossless only at -d 0. |
 | `jl:domain.route.reencode` | 1 | JPEG with --lossless_jpeg=0, or any JXL input, decoded and re-encoded; not reversible. |
@@ -43,8 +44,9 @@ Views, command-line flags and context-menu entries the user touches.
 | `jl:view.context-menu` | 0 | Per-user Explorer context-menu entry carrying the bound preset's name; no admin rights needed. |
 | `jl:view.expert` | 1 | Expert view: full generated cjxl flag surface with help tooltips, effort ladder and command preview. |
 | `jl:view.history` | 1 | History view: past conversions newest-first with sizes, savings, routes and presets. |
-| `jl:view.main` | 1 | Main view: file queue grouped by type with route badges, session overrides and the convert bar. |
+| `jl:view.main` | 2 | Main view: flat file intake in added order with route badges, session overrides and the move-to-queue bar. |
 | `jl:view.presets` | 1 | Presets view: preset library with rule summaries, output-policy editing and entry-point bindings. |
+| `jl:view.queue` | 7 | Queue view: session-only staging with frozen per-item settings, global start/pause/cancel, per-process CPU/RAM while running, and successes auto-moving to History. |
 | `jl:view.tools` | 1 | Tools view: installed cjxl/djxl/jxlinfo versions compared against the latest libjxl release. |
 
 ## Technical facts (jl:tech)
@@ -61,6 +63,7 @@ Implementation facts that surface in the UI — toolchain, IPC, recycle bin.
 | `jl:tech.tool.flags` | 1 | Accepted flags come from the installed cjxl's own --help snapshot; unknown flags refuse the run. |
 | `jl:tech.tool.hidden-window` | 0 | Tool children spawn with no visible console window. |
 | `jl:tech.tool.inspect` | 4 | jxlinfo -v output for one .jxl, shown in drill-down and saved as sidecar. |
+| `jl:tech.tool.resources` | 6 | Per-process CPU time and working-set RAM of a running cjxl child, sampled on a fixed cadence while its row shows processing. |
 | `jl:tech.toolchain.managed` | 2 | libjxl binaries fetched from the official release asset jxl-x64-windows-static.zip and integrity-verified. |
 | `jl:tech.update.notify-only` | 1 | App and toolchain updates are notify-only; nothing downloads without the user asking. |
 

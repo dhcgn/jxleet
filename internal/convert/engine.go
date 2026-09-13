@@ -63,6 +63,7 @@ type Settings struct {
 }
 
 // FileResult is the outcome for one input file.
+// jl:domain.queue.item=One staged file with a frozen settings snapshot (distance with quality, effort, extra-flags hint); later preset edits never touch it, and the same file may be queued twice with different settings.
 type FileResult struct {
 	Input      string
 	Format     routes.Format

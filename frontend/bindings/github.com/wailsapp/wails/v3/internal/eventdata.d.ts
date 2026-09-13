@@ -17,9 +17,14 @@ declare module "@wailsio/runtime" {
             "conversion-done": app$0.ConversionSummary;
             "conversion-error": string;
             "conversion-file": app$0.FileUpdate;
+            "conversion-file-start": app$0.FileStartUpdate;
             "files": string[] | null;
             "preset": string;
             "progress": app$0.ProgressUpdate;
+            "queue-cancel": string;
+            "queue-reclaim": string;
+            "queue-remove": string;
+            "queue-show": string;
             "toolchain-progress": app$0.ToolchainProgress;
         }
     }

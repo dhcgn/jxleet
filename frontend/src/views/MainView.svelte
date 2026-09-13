@@ -1,21 +1,14 @@
-<!-- jl:view.main=Main view: file queue grouped by type with route badges, session overrides and the convert bar. -->
+<!-- jl:view.main=Main view: flat file intake in added order with route badges, session overrides and the move-to-queue bar. -->
 <script lang="ts">
-  import type { ConversionSummary, FilePreview, FileUpdate, ProgressUpdate, Status, ToolchainProgress, ToolchainStatus } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
-  import { onMount } from 'svelte';
-  import { compactPath, formatBytes, formatDelta, formatEta, formatRate, savedPct } from '../lib/format';
+  import type { FilePreview, Status, ToolchainProgress, ToolchainStatus } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
+  import { formatBytes } from '../lib/format';
   import { effortNames } from '../lib/effort';
   import { routeClass, routeTitle } from '../lib/routes';
-  import type { FileGroup, RouteMode } from '../lib/types';
+  import type { RouteMode } from '../lib/types';
   import QualitySliders from '../components/QualitySliders.svelte';
-  import JxlInfoPanel from '../components/JxlInfoPanel.svelte';
 
   interface Props {
     files: FilePreview[];
-    results: FileUpdate[];
-    meta: { selection: string; output: string; error: string; loading: boolean };
-    run: { busy: boolean; summary: ConversionSummary | null };
-    progress: ProgressUpdate;
-    inFlight: Record<string, { pid: number; startedAt: number }>;
     settings: { distance: number; effort: number; jpegLossless: boolean; outputPolicy: string; embedSettings: boolean; jxlInfoSidecar: boolean };
     routeMode: RouteMode;
     quality: number;
@@ -23,16 +16,11 @@
     presetName: string;
     appStatus: Status | null;
     tools: { status: ToolchainStatus | null; installing: boolean; progress: ToolchainProgress | null };
-    canConvert: boolean;
-    pendingCount: number;
+    canQueue: boolean;
     onOpenFile(): void;
     onOpenFolder(): void;
-    onTogglePause(): void;
-    onCancel(): void;
-    onCancelFile(input: string): void;
     onInstallToolchain(): void;
     onGoToPresets(): void;
-    onSelectResult(result: FileUpdate): void;
     onClearAll(): void;
     onSetDistance(value: number): void;
     onSetQuality(quality: number): void;
@@ -41,15 +29,10 @@
     onSetOutputPolicy(policy: 'alongside' | 'subfolder' | 'replace'): void;
     onSetEmbedSettings(embed: boolean): void;
     onSetJxlInfoSidecar(sidecar: boolean): void;
-    onStart(): void;
+    onMoveToQueue(): void;
   }
   let {
     files,
-    results,
-    meta,
-    run,
-    progress,
-    inFlight,
     settings,
     routeMode,
     quality,
@@ -57,16 +40,11 @@
     presetName,
     appStatus,
     tools,
-    canConvert,
-    pendingCount,
+    canQueue,
     onOpenFile,
     onOpenFolder,
-    onTogglePause,
-    onCancel,
-    onCancelFile,
     onInstallToolchain,
     onGoToPresets,
-    onSelectResult,
     onClearAll,
     onSetDistance,
     onSetQuality,
@@ -75,118 +53,16 @@
     onSetOutputPolicy,
     onSetEmbedSettings,
     onSetJxlInfoSidecar,
-    onStart,
+    onMoveToQueue,
   }: Props = $props();
 
-  let collapsedGroups = $state(new Set<string>());
-  // One input can have several results (re-converted with different
-  // settings); each conversion keeps its own row keyed by seq.
-  let resultsByInput = $derived.by(() => {
-    const map = new Map<string, FileUpdate[]>();
-    for (const result of results) {
-      const list = map.get(result.input) ?? [];
-      list.push(result);
-      map.set(result.input, list);
-    }
-    return map;
-  });
-  let selectedResult = $derived(results.find((result) => String(result.seq) === meta.selection) ?? null);
   let routeCounts = $derived.by(() => ({
     Transcode: files.filter((file) => file.route === 'Transcode').length,
     Reencode: files.filter((file) => file.route === 'Reencode').length,
     Encode: files.filter((file) => file.route === 'Encode').length,
     Skip: files.filter((file) => file.skip).length,
   }));
-  let dominantRoute = $derived(
-    routeCounts.Reencode >= routeCounts.Encode && routeCounts.Reencode >= routeCounts.Transcode
-      ? 'Reencode'
-      : routeCounts.Encode >= routeCounts.Transcode
-        ? 'Encode'
-        : 'Transcode',
-  );
   let totalSize = $derived(files.reduce((total, file) => total + file.size, 0));
-  let groups = $derived.by<FileGroup[]>(() => {
-    const map = new Map<string, FileGroup>();
-    for (const file of files) {
-      const route = file.skip ? 'Skip' : file.route || 'pending';
-      const key = `${route}|${file.format}|${file.skip ? file.reason : file.settings}|${file.flagsSet}`;
-      let group = map.get(key);
-      if (!group) {
-        group = {
-          key,
-          format: file.format,
-          route,
-          skip: file.skip,
-          reason: file.reason,
-          settings: file.settings,
-          flagsSet: file.flagsSet,
-          files: [],
-          sizeIn: 0,
-          sizeOut: 0,
-          sizeDoneIn: 0,
-          hasResults: false,
-        };
-        map.set(key, group);
-      }
-      group.files.push(file);
-      group.sizeIn += file.size;
-      const fileResults = resultsByInput.get(file.path) ?? [];
-      const result = fileResults[fileResults.length - 1];
-      if (result && !result.error && !result.skipped && !result.cancelled) {
-        group.sizeOut += result.outputSize;
-        group.sizeDoneIn += result.inputSize;
-        group.hasResults = true;
-      }
-    }
-    const order = (route: string) => (route === 'Transcode' ? 0 : route === 'Reencode' ? 1 : route === 'Encode' ? 2 : 3);
-    return [...map.values()].sort((a, b) => order(a.route) - order(b.route));
-  });
-  let fileStatuses = $derived.by(() => {
-    const map = new Map<string, string>();
-    for (const file of files) {
-      if ((resultsByInput.get(file.path) ?? []).length > 0) continue;
-      if (inFlight[file.path]) {
-        map.set(file.path, 'running');
-      } else if (run.busy) {
-        map.set(file.path, 'waiting');
-      } else {
-        map.set(file.path, '');
-      }
-    }
-    return map;
-  });
-
-  function fileStatus(file: FilePreview): string {
-    return fileStatuses.get(file.path) ?? '';
-  }
-
-  // Ticking clock for elapsed timers; only runs during a conversion.
-  let now = $state(Date.now());
-  onMount(() => {
-    const timer = setInterval(() => {
-      if (run.busy) now = Date.now();
-    }, 1000);
-    return () => clearInterval(timer);
-  });
-
-  // MM:ss once a task runs longer than 10s, else empty.
-  function elapsedText(input: string): string {
-    const entry = inFlight[input];
-    if (!entry) return '';
-    const sec = Math.floor((now - entry.startedAt) / 1000);
-    if (sec < 10) return '';
-    return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
-  }
-
-  function toggleGroup(key: string): void {
-    const next = new Set(collapsedGroups);
-    if (next.has(key)) {
-      next.delete(key);
-    } else {
-      next.add(key);
-    }
-    collapsedGroups = next;
-  }
 </script>
 
 <div class="body">
@@ -217,25 +93,12 @@
       <button class="btn ghost" style="margin-left:auto" onclick={onGoToPresets}>Set bindings</button>
     </div>
   {/if}
-  {#if run.busy}
-    <div class="run-strip" data-testid="run-strip">
-      <div class="run-head">
-        <span class="badge b-reencode">{progress.paused ? 'Paused' : 'Converting'}</span>
-        <span class="run-count">{progress.completed + progress.failed + progress.skipped} of {progress.total}</span>
-        <span class="mini">{formatEta(progress.etaSeconds)} remaining - {formatRate(progress.throughput)}</span>
-        <span class="spacer"></span>
-        <button class="btn" onclick={onTogglePause}>{progress.paused ? 'Resume' : 'Pause'}</button>
-        <button class="btn danger" data-testid="cancel" onclick={onCancel}>Cancel</button>
-      </div>
-      <div class="bar"><i style={`width:${Math.min(100, progress.percent)}%`}></i></div>
-    </div>
-  {/if}
   {#if presetName === '' && files.length > 0}
     <div class="banner info" style="margin-bottom:12px"><span class="ic">i</span><span>Files are selected. Select a preset in the toolbar to classify their routes.</span></div>
   {/if}
   <div class="cols">
     <div class="groups-col" style="--custom-contextmenu: file-table; --default-contextmenu: hide">
-      {#if files.length === 0 && !run.busy}
+      {#if files.length === 0}
       <div
         class="drop"
         aria-label="Drop files or folders"
@@ -253,91 +116,52 @@
         <button class="btn" onclick={onOpenFolder}>Open Folder</button>
       </div>
     </div>
-      {:else if files.length === 0}
-        <div class="empty">Preparing the queue...</div>
       {:else}
-      {#each groups as group (group.key)}
-        <div class="card group" data-testid={`group-${group.route.toLowerCase()}`}>
-          <button type="button" class="group-head" aria-expanded={!collapsedGroups.has(group.key)} onclick={() => toggleGroup(group.key)}>
-            <span class={`badge ${routeClass(group.route)}`}>{group.skip ? 'skip' : group.format || 'file'}</span>
-            <span class="group-title">{group.route === 'pending' ? 'Select a preset' : routeTitle(group.route)}</span>
-            <span class="mini">{group.files.length} files - {formatBytes(group.sizeIn)}</span>
-            <span class="spacer"></span>
-            {#if group.skip}
-              <span class="mini">{group.reason || 'skipped'}</span>
-            {:else}
-              <span class="mono-mini" title={group.flagsSet ? `${group.settings} + extra flags` : group.settings}>{group.settings || '-'}</span>
-              {#if group.flagsSet}<span class="flag-chip" title="Extra cjxl flags applied">+flags</span>{/if}
-              {#if group.hasResults && group.sizeDoneIn > 0}
-                <span class="delta-chip" class:neg={savedPct(group.sizeDoneIn, group.sizeOut) < 0}>{formatDelta(group.sizeDoneIn, group.sizeOut)}</span>
-              {/if}
-            {/if}
-            <svg class="chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"></path></svg>
-          </button>
-          {#if !collapsedGroups.has(group.key)}
-            <table class="files group-files" data-testid="file-table">
-              <colgroup>
-                <col class="gf-file" />
-                <col class="gf-hug" />
-                <col class="gf-hug" />
-                <col class="gf-status" />
-              </colgroup>
-              <thead><tr><th>File</th><th style="text-align:right">Size</th><th style="text-align:right">JXL</th><th>Result</th></tr></thead>
-              <tbody>
-                {#each group.files as file (file.path)}
-                  {@const fileResults = resultsByInput.get(file.path) ?? []}
-                  {@const flight = inFlight[file.path]}
-                  {#each fileResults as result (result.seq)}
-                    {@const failed = result.error !== ''}
-                    {@const warn = result.error === '' && !result.skipped && !result.cancelled && result.warning !== '' ? result.warning : ''}
-                    {@const inspectable = run.summary != null && !run.busy && !failed && !result.skipped && !result.cancelled}
-                    <tr
-                      class:selected={meta.selection === String(result.seq)}
-                      class:clickable={inspectable}
-                      onclick={() => { if (inspectable) void onSelectResult(result); }}
-                    >
-                      <td class="fn" title={file.path}>{file.name}{#if result.settings}<div class="mono-mini" title={result.flagsSet ? `${result.settings} + extra flags` : result.settings}>{result.settings}{#if result.flagsSet} +flags{/if}</div>{/if}</td>
-                      <td class="num">{formatBytes(file.size)}</td>
-                      <td class="num">{!failed && !result.skipped && !result.cancelled ? formatBytes(result.outputSize) : '-'}</td>
-                      <td class="status-cell" class:success={!failed && !result.skipped && !result.cancelled} class:error={failed} title={warn || undefined}>
-                        {failed ? (result.error || 'failed') : result.skipped ? (result.skipReason || 'skipped') : result.cancelled ? 'cancelled' : formatDelta(result.inputSize, result.outputSize)}{warn ? ' ⚠' : ''}
-                      </td>
-                    </tr>
-                  {/each}
-                  {#if flight}
-                    <tr style="--custom-contextmenu: file-row; --custom-contextmenu-data: {file.path}; --default-contextmenu: hide">
-                      <td colspan={4}>
-                        <div class="live-row">
-                          <span class="badge b-reencode">Converting</span>
-                          <span class="fn" title={file.path}>{file.name}</span>
-                          {#if flight.pid > 0}<span class="mono-mini">PID {flight.pid}</span>{/if}
-                          {#if elapsedText(file.path) !== ''}<span class="mono-mini">{elapsedText(file.path)}</span>{/if}
-                          <span class="spacer"></span>
-                          <button class="btn" onclick={() => onCancelFile(file.path)}>Cancel file</button>
-                        </div>
-                      </td>
-                    </tr>
-                  {:else if fileResults.length === 0}
-                    <tr>
-                      <td class="fn" title={file.path}>{file.name}</td>
-                      <td class="num">{formatBytes(file.size)}</td>
-                      <td class="num">-</td>
-                      <td class="status-cell">
-                        {#if group.skip}
-                          {file.reason || 'skipped'}
-                        {:else if run.busy}
-                          {fileStatus(file)}
-                        {/if}
-                      </td>
-                    </tr>
-                  {/if}
-                {/each}
-              </tbody>
-            </table>
-          {/if}
+      <div class="card group" data-testid="group-intake">
+        <div class="group-head">
+          <span class="badge b-encode">intake</span>
+          <span class="group-title">Files in added order</span>
+          <span class="mini">{files.length} files - {formatBytes(totalSize)}</span>
+          <span class="spacer"></span>
+          {#if routeCounts.Transcode > 0}<span class="mini" title={routeTitle('Transcode')}>🟢 {routeCounts.Transcode}</span>{/if}
+          {#if routeCounts.Reencode > 0}<span class="mini" title={routeTitle('Reencode')}>🟠 {routeCounts.Reencode}</span>{/if}
+          {#if routeCounts.Encode > 0}<span class="mini" title={routeTitle('Encode')}>🔵 {routeCounts.Encode}</span>{/if}
+          {#if routeCounts.Skip > 0}<span class="mini">skip {routeCounts.Skip}</span>{/if}
         </div>
-      {/each}
-      <div class="mini" style="padding:0 2px">Drop more files or folders anywhere in the window to add them.</div>
+        <table class="files group-files" data-testid="file-table">
+          <colgroup>
+            <col class="gf-file" />
+            <col class="gf-hug" />
+            <col class="gf-hug" />
+            <col class="gf-status" />
+          </colgroup>
+          <thead><tr><th>File</th><th style="text-align:right">Size</th><th>Route</th><th>Settings</th></tr></thead>
+          <tbody>
+            {#each files as file (file.path)}
+              <tr>
+                <td class="fn" title={file.path}>{file.name}</td>
+                <td class="num">{formatBytes(file.size)}</td>
+                <td>
+                  {#if file.skip}
+                    <span class="badge b-skip">skip</span>
+                  {:else}
+                    <span class={`badge ${routeClass(file.route)}`}>{file.format || 'file'}</span>
+                  {/if}
+                </td>
+                <td class="status-cell">
+                  {#if file.skip}
+                    {file.reason || 'skipped'}
+                  {:else}
+                    <span class="mono-mini" title={file.flagsSet ? `${file.settings} + extra flags` : file.settings}>{file.settings || '-'}</span>
+                    {#if file.flagsSet}<span class="flag-chip" title="Extra cjxl flags applied">+flags</span>{/if}
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+      <div class="mini" style="padding:0 2px">Drop more files or folders anywhere in the window to add them. Conversion runs from the Queue — staged files keep a frozen copy of these settings.</div>
       {/if}
     </div>
 
@@ -402,39 +226,14 @@
           </label>
         </div>
       </div>
-
-      {#if run.summary && !run.busy}
-        <div class="card">
-          <h3>Output summary</h3>
-          <div class="in kv">
-            <div><span>Converted</span><span>{run.summary.completed}{#if run.summary.failed > 0} - {run.summary.failed} failed{/if}{#if run.summary.skipped > 0} - {run.summary.skipped} skipped{/if}</span></div>
-            <div><span>Bytes</span><span>{formatBytes(run.summary.bytesIn)} -&gt; {formatBytes(run.summary.bytesOut)}</span></div>
-            <div><span>Saved</span><span class="success">{formatDelta(run.summary.bytesIn, run.summary.bytesOut)}</span></div>
-          </div>
-        </div>
-        <JxlInfoPanel
-          label={selectedResult ? (selectedResult.output ? compactPath(selectedResult.output, 34) : 'unavailable') : 'select a converted file'}
-          emptyText="Select a converted file to inspect its JPEG XL metadata."
-          hasSelection={selectedResult != null}
-          loading={meta.loading}
-          error={meta.error}
-          output={meta.output}
-        />
-      {/if}
     </div>
   </div>
 </div>
 {#if files.length > 0}
   <div class="convertbar" data-testid="convertbar">
-    {#if run.summary && !run.busy}
-      <span class:error={run.summary.failed > 0} class:success={run.summary.failed === 0}>{run.summary.completed} converted{#if run.summary.failed > 0} - {run.summary.failed} failed{/if}{#if run.summary.skipped > 0} - {run.summary.skipped} skipped{/if}</span>
-      <span class="mono-mini">{formatBytes(run.summary.bytesIn)} -&gt; {formatBytes(run.summary.bytesOut)}</span>
-      <span class="delta-chip" class:neg={savedPct(run.summary.bytesIn, run.summary.bytesOut) < 0}>{formatDelta(run.summary.bytesIn, run.summary.bytesOut)}</span>
-    {:else}
-      <span class="mini">{files.length} files - {formatBytes(totalSize)}</span>
-    {/if}
+    <span class="mini">{files.length} files - {formatBytes(totalSize)}</span>
     <span class="spacer"></span>
-    {#if !run.busy}<button class="btn" data-testid="new-files" onclick={onClearAll}>Clear All</button>{/if}
-    <button class="btn primary convert-action" style={`background:var(--p-${dominantRoute === 'Transcode' ? 'transcode' : dominantRoute === 'Encode' ? 'encode' : 'reencode'});padding:11px`} data-testid="start-convert" onclick={onStart} disabled={!canConvert}>Convert {pendingCount || files.length} files</button>
+    <button class="btn" data-testid="new-files" onclick={onClearAll}>Clear All</button>
+    <button class="btn primary convert-action" style="background:var(--p-encode);padding:11px" data-testid="move-to-queue" onclick={onMoveToQueue} disabled={!canQueue}>Move {files.length} file{files.length === 1 ? '' : 's'} to queue</button>
   </div>
 {/if}

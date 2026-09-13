@@ -545,3 +545,10 @@ func TestFileUpdateCarriesSettings(t *testing.T) {
 		t.Errorf("settings = %q, want D/E chip", update.Settings)
 	}
 }
+
+func TestFileUpdateCarriesDuration(t *testing.T) {
+	update := fileUpdate(1, convert.FileResult{Input: "a.png", Duration: 1500 * 1000000})
+	if update.DurationSeconds != 1.5 {
+		t.Errorf("duration = %v, want 1.5", update.DurationSeconds)
+	}
+}

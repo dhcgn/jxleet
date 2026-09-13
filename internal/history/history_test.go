@@ -19,7 +19,7 @@ func TestStoreRoundTripAndClear(t *testing.T) {
 	}
 
 	at := time.Date(2026, 8, 29, 12, 0, 0, 0, time.UTC)
-	if err := store.Append(Entry{At: at, Input: `C:\a.jpg`, Output: `C:\a.jxl`, Route: "Transcode", Preset: "p", InputSize: 100, OutputSize: 80}); err != nil {
+	if err := store.Append(Entry{At: at, Input: `C:\a.jpg`, Output: `C:\a.jxl`, Route: "Transcode", Preset: "p", InputSize: 100, OutputSize: 80, DurationSeconds: 1.5}); err != nil {
 		t.Fatalf("Append: %v", err)
 	}
 	if err := store.Append(Entry{At: at, Input: `C:\b.png`, Output: `C:\b.jxl`, Route: "Encode", Preset: "p", InputSize: 200, OutputSize: 50}); err != nil {
@@ -35,6 +35,12 @@ func TestStoreRoundTripAndClear(t *testing.T) {
 	}
 	if entries[0].Input != `C:\a.jpg` || entries[0].OutputSize != 80 || entries[1].Input != `C:\b.png` {
 		t.Fatalf("unexpected entries: %+v", entries)
+	}
+	if entries[0].DurationSeconds != 1.5 {
+		t.Fatalf("duration not preserved: %v", entries[0].DurationSeconds)
+	}
+	if entries[1].DurationSeconds != 0 {
+		t.Fatalf("missing duration should decode as 0, got %v", entries[1].DurationSeconds)
 	}
 	if !entries[0].At.Equal(at) {
 		t.Fatalf("timestamp not preserved: %v", entries[0].At)
