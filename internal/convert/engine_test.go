@@ -135,7 +135,7 @@ func TestEngineCollisionRenameNumbersOutput(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("OnFile called %d times, want 1", len(got))
 	}
-	want := filepath.Join(dir, "a (1).jxl")
+	want := filepath.Join(dir, "a_1.jxl")
 	if got[0].Output != want {
 		t.Errorf("output = %q, want numbered sibling %q", got[0].Output, want)
 	}
