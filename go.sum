@@ -22,8 +22,8 @@ github.com/mattn/go-isatty v0.0.24 h1:tGZZoVgT/KiqK1c8ocVLeDS8BSWMRd47J3Lbz7vsRe
 github.com/mattn/go-isatty v0.0.24/go.mod h1:nMCL3Zebbrt45jsMDgnfIwz6ydEQApk5oEI3HqDio6A=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/spf13/fileflow v0.1.0 h1:Mg6q16Sdderp19ki/4TQNb6MeA/fA1vnwixmzIVm0bE=
-github.com/spf13/fileflow v0.1.0/go.mod h1:Nw39c9r4kkqJAP5dcoXjhBkWugFuFb8s00V3+MBddmo=
+github.com/spf13/fileflow v0.2.0 h1:VpW2wRzzO2430E11gvScFExEnoYqhzfK1daaJKVhLEQ=
+github.com/spf13/fileflow v0.2.0/go.mod h1:Nw39c9r4kkqJAP5dcoXjhBkWugFuFb8s00V3+MBddmo=
 github.com/spf13/pathologize v1.1.0 h1:ByNoCEj7iPpZeZ2dUv52ky5TnfJv5IpNLilpaiAAW3I=
 github.com/spf13/pathologize v1.1.0/go.mod h1:CwE+2y5kdp5EBv1kxhXujQo2SrY0s+rYAM02KluGFEs=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
