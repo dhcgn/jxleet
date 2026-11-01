@@ -1,7 +1,8 @@
-<!-- jl:view.history=History view: past conversions newest-first with sizes, savings, routes and presets. -->
+<!-- jl:view.history=History view: past conversions newest-first with sizes, savings, routes and presets; a row's right-click menu opens its JXL in Explorer or the standard viewer. -->
 <script lang="ts">
   import type { HistoryEntry } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
   import { compactPath, formatBytes, formatDelta, formatDuration, savedPct } from '../lib/format';
+  import { resultMenuStyle } from '../lib/menu';
   import { routeClass } from '../lib/routes';
   import JxlInfoPanel from '../components/JxlInfoPanel.svelte';
 
@@ -38,9 +39,10 @@
           </colgroup>
           <thead><tr><th>File</th><th>Route</th><th style="text-align:right">Original</th><th style="text-align:right">JXL</th><th style="text-align:right">Saved</th><th style="text-align:right">Needed</th></tr></thead>
           <tbody>
-            {#each entries as entry (entry.at + entry.output)}
+            {#each entries as entry, index (entry.at + entry.output)}
               <tr
                 class="clickable"
+                style={resultMenuStyle(`h${index}`)}
                 class:selected={meta.entry === entry}
                 onclick={() => { if (meta.entry !== entry) void onInspect(entry); }}
                 title="{entry.at} · preset {entry.preset}"

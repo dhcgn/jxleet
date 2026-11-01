@@ -280,6 +280,18 @@ func main() {
 		wailsApp.Event.Emit("queue-cancel", ctx.ContextMenuData())
 	})
 	wailsApp.ContextMenu.Add("queue-row", queueMenu)
+	// Result rows of the Running view (ref:jl:view.automatic) and the History
+	// view (ref:jl:view.history) share one menu; the menu data names the row
+	// ("r<seq>" or "h<index>", see lib/menu.ts) and the frontend resolves it to
+	// the output file.
+	resultMenu := wailsApp.ContextMenu.New()
+	resultMenu.Add("Open Explorer").OnClick(func(ctx *application.Context) {
+		wailsApp.Event.Emit("result-open-explorer", ctx.ContextMenuData())
+	})
+	resultMenu.Add("Open Standard Viewer").OnClick(func(ctx *application.Context) {
+		wailsApp.Event.Emit("result-open-viewer", ctx.ContextMenuData())
+	})
+	wailsApp.ContextMenu.Add("result-row", resultMenu)
 
 	// App updates are notify-only: the updater is initialized without a
 	// CheckInterval, so nothing is ever checked or downloaded automatically.

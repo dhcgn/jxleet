@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"os/exec"
@@ -635,9 +636,17 @@ func (s *Service) PreviewPaths(paths []string, options ConversionOptions) ([]Fil
 	result := make([]FilePreview, 0, len(inputs))
 	for _, path := range inputs {
 		item := FilePreview{Path: path, Name: filepath.Base(path)}
-		if info, statErr := os.Stat(path); statErr == nil {
-			item.Size = info.Size()
+		info, statErr := os.Stat(path)
+		if statErr != nil {
+			item.Skip = true
+			item.Reason = "file not found"
+			if !errors.Is(statErr, fs.ErrNotExist) {
+				item.Reason = "file not readable"
+			}
+			result = append(result, item)
+			continue
 		}
+		item.Size = info.Size()
 		format := convert.DetectFormat(path)
 		item.Format = string(format)
 		if format == routes.FormatUnknown {
@@ -874,30 +883,53 @@ func (s *Service) GetProcessResources(pid int) (ProcessResources, error) {
 }
 
 // ShowInExplorer reveals one path in Explorer (selecting the file, or opening
-// the folder). Used by the Queue row context menu (ref:jl:view.queue).
+// the folder). Used by the Queue row context menu (ref:jl:view.queue) and the
+// result rows of the Running and History views. A file that is gone falls back
+// to its containing folder when that still exists; the returned error then
+// says so, so the GUI can tell the user the file moved or was deleted.
 func (s *Service) ShowInExplorer(path string) error {
 	absolute, err := filepath.Abs(strings.TrimSpace(path))
 	if err != nil {
 		return fmt.Errorf("resolve explorer path: %w", err)
 	}
-	info, err := os.Stat(absolute)
+	args, gone, err := explorerArgs(absolute)
 	if err != nil {
-		return fmt.Errorf("stat explorer path: %w", err)
+		return err
 	}
-	var cmd *exec.Cmd
-	if info.IsDir() {
-		cmd = exec.Command("explorer.exe", absolute)
-	} else {
-		cmd = exec.Command("explorer.exe", "/select,", absolute)
-	}
+	cmd := exec.Command("explorer.exe", args...)
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("open explorer: %w", err)
 	}
-	return cmd.Process.Release()
+	if err := cmd.Process.Release(); err != nil {
+		return err
+	}
+	if gone {
+		return fmt.Errorf("%s no longer exists; opened its folder", filepath.Base(absolute))
+	}
+	return nil
+}
+
+// explorerArgs picks what Explorer is asked to show: a file is selected, a
+// folder is opened, and a vanished path falls back to its parent folder
+// (gone=true) when that still exists.
+func explorerArgs(absolute string) (args []string, gone bool, err error) {
+	info, err := os.Stat(absolute)
+	switch {
+	case err == nil && info.IsDir():
+		return []string{absolute}, false, nil
+	case err == nil:
+		return []string{"/select,", absolute}, false, nil
+	case errors.Is(err, fs.ErrNotExist):
+		if parent, parentErr := os.Stat(filepath.Dir(absolute)); parentErr == nil && parent.IsDir() {
+			return []string{filepath.Dir(absolute)}, true, nil
+		}
+	}
+	return nil, false, fmt.Errorf("stat explorer path: %w", err)
 }
 
 // OpenConvertedFile opens one converted file with its default application.
-// Used by the Queue row action (ref:jl:view.queue).
+// Used by the Queue row action (ref:jl:view.queue) and the result rows of the
+// Running and History views.
 func (s *Service) OpenConvertedFile(path string) error {
 	absolute, err := filepath.Abs(strings.TrimSpace(path))
 	if err != nil {
@@ -905,6 +937,9 @@ func (s *Service) OpenConvertedFile(path string) error {
 	}
 	info, err := os.Stat(absolute)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("%s no longer exists", filepath.Base(absolute))
+		}
 		return fmt.Errorf("stat converted file path: %w", err)
 	}
 	if !info.Mode().IsRegular() {
@@ -1011,6 +1046,33 @@ func (s *Service) GetProgress() ProgressUpdate {
 		return ProgressUpdate{}
 	}
 	return progressUpdate(engine.Progress())
+}
+
+// RunFiles is the live run's file list for a window that opened after the
+// earlier events were emitted (ref:jl:view.automatic).
+type RunFiles struct {
+	Inputs   []string     `json:"inputs"`   // every input in arrival order
+	Finished []FileUpdate `json:"finished"` // results in completion order
+	Running  []string     `json:"running"`  // inputs encoding right now
+}
+
+// GetRunFiles snapshots the live run's files; it is empty when no run is live.
+func (s *Service) GetRunFiles() RunFiles {
+	files := RunFiles{Inputs: []string{}, Finished: []FileUpdate{}, Running: []string{}}
+	engine := s.currentEngine()
+	if engine == nil {
+		return files
+	}
+	inputs, finished, running := engine.Snapshot()
+	files.Inputs = append(files.Inputs, inputs...)
+	files.Running = append(files.Running, running...)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, result := range finished {
+		s.seq++
+		files.Finished = append(files.Finished, fileUpdate(s.seq, result))
+	}
+	return files
 }
 
 // ToolchainStatus is the compact toolchain state rendered by the Tools view.
@@ -1564,7 +1626,11 @@ func expandPaths(inputs []string) ([]string, error) {
 		}
 		info, err := os.Stat(absolute)
 		if err != nil {
-			return nil, fmt.Errorf("stat %q: %w", input, err)
+			// Keep an unreadable or vanished path in the batch: the engine
+			// reports it as one failed file, where an error here would drop the
+			// whole batch (and every later preview) with only a banner to show.
+			addPath(absolute, seen, &result)
+			continue
 		}
 		if !info.IsDir() {
 			addPath(absolute, seen, &result)

@@ -216,6 +216,17 @@ bar**, not twenty — and the calling application is never left waiting. A batch
 arrives after the previous run has finished starts a new run on its own, and while a
 run is in progress each completed row shows the output size and its saving ratio.
 
+The running window lists **every file of the run** — hundreds stay usable, the list
+scrolls inside its card — with its live status (waiting, running, done, failed). A file
+that fails, including one that disappeared before its turn, shows its reason right in its
+row instead of only a counter in the status bar. Right-click a result row for **Open
+Explorer** (reveals the converted file) or **Open Standard Viewer** — the same menu as in
+the History view.
+
+<p align="center">
+  <img src="docs/screenshots/running.png" alt="The Running window of a coalesced external run: progress, every file with its live status, and one failed file with its reason">
+</p>
+
 ### 3. The Explorer context menu
 
 Right-click any file, folder, or folder background. Registration is per-user and needs no
@@ -480,7 +491,10 @@ needed time, plus the timestamp.
 
 Click an entry to run `jxlinfo -v` on the stored output and inspect what ended up in the
 file; if the output has since been moved or deleted, the entry says so instead of failing
-silently. A Reload action picks up new entries, and Clear — behind a confirmation —
+silently. Right-click an entry for **Open Explorer** (reveals the converted file) or
+**Open Standard Viewer** (opens it in the default application); if the file is gone,
+a short message says so and Open Explorer opens the containing folder when it still
+exists. A Reload action picks up new entries, and Clear — behind a confirmation —
 empties the history.
 
 <p align="center">

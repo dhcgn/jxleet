@@ -157,6 +157,13 @@ export function GetProgress(): $CancellablePromise<$models.ProgressUpdate> {
 }
 
 /**
+ * GetRunFiles snapshots the live run's files; it is empty when no run is live.
+ */
+export function GetRunFiles(): $CancellablePromise<$models.RunFiles> {
+    return $Call.ByID(190292454);
+}
+
+/**
  * GetStatus reports whether the app is ready to run conversions.
  */
 export function GetStatus(): $CancellablePromise<$models.Status> {
@@ -204,7 +211,8 @@ export function ListPresets(): $CancellablePromise<$models.PresetSummary[] | nul
 
 /**
  * OpenConvertedFile opens one converted file with its default application.
- * Used by the Queue row action (ref:jl:view.queue).
+ * Used by the Queue row action (ref:jl:view.queue) and the result rows of the
+ * Running and History views.
  */
 export function OpenConvertedFile(path: string): $CancellablePromise<void> {
     return $Call.ByID(2959388494, path);
@@ -327,7 +335,10 @@ export function SetBinding(entryPoint: string, presetName: string): $Cancellable
 
 /**
  * ShowInExplorer reveals one path in Explorer (selecting the file, or opening
- * the folder). Used by the Queue row context menu (ref:jl:view.queue).
+ * the folder). Used by the Queue row context menu (ref:jl:view.queue) and the
+ * result rows of the Running and History views. A file that is gone falls back
+ * to its containing folder when that still exists; the returned error then
+ * says so, so the GUI can tell the user the file moved or was deleted.
  */
 export function ShowInExplorer(path: string): $CancellablePromise<void> {
     return $Call.ByID(1992016875, path);

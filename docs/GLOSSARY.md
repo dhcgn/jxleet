@@ -40,10 +40,11 @@ Views, command-line flags and context-menu entries the user touches.
 
 | Key | ref-count | Description |
 |---|---|---|
+| `jl:view.automatic` | 6 | Running view: the compact window of an external CLI/Explorer run, with progress, every file's live status (failures with their reason) and a result-row menu to open Explorer or the converted file. |
 | `jl:view.cli` | 0 | Command-line path invocation using the CLI-bound preset, with --preset for a one-call override. |
 | `jl:view.context-menu` | 0 | Per-user Explorer context-menu entry carrying the bound preset's name; no admin rights needed. |
 | `jl:view.expert` | 1 | Expert view: full generated cjxl flag surface with help tooltips, effort ladder and command preview. |
-| `jl:view.history` | 1 | History view: past conversions newest-first with sizes, savings, routes and presets. |
+| `jl:view.history` | 4 | History view: past conversions newest-first with sizes, savings, routes and presets; a row's right-click menu opens its JXL in Explorer or the standard viewer. |
 | `jl:view.main` | 2 | Main view: flat file intake in added order with route badges, session overrides and the move-to-queue bar. |
 | `jl:view.presets` | 1 | Presets view: preset library with rule summaries, output-policy editing and entry-point bindings. |
 | `jl:view.queue` | 8 | Queue view: session-only staging with frozen per-item settings, global start/pause/cancel, per-process CPU/RAM while running, and successes auto-moving to History. |

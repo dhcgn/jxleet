@@ -24,6 +24,7 @@ export type {
     ProcessResources,
     ProgressUpdate,
     QueueItemInput,
+    RunFiles,
     Status,
     ToolchainProgress,
     ToolchainStatus,

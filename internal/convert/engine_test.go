@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -264,6 +265,45 @@ func TestEngineFailurePropagates(t *testing.T) {
 	}
 	if result.Output != "" {
 		t.Fatalf("failed result should not expose an output path: %q", result.Output)
+	}
+}
+
+// A path that vanished before dispatch is a failed row of its own, never an
+// "unsupported format" skip, and it does not stop its neighbours.
+func TestEngineMissingInputFailsOnItsOwn(t *testing.T) {
+	dir := t.TempDir()
+	good := filepath.Join(dir, "a.png")
+	pngFile(t, good)
+	missing := filepath.Join(dir, "gone.d0.75-e7-cjxl0.12.0.jxl")
+	e := New(Deps{Encoder: &fakeEncoder{}}, Settings{Processes: 1, Preset: encodePreset()})
+	results := map[string]FileResult{}
+	e.OnFile = func(r FileResult) { results[r.Input] = r }
+	sum := e.Run(context.Background(), []string{missing, good})
+	if sum.Failed != 1 || sum.Completed != 1 || sum.Skipped != 0 {
+		t.Fatalf("summary = %+v", sum)
+	}
+	if got := results[missing]; got.Err == nil || got.Skipped {
+		t.Fatalf("missing input result = %+v, want a failure", got)
+	}
+}
+
+// The engine owns the run's file list: OnAdd announces each batch and Snapshot
+// rebuilds the list for a window that opened late.
+func TestEngineSnapshotListsInputsAndResults(t *testing.T) {
+	dir := t.TempDir()
+	a, b := filepath.Join(dir, "a.png"), filepath.Join(dir, "b.png")
+	pngFile(t, a)
+	pngFile(t, b)
+	e := New(Deps{Encoder: &fakeEncoder{}}, Settings{Processes: 1, Preset: encodePreset()})
+	var announced []string
+	e.OnAdd = func(inputs []string) { announced = append(announced, inputs...) }
+	e.Run(context.Background(), []string{a, b})
+	inputs, finished, running := e.Snapshot()
+	if !slices.Equal(announced, []string{a, b}) || !slices.Equal(inputs, announced) {
+		t.Fatalf("announced = %v, snapshot inputs = %v", announced, inputs)
+	}
+	if len(finished) != 2 || len(running) != 0 {
+		t.Fatalf("finished = %d, running = %v", len(finished), running)
 	}
 }
 

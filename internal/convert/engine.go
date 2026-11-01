@@ -6,6 +6,9 @@ package convert
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"strconv"
 	"sync"
@@ -144,6 +147,7 @@ type Engine struct {
 	OnFile      func(FileResult)
 	OnFileStart func(FileStarted)
 	OnProgress  func(Progress)
+	OnAdd       func(inputs []string) // every batch of inputs accepted into the run
 
 	// CollisionHandler is invoked synchronously from a worker when the output
 	// file already exists under the skip-on-collision policy. It may block
@@ -157,6 +161,11 @@ type Engine struct {
 
 	// fileCancels tracks one cancel func per in-flight file for per-file cancel.
 	fileCancels map[string]context.CancelFunc
+
+	// inputs and finished are the run's own file list in arrival and completion
+	// order, so a window that opened late can rebuild its view (Snapshot).
+	inputs   []string
+	finished []FileResult
 
 	total      int
 	completed  int
@@ -274,6 +283,7 @@ func (e *Engine) TryAdd(inputs []string) bool {
 	}
 	for _, in := range inputs {
 		e.pending = append(e.pending, WorkItem{Path: in})
+		e.inputs = append(e.inputs, in)
 		e.total++
 		if fi, err := os.Stat(in); err == nil {
 			e.bytesTotal += fi.Size()
@@ -282,6 +292,9 @@ func (e *Engine) TryAdd(inputs []string) bool {
 	e.coalesced++
 	e.cond.Broadcast()
 	e.mu.Unlock()
+	if e.OnAdd != nil {
+		e.OnAdd(inputs)
+	}
 	e.emitProgress()
 	return true
 }
@@ -297,8 +310,11 @@ func (e *Engine) TryAddItems(items []WorkItem) bool {
 		e.mu.Unlock()
 		return false
 	}
+	added := make([]string, 0, len(items))
 	for _, item := range items {
 		e.pending = append(e.pending, item)
+		e.inputs = append(e.inputs, item.Path)
+		added = append(added, item.Path)
 		e.total++
 		if fi, err := os.Stat(item.Path); err == nil {
 			e.bytesTotal += fi.Size()
@@ -307,8 +323,25 @@ func (e *Engine) TryAddItems(items []WorkItem) bool {
 	e.coalesced++
 	e.cond.Broadcast()
 	e.mu.Unlock()
+	if e.OnAdd != nil {
+		e.OnAdd(added)
+	}
 	e.emitProgress()
 	return true
+}
+
+// Snapshot returns the run's file list as it stands: every input in arrival
+// order, the finished results in completion order, and the inputs whose encode
+// is in flight right now.
+func (e *Engine) Snapshot() (inputs []string, finished []FileResult, running []string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	inputs = append(inputs, e.inputs...)
+	finished = append(finished, e.finished...)
+	for path := range e.fileCancels {
+		running = append(running, path)
+	}
+	return inputs, finished, running
 }
 
 // CloseInput signals that no more Add calls will come; workers finish the queue
@@ -454,6 +487,7 @@ func (e *Engine) finish(res FileResult) {
 	}
 	e.bytesDone += res.InputSize
 	e.bytesOut += res.OutputSize
+	e.finished = append(e.finished, res)
 	e.tp.record(e.bytesDone)
 	e.cond.Broadcast()
 	e.mu.Unlock()
@@ -470,9 +504,19 @@ func (e *Engine) process(ctx context.Context, item WorkItem) FileResult {
 	path := item.Path
 	start := time.Now()
 	res := FileResult{Input: path}
-	if fi, err := os.Stat(path); err == nil {
-		res.InputSize = fi.Size()
+	fi, err := os.Stat(path)
+	if err != nil {
+		// A file that vanished (or never existed) between handover and dispatch
+		// fails on its own row instead of reading as an unsupported format.
+		var pathErr *fs.PathError
+		if errors.As(err, &pathErr) {
+			err = pathErr.Err // the row already names the path
+		}
+		res.Err = fmt.Errorf("input file unavailable: %w", err)
+		res.Duration = time.Since(start)
+		return res
 	}
+	res.InputSize = fi.Size()
 
 	format := detectFormat(path)
 	res.Format = format

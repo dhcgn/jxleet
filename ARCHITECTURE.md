@@ -65,7 +65,7 @@ so dangling pointers cannot merge silently.
 | Package | Responsibility |
 |---|---|
 | `main.go` | Thin wiring: parse args, single-instance startup, launch the app |
-| `internal/app` | Wails services exposed to the frontend: file intake, conversion control, presets, toolchain status/install, app update check/install via the Wails updater (notify-only), history, collision resolution. Emits the `files`, conversion-progress, `conversion-file-start`, `collision-prompt` and `toolchain-progress` events |
+| `internal/app` | Wails services exposed to the frontend: file intake, conversion control, presets, toolchain status/install, app update check/install via the Wails updater (notify-only), history, collision resolution. Emits the `files`, `run-inputs`, conversion-progress, `conversion-file-start`, `collision-prompt` and `toolchain-progress` events |
 | `internal/cli` | Strict path/flag parsing for path invocation, `--preset` override, exit codes. No dialogs |
 | `internal/routes` | Route determination, route colours, effort-ladder reference data |
 | `internal/preset` | YAML load/save, schema + version migration, validation, CRUD/import/export, entry-point bindings, read-only defaults |
@@ -74,7 +74,7 @@ so dangling pointers cannot merge silently.
 | `internal/djxl` | Decode verification for the replace safety order |
 | `internal/jxlinfo` | `jxlinfo -v` invocation and output parsing (result and history drill-down) |
 | `internal/process` | Child-process execution with hidden windows |
-| `internal/convert` | The engine: queue of per-item work (`WorkItem` preset per file), worker pool, pause/resume/cancel (whole-run and per-file via `CancelFile`), per-file start events (`OnFileStart` with PID), throughput-based ETA, collision handling, incremental adds after a finished run. `FileResult` carries the PID and resolved args so repeats of one file render as comparable rows |
+| `internal/convert` | The engine: queue of per-item work (`WorkItem` preset per file), worker pool, pause/resume/cancel (whole-run and per-file via `CancelFile`), per-file start events (`OnFileStart` with PID), throughput-based ETA, collision handling, incremental adds after a finished run. It keeps its own file list (`OnAdd` per accepted batch, `Snapshot` of inputs/results/in-flight). `FileResult` carries the PID and resolved args so repeats of one file render as comparable rows |
 | `internal/output` | Output policies (alongside/subfolder/replace), name collisions, recycle bin |
 | `internal/ipc` | Named-pipe single instance (per-user SID), handover, takeover when the owner is unreachable, coalescing |
 | `internal/shellext` | Per-user Explorer context-menu registration (registry, no admin) |
@@ -176,6 +176,13 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   ack and exit within milliseconds — the calling application never waits
 - The owner coalesces arriving batches into one run: one window, one progress
   bar. A handover arriving after the previous run finished auto-starts a new run
+- A path that vanished (or cannot be stat'ed) before dispatch stays in its
+  batch: `expandPaths` no longer errors on it and the engine reports it as one
+  failed file (`FileResult.Err`, counted in `Progress.Failed`, emitted as a
+  normal `conversion-file`), instead of the whole batch — and every later
+  preview — dying on a banner. The Main preview flags such a file as skipped
+  with "file not found"; a queue run hands a vanished staged file to the
+  engine rather than refusing the run
 - Takeover if the pipe is stale (owner crashed): try-connect, then claim
 - Engine: worker pool over per-item work (`WorkItem` carries each file's frozen
   preset, so mixed batches run fully parallel in one run); process count is
@@ -242,8 +249,27 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   clear all/cancel forwarded as `queue-*` events the frontend owns with the
   queue id as menu data). Closing with
   waiting or processing items warns once via `beforeunload` and discards them
-  on confirm. Stats is a static mock (no backend
-  calls) until wired to real run data.
+  on confirm. A result the queue never staged (an external invocation
+  coalesced into the running queue) is appended as its own row, so its failure
+  is visible there and not only in the status bar counter. The Running view
+  (`ref:jl:view.automatic`) owns external CLI/Explorer runs: one row per
+  input, taken from the engine's own list (the `run-inputs` event per accepted
+  batch, `Service.GetRunFiles` to rebuild it when the window opened after
+  earlier events, never the stat-based intake preview) and merged with the
+  results by input path, with live `waiting`/`running`/`done`/`failed`/`skipped`
+  status (`running` from `conversion-file-start`), failed rows pinned on top
+  with their reason, and the whole list scrolling inside its card. A new run
+  (first `run-inputs` after `conversion-done`) starts a fresh list. Its result
+  rows and the History rows (`ref:jl:view.history`) share one `result-row`
+  native menu (`Open Explorer` → `result-open-explorer`, `Open Standard Viewer`
+  → `result-open-viewer`); `lib/menu.ts` builds the opt-in style, and the menu
+  data names the row (`r<seq>` for a run result, `h<index>` for a history
+  entry). `App.svelte` resolves it to the output path (the source path for a
+  failed file) and calls `ShowInExplorer`/`OpenConvertedFile`. A file that is
+  gone gets a short message: `ShowInExplorer` falls back to the containing
+  folder when it still exists (and reports that the file no longer exists),
+  `OpenConvertedFile` reports it. Stats is a static mock (no backend calls)
+  until wired to real run data.
 - **`components/`** — reusable widgets (EffortLadder, QualitySliders,
   CommandPreview, JxlInfoPanel); **`lib/`** — pure modules (effort ladder
   data, quality/distance math, formatters, route and cjxl-flag helpers).

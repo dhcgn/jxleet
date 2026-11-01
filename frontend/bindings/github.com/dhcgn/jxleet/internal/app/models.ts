@@ -241,6 +241,27 @@ export interface QueueItemInput {
 }
 
 /**
+ * RunFiles is the live run's file list for a window that opened after the
+ * earlier events were emitted (ref:jl:view.automatic).
+ */
+export interface RunFiles {
+    /**
+     * every input in arrival order
+     */
+    "inputs": string[] | null;
+
+    /**
+     * results in completion order
+     */
+    "finished": FileUpdate[] | null;
+
+    /**
+     * inputs encoding right now
+     */
+    "running": string[] | null;
+}
+
+/**
  * Status is a small snapshot the frontend can render on start.
  */
 export interface Status {
