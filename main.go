@@ -67,6 +67,12 @@ func init() {
 }
 
 func main() {
+	// Updater.Restart re-runs this exe as its swap helper while the running
+	// app still owns the single-instance pipe. application.New would catch
+	// helper mode too late: the helper would hand over to the running app and
+	// exit, and the update fails with "helper did not signal readiness".
+	updater.HandleHelperMode()
+
 	arguments, err := cli.Parse(os.Args[1:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "jxleet:", err)

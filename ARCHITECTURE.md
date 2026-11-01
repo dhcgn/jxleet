@@ -319,5 +319,8 @@ portable copy never coalesces with an installed instance).
   exists; the banner's Update button and the Tools view's manual check run
   `CheckAndInstall`, which opens the framework update window (release notes,
   progress, checksum verification, helper-mode binary swap on relaunch).
+  The swap helper is this exe re-run while the app still owns the
+  single-instance pipe, so `main()` calls `updater.HandleHelperMode()` before
+  anything else; otherwise the helper hands over to the running app and exits.
   Notify-only: dev builds, offline runs and pre-releases never warn, and
   nothing is ever downloaded without the user asking
