@@ -608,6 +608,50 @@ input[type="range"] {
   font: 600 13px/1 var(--mono);
 }
 
+/* Queue header: the three groups wrap as units, so nothing is squeezed or
+   split mid-label. The Start button must not inherit the full-width
+   .convert-action sizing, which gave it a full-row flex basis and shrank
+   every sibling. */
+.queue-head {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.queue-head > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.queue-head .run-actions {
+  margin-left: auto;
+}
+
+.queue-head .run-count,
+.queue-head .mini {
+  white-space: nowrap;
+}
+
+.queue-head .run-preset {
+  min-width: 0;
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-head select,
+.queue-head .btn {
+  flex: none;
+  white-space: nowrap;
+}
+
+.queue-head .convert-action {
+  position: static;
+  width: auto;
+  min-width: 150px;
+  box-shadow: none;
+}
+
 .effort-basic input[type="range"] {
   width: 100%;
   margin: 4px 0 2px;
