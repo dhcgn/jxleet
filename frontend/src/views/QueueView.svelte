@@ -139,39 +139,44 @@
 
 <div class="body">
   <div class="run-strip" data-testid="queue-strip">
-    <div class="run-head">
-      <span class="badge b-reencode">{queueRunning ? (paused ? 'Paused' : 'Running') : 'Queue'}</span>
-      <span class="run-count">{queueDone} of {queueTotal}{openCount > 0 ? ` · ${openCount} open` : ''}</span>
-      <span class="mini">{presetName || 'preset'}</span>
-      <label class="mini" for="queue-processes">Processes</label>
-      <select id="queue-processes" value={processes} onchange={(event) => onSetProcesses(Number((event.currentTarget as HTMLSelectElement).value))} disabled={queueRunning} title="Parallel cjxl processes; Auto uses all cores minus one">
-        <option value={0}>Auto{cpuCount > 0 ? ` (${autoProcesses})` : ''}</option>
-        {#each processOptions as count}
-          <option value={count}>{count}</option>
-        {/each}
-      </select>
-      <label class="mini" for="queue-threads">Threads</label>
-      <select id="queue-threads" value={threads} onchange={(event) => onSetThreads(Number((event.currentTarget as HTMLSelectElement).value))} disabled={queueRunning} title="Threads per cjxl process; Auto leaves --num_threads to the preset / cjxl default">
-        <option value={0}>Auto</option>
-        {#each threadOptions as count}
-          <option value={count}>{count}</option>
-        {/each}
-      </select>
-      <span class="spacer"></span>
-      {#if queueRunning}
-        <button class="btn" onclick={onTogglePause}>{paused ? 'Resume' : 'Pause'}</button>
-        <button class="btn danger" data-testid="cancel" onclick={onCancel}>Cancel</button>
-      {:else}
-        {#if doneCount > 0}
-          <button class="btn ghost" onclick={onClearDone}>Clear done</button>
+    <div class="run-head queue-head">
+      <div class="run-info">
+        <span class="badge b-reencode">{queueRunning ? (paused ? 'Paused' : 'Running') : 'Queue'}</span>
+        <span class="run-count">{queueDone} of {queueTotal}{openCount > 0 ? ` · ${openCount} open` : ''}</span>
+        <span class="mini run-preset" title={presetName}>{presetName || 'preset'}</span>
+      </div>
+      <div class="run-opts">
+        <label class="mini" for="queue-processes">Processes</label>
+        <select id="queue-processes" value={processes} onchange={(event) => onSetProcesses(Number((event.currentTarget as HTMLSelectElement).value))} disabled={queueRunning} title="Parallel cjxl processes; Auto uses all cores minus one">
+          <option value={0}>Auto{cpuCount > 0 ? ` (${autoProcesses})` : ''}</option>
+          {#each processOptions as count}
+            <option value={count}>{count}</option>
+          {/each}
+        </select>
+        <label class="mini" for="queue-threads">Threads</label>
+        <select id="queue-threads" value={threads} onchange={(event) => onSetThreads(Number((event.currentTarget as HTMLSelectElement).value))} disabled={queueRunning} title="Threads per cjxl process; Auto leaves --num_threads to the preset / cjxl default">
+          <option value={0}>Auto</option>
+          {#each threadOptions as count}
+            <option value={count}>{count}</option>
+          {/each}
+        </select>
+      </div>
+      <div class="run-actions">
+        {#if queueRunning}
+          <button class="btn" onclick={onTogglePause}>{paused ? 'Resume' : 'Pause'}</button>
+          <button class="btn danger" data-testid="cancel" onclick={onCancel}>Cancel</button>
+        {:else}
+          {#if doneCount > 0}
+            <button class="btn ghost" onclick={onClearDone}>Clear done</button>
+          {/if}
+          {#if items.length > 0}
+            <button class="btn ghost" data-testid="clear-all-queue" onclick={onClearAll} title="Remove every staged item, whatever its state">Clear all</button>
+          {/if}
+          <button class="btn primary convert-action" style="background:var(--p-encode);padding:11px" data-testid="start-queue" onclick={onStart} disabled={startable === 0}>
+            {retryCount > 0 && queueDone > 0 ? `Retry ${retryCount} · Start ${startable}` : `Start ${startable} file${startable === 1 ? '' : 's'}`}
+          </button>
         {/if}
-        {#if items.length > 0}
-          <button class="btn ghost" data-testid="clear-all-queue" onclick={onClearAll} title="Remove every staged item, whatever its state">Clear all</button>
-        {/if}
-        <button class="btn primary convert-action" style="background:var(--p-encode);padding:11px" data-testid="start-queue" onclick={onStart} disabled={startable === 0}>
-          {retryCount > 0 && queueDone > 0 ? `Retry ${retryCount} · Start ${startable}` : `Start ${startable} file${startable === 1 ? '' : 's'}`}
-        </button>
-      {/if}
+      </div>
     </div>
     <div class="bar"><i style={`width:${Math.min(100, queuePercent)}%`}></i></div>
   </div>
