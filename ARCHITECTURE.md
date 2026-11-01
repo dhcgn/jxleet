@@ -74,7 +74,7 @@ so dangling pointers cannot merge silently.
 | `internal/djxl` | Decode verification for the replace safety order |
 | `internal/jxlinfo` | `jxlinfo -v` invocation and output parsing (result and history drill-down) |
 | `internal/process` | Child-process execution with hidden windows |
-| `internal/convert` | The engine: queue, worker pool, pause/resume/cancel (whole-run and per-file via `CancelFile`), per-file start events (`OnFileStart` with PID), throughput-based ETA, collision handling, incremental adds after a finished run. `FileResult` carries the PID and resolved args so repeats of one file render as comparable rows |
+| `internal/convert` | The engine: queue of per-item work (`WorkItem` preset per file), worker pool, pause/resume/cancel (whole-run and per-file via `CancelFile`), per-file start events (`OnFileStart` with PID), throughput-based ETA, collision handling, incremental adds after a finished run. `FileResult` carries the PID and resolved args so repeats of one file render as comparable rows |
 | `internal/output` | Output policies (alongside/subfolder/replace), name collisions, recycle bin |
 | `internal/ipc` | Named-pipe single instance (per-user SID), handover, takeover when the owner is unreachable, coalescing |
 | `internal/shellext` | Per-user Explorer context-menu registration (registry, no admin) |
@@ -177,10 +177,13 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
 - The owner coalesces arriving batches into one run: one window, one progress
   bar. A handover arriving after the previous run finished auto-starts a new run
 - Takeover if the pipe is stale (owner crashed): try-connect, then claim
-- Engine: worker pool with processes and threads (`--num_threads`) configurable
-  separately; pause/resume/cancel (whole-run plus one file at a time); run
+- Engine: worker pool over per-item work (`WorkItem` carries each file's frozen
+  preset, so mixed batches run fully parallel in one run); process count is
+  automatic (all cores minus one, capped at 16) with a session override in the
+  Queue header, `--num_threads` is only sent when the preset or the user sets
+  it; pause/resume/cancel (whole-run plus one file at a time); run
   progress counts the run start as 10% so the bar moves immediately, then
-  scales completed work over 10–100%; ETA from measured throughput over a sliding
+  scales completed work over 10-100%; ETA from measured throughput over a sliding
   window of recent files
 
 ## Toolchain management

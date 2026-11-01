@@ -23,6 +23,7 @@ export type {
     PresetSummary,
     ProcessResources,
     ProgressUpdate,
+    QueueItemInput,
     Status,
     ToolchainProgress,
     ToolchainStatus,

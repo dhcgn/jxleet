@@ -51,8 +51,6 @@
   let queue = $state<QueueItem[]>([]);
   let queueSeq = 0;
   let queueRunning = $state(false);
-  let queueCurrentId: string | null = null;
-  let queueCancelRequested = false;
   let queueWaiter: (() => void) | null = null;
 
   // Grouped state: each object is one prop for a view component.
@@ -77,10 +75,11 @@
     outputPolicy: 'alongside',
     embedSettings: false,
     jxlInfoSidecar: false,
-    processes: 2,
-    threads: 8,
+    processes: 0, // 0 = automatic (cores minus one); an explicit value pins it
+    threads: 0, // 0 = leave --num_threads to the preset / cjxl default
     lossyDistance: 1.0,
   });
+  let cpuCount = $state(0);
 
   // Request counters and timers are not reactive state.
   let previewRequest = 0;
@@ -128,6 +127,9 @@
   let canQueue = $derived(inputPaths.length > 0 && files.length > 0 && presetName !== '' && !tools.installing);
   let queueOpen = $derived(queue.filter((item) => item.status === 'waiting' || item.status === 'processing').length);
   let queueDoneCount = $derived(queue.filter((item) => item.status === 'done').length);
+  // Display resolution of the automatic process count; the backend owns the
+  // truth for actual runs (AutoProcesses), this mirrors it for labels.
+  let resolvedProcesses = $derived(settings.processes > 0 ? settings.processes : Math.max(1, Math.min(cpuCount - 1, 16)));
   let activePresetSummary = $derived(presets.find((preset) => preset.name === presetName) ?? null);
 
   let presetChanged = $derived.by(() => {
@@ -195,22 +197,20 @@
             saved: sessionStats.saved + (update.inputSize - update.outputSize),
           };
         }
-        // Queue runs stage one item at a time; route its result back to the
-        // processing row. Anything else is an external/coalesced arrival.
-        if (queueRunning && queueCurrentId) {
-          const item = queue.find((entry) => entry.id === queueCurrentId && entry.path === update.input && entry.status === 'processing');
-          if (item) {
-            fillQueueResult(item, update);
-            if (succeeded) prependHistory(item, update);
-            resolveQueueWaiter();
-          }
+        // Route the result back to its processing queue row, if any.
+        // Anything else is an external/coalesced arrival.
+        const item = queue.find((entry) => entry.path === update.input && entry.status === 'processing');
+        if (item) {
+          fillQueueResult(item, update);
+          if (succeeded) prependHistory(item, update);
+          if (!queue.some((entry) => entry.status === 'processing')) resolveQueueWaiter();
         }
       }
     });
     const offFileStart = Events.On('conversion-file-start', (event: any) => {
       const data = event?.data as { input?: string; pid?: number; startedAt?: number } | undefined;
-      if (data?.input && queueRunning && queueCurrentId) {
-        const item = queue.find((entry) => entry.id === queueCurrentId && entry.path === data.input && entry.status === 'processing');
+      if (data?.input) {
+        const item = queue.find((entry) => entry.path === data.input && entry.status === 'processing' && entry.pid === 0);
         if (item) {
           item.pid = data.pid ?? 0;
           item.startedAt = Date.now();
@@ -228,12 +228,6 @@
       }
     });
     const offDone = Events.On('conversion-done', (event: any) => {
-      // Queue runs stage one item per engine run; the loop owns run state and
-      // only needs the waiter released. External runs settle here.
-      if (queueRunning) {
-        resolveQueueWaiter();
-        return;
-      }
       run.summary = event?.data as ConversionSummary;
       progress = { ...progress, paused: false, percent: 100 };
       run.busy = false;
@@ -241,6 +235,7 @@
       if (run.summary?.cancelled) {
         errorMessage = '! cancelled by user';
       }
+      resolveQueueWaiter(); // defensive: the queue waiter also resolves on its last file
     });
     const offError = Events.On('conversion-error', (event: any) => {
       errorMessage = String(event?.data ?? 'Conversion error');
@@ -318,6 +313,11 @@
         tools.contextMenu = await Service.ContextMenuRegistered();
       } catch (error) {
         errorMessage = errorText(error);
+      }
+      try {
+        cpuCount = await Service.GetCPUCount();
+      } catch {
+        cpuCount = 0;
       }
       const pending = (await Service.TakePending()) ?? [];
       const pendingPreset = await Service.TakePendingPreset();
@@ -568,10 +568,10 @@
     }
   }
 
-  // Execute staged items back to back, one engine run per file so each keeps
-  // its frozen settings. Failed/cancelled rows (and skipped rows from a
-  // previous run) retry; done rows are left alone, as are intake-rejected
-  // skips that never started.
+  // Execute staged items in one parallel run: each file keeps its frozen
+  // settings on a shared worker pool sized by the backend (AutoProcesses).
+  // Failed/cancelled rows (and skipped rows from a previous run) retry; done
+  // rows are left alone, as are intake-rejected skips that never started.
   async function startQueue(): Promise<void> {
     const startable = queue.filter(
       (item) =>
@@ -597,52 +597,43 @@
       return;
     }
     queueRunning = true;
-    queueCancelRequested = false;
     run.busy = true;
     run.summary = null;
     errorMessage = '';
     view = 'queue';
     for (const item of startable) {
-      if (item.status !== 'waiting') {
-        item.status = 'waiting';
-        item.error = '';
-        item.warning = '';
-        item.skipReason = '';
-        item.skipped = false;
-        item.cancelled = false;
-        item.output = '';
-        item.outputSize = 0;
-        item.durationSeconds = 0;
-        item.pid = 0;
-      }
-    }
-    const ordered = queue.filter((item) => item.status === 'waiting');
-    for (const item of ordered) {
-      if (queueCancelRequested) break;
       item.status = 'processing';
       item.startedAt = Date.now();
       item.pid = 0;
       item.cpuPercent = null;
       item.memoryBytes = null;
-      queueCurrentId = item.id;
-      try {
-        await Service.StartConversion([item.path], item.options);
-      } catch (error) {
-        item.status = 'failed';
-        item.error = errorText(error);
-        queueCurrentId = null;
-        continue;
-      }
-      await waitForQueueItem();
-      queueCurrentId = null;
+      item.error = '';
+      item.warning = '';
+      item.skipReason = '';
+      item.skipped = false;
+      item.cancelled = false;
+      item.output = '';
+      item.outputSize = 0;
+      item.durationSeconds = 0;
     }
+    try {
+      await Service.StartQueueRun(startable.map((item) => ({ path: item.path, options: item.options })));
+    } catch (error) {
+      for (const item of startable) {
+        if (item.status === 'processing') {
+          item.status = 'failed';
+          item.error = errorText(error);
+        }
+      }
+      queueRunning = false;
+      run.busy = false;
+      return;
+    }
+    await waitForQueueItem();
     queueRunning = false;
-    run.busy = false;
-    progress = { ...progress, paused: false, percent: 100 };
   }
 
   async function cancelQueue(): Promise<void> {
-    queueCancelRequested = true;
     try {
       await Service.CancelConversion();
     } catch (error) {
@@ -688,6 +679,8 @@
     }
     settings.effort = item.options.effort;
     settings.jpegLossless = item.options.jpegMode !== 'reencode';
+    settings.processes = item.options.processes;
+    settings.threads = item.options.threads;
     settings.outputPolicy = item.options.outputPolicy || 'alongside';
     settings.embedSettings = item.options.embedSettings;
     settings.jxlInfoSidecar = item.options.jxlInfoSidecar;
@@ -733,13 +726,11 @@
     queue = queue.filter((item) => item.status !== 'done');
   }
 
-  // Clear all drops every staged item whatever its state. A running item is
-  // cancelled first; the loop exits once the engine settles (conversion-done
-  // always releases the waiter).
+  // Clear all drops every staged item whatever its state. A running run is
+  // cancelled first; rows settle via their file events and conversion-done.
   async function clearQueueAll(): Promise<void> {
     if (queue.length === 0) return;
     if (queueRunning) {
-      queueCancelRequested = true;
       try {
         await Service.CancelConversion();
       } catch (error) {
@@ -747,7 +738,6 @@
       }
     }
     queue = [];
-    queueCurrentId = null;
   }
 
   async function togglePause(): Promise<void> {
@@ -1279,10 +1269,13 @@
       presetName={presetName}
       processes={settings.processes}
       threads={settings.threads}
+      cpuCount={cpuCount}
       approvalInput={collisionPrompt?.input ?? null}
       onStart={() => void startQueue()}
       onTogglePause={() => void togglePause()}
       onCancel={() => void cancelQueue()}
+      onSetProcesses={(value) => { settings.processes = value; onSettingsChanged(); }}
+      onSetThreads={(value) => { settings.threads = value; onSettingsChanged(); }}
       onRemove={removeItem}
       onReclaim={reclaimItem}
       onShow={(id) => void showItem(id)}
@@ -1318,7 +1311,7 @@
   {:else if view === 'automatic'}
     <AutomaticView
       presetName={presetName}
-      processes={settings.processes}
+      processes={resolvedProcesses}
       threads={settings.threads}
       progress={progress}
       results={results}

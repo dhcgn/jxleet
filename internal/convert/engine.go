@@ -55,10 +55,12 @@ type Deps struct {
 	Inspector Inspector       // required for the jxlinfo-sidecar flag; may be nil otherwise (ref:jl:tech.tool.inspect)
 }
 
-// Settings configure a run. Processes and Threads are independent: Processes is
-// how many cjxl invocations run in parallel, Threads is --num_threads passed to
-// each (0 leaves it to the preset / cjxl default). CJXLVersion is the installed
-// toolchain version embedded in output filenames when the preset enables it.
+// Settings configure a run. Processes is how many cjxl invocations run in
+// parallel (the service resolves auto to a core-derived count beforehand).
+// Threads is --num_threads passed to each file, 0 leaving it to the preset /
+// cjxl default; per-item Threads in WorkItem wins when non-zero.
+// CJXLVersion is the installed toolchain version embedded in output filenames
+// when the preset enables it.
 type Settings struct {
 	Processes   int
 	Threads     int
@@ -67,12 +69,23 @@ type Settings struct {
 	CJXLVersion string
 }
 
+// WorkItem is one queued file with its own resolved preset: the frozen
+// per-item settings of a queue staging (ref:jl:domain.queue.item). A zero
+// Preset falls back to the run's Settings.Preset (plain path runs,
+// coalesced arrivals); Threads likewise falls back to Settings.Threads.
+type WorkItem struct {
+	Path    string
+	Preset  preset.Preset
+	Threads int
+}
+
 // FileResult is the outcome for one input file.
 // jl:domain.queue.item=One staged file with a frozen settings snapshot (distance with quality, effort, extra-flags hint); later preset edits never touch it, and the same file may be queued twice with different settings.
 type FileResult struct {
 	Input      string
 	Format     routes.Format
 	Route      routes.Route
+	PresetName string // preset the file was encoded with (per-item in queue runs)
 	Output     string
 	InputSize  int64
 	OutputSize int64
@@ -139,7 +152,7 @@ type Engine struct {
 
 	mu       sync.Mutex
 	cond     *sync.Cond
-	pending  []string
+	pending  []WorkItem
 	inflight int
 
 	// fileCancels tracks one cancel func per in-flight file for per-file cancel.
@@ -195,6 +208,15 @@ func (e *Engine) Run(ctx context.Context, inputs []string) Summary {
 	return e.Wait()
 }
 
+// RunItems processes work items to completion (no further Add expected) and
+// returns a Summary. It is a convenience over Start/AddItems/CloseInput/Wait.
+func (e *Engine) RunItems(ctx context.Context, items []WorkItem) Summary {
+	e.Start(ctx)
+	e.AddItems(items)
+	e.CloseInput()
+	return e.Wait()
+}
+
 // Start spawns the worker pool. Workers block until items are added and exit
 // once the input is closed and the queue is drained, or on Cancel.
 func (e *Engine) Start(ctx context.Context) {
@@ -216,6 +238,12 @@ func (e *Engine) Start(ctx context.Context) {
 // after a run finished should use TryAdd and start a fresh run on false.
 func (e *Engine) Add(inputs []string) {
 	_ = e.TryAdd(inputs)
+}
+
+// AddItems appends work items to the queue; the Items variant of Add for runs
+// where each file carries its own preset.
+func (e *Engine) AddItems(items []WorkItem) {
+	_ = e.TryAddItems(items)
 }
 
 // Done returns a channel closed when the run is cancelled. Before Start it
@@ -245,9 +273,34 @@ func (e *Engine) TryAdd(inputs []string) bool {
 		return false
 	}
 	for _, in := range inputs {
-		e.pending = append(e.pending, in)
+		e.pending = append(e.pending, WorkItem{Path: in})
 		e.total++
 		if fi, err := os.Stat(in); err == nil {
+			e.bytesTotal += fi.Size()
+		}
+	}
+	e.coalesced++
+	e.cond.Broadcast()
+	e.mu.Unlock()
+	e.emitProgress()
+	return true
+}
+
+// TryAddItems appends work items to the queue and reports whether the engine
+// can still process them; the Items variant of TryAdd.
+func (e *Engine) TryAddItems(items []WorkItem) bool {
+	if len(items) == 0 {
+		return true
+	}
+	e.mu.Lock()
+	if e.workersExited >= e.settings.Processes {
+		e.mu.Unlock()
+		return false
+	}
+	for _, item := range items {
+		e.pending = append(e.pending, item)
+		e.total++
+		if fi, err := os.Stat(item.Path); err == nil {
 			e.bytesTotal += fi.Size()
 		}
 	}
@@ -337,16 +390,17 @@ func (e *Engine) worker() {
 		e.mu.Unlock()
 	}()
 	for {
-		path, ok := e.acquire()
+		item, ok := e.acquire()
 		if !ok {
 			return
 		}
+		path := item.Path
 		// One child context per file so CancelFile stops only this file.
 		e.mu.Lock()
 		fileCtx, fileCancel := context.WithCancel(e.ctx)
 		e.fileCancels[path] = fileCancel
 		e.mu.Unlock()
-		res := e.process(fileCtx, path)
+		res := e.process(fileCtx, item)
 		e.mu.Lock()
 		delete(e.fileCancels, path)
 		e.mu.Unlock()
@@ -355,30 +409,30 @@ func (e *Engine) worker() {
 	}
 }
 
-// acquire returns the next path to process, blocking while paused or empty. It
-// returns ok=false when the worker should exit (cancelled, or input closed and
-// nothing left to do).
-func (e *Engine) acquire() (string, bool) {
+// acquire returns the next work item to process, blocking while paused or
+// empty. It returns ok=false when the worker should exit (cancelled, or input
+// closed and nothing left to do).
+func (e *Engine) acquire() (item WorkItem, ok bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	for {
 		if e.cancelled {
-			return "", false
+			return WorkItem{}, false
 		}
 		if e.paused {
 			e.cond.Wait()
 			continue
 		}
 		if len(e.pending) > 0 {
-			path := e.pending[0]
+			item := e.pending[0]
 			e.pending = e.pending[1:]
 			e.inflight++
-			return path, true
+			return item, true
 		}
 		if e.inputClosed && e.inflight == 0 {
 			// Drained; wake any siblings also waiting so they can exit too.
 			e.cond.Broadcast()
-			return "", false
+			return WorkItem{}, false
 		}
 		e.cond.Wait()
 	}
@@ -410,8 +464,10 @@ func (e *Engine) finish(res FileResult) {
 	e.emitProgress()
 }
 
-// process runs the full per-file pipeline.
-func (e *Engine) process(ctx context.Context, path string) FileResult {
+// process runs the full per-file pipeline. A work item with its own preset
+// (and threads) uses it; otherwise the run's Settings apply.
+func (e *Engine) process(ctx context.Context, item WorkItem) FileResult {
+	path := item.Path
 	start := time.Now()
 	res := FileResult{Input: path}
 	if fi, err := os.Stat(path); err == nil {
@@ -427,7 +483,17 @@ func (e *Engine) process(ctx context.Context, path string) FileResult {
 		return res
 	}
 
-	route, args, ok := e.settings.Preset.Route(format)
+	active := e.settings.Preset
+	if item.Preset.Name != "" {
+		active = item.Preset
+	}
+	res.PresetName = active.Name
+	threads := e.settings.Threads
+	if item.Threads != 0 {
+		threads = item.Threads
+	}
+
+	route, args, ok := active.Route(format)
 	res.Route = route
 	if !ok {
 		res.Skipped = true
@@ -436,7 +502,7 @@ func (e *Engine) process(ctx context.Context, path string) FileResult {
 		return res
 	}
 
-	eff := output.EffectiveOutput(e.settings.Preset.Output, route, e.settings.Deletion)
+	eff := output.EffectiveOutput(active.Output, route, e.settings.Deletion)
 	suffix := ""
 	if eff.EmbedSettings {
 		suffix = output.SuffixFor(route, args, e.settings.CJXLVersion)
@@ -477,7 +543,7 @@ func (e *Engine) process(ctx context.Context, path string) FileResult {
 	}
 	res.Output = plan.Final
 
-	args = e.withThreads(args)
+	args = e.withThreads(args, threads)
 	res.Args = append([]cjxl.Arg(nil), args...)
 	encodeStart := time.Now()
 	res.StartedAt = encodeStart
@@ -597,8 +663,9 @@ func (e *Engine) runEncode(ctx context.Context, args []cjxl.Arg, input, output s
 }
 
 // withThreads injects --num_threads when configured and not already set.
-func (e *Engine) withThreads(args []cjxl.Arg) []cjxl.Arg {
-	if e.settings.Threads <= 0 {
+// Zero leaves the thread count to the preset / cjxl default.
+func (e *Engine) withThreads(args []cjxl.Arg, threads int) []cjxl.Arg {
+	if threads <= 0 {
 		return args
 	}
 	for _, a := range args {
@@ -608,7 +675,7 @@ func (e *Engine) withThreads(args []cjxl.Arg) []cjxl.Arg {
 	}
 	out := make([]cjxl.Arg, len(args), len(args)+1)
 	copy(out, args)
-	return append(out, cjxl.Arg{Key: "--num_threads", Value: strconv.Itoa(e.settings.Threads)})
+	return append(out, cjxl.Arg{Key: "--num_threads", Value: strconv.Itoa(threads)})
 }
 
 // Progress returns a snapshot of the current state.

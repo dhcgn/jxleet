@@ -18,7 +18,7 @@
 <div class="body">
   <div class="toolbar" style="margin:-12px -12px 12px">
     <span class="badge b-reencode">Running</span>
-    <span class="mini">{presetName || 'preset'} - {processes} processes - {threads} threads</span>
+    <span class="mini">{presetName || 'preset'} - {processes} processes - {threads > 0 ? `${threads} threads` : 'auto threads'}</span>
     <span class="spacer"></span>
     <button class="btn" onclick={() => void onTogglePause()}>{progress.paused ? 'Resume' : 'Pause'}</button>
     <button class="btn danger" data-testid="cancel" onclick={() => void onCancel()}>Cancel</button>
