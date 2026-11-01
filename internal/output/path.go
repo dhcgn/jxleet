@@ -107,14 +107,14 @@ func jxlName(input, suffix string) string {
 	return stem + ".jxl"
 }
 
-// nextNumbered finds "name (1).jxl", "name (2).jxl", ... that does not exist.
+// nextNumbered finds "name_1.jxl", "name_2.jxl", ... that does not exist.
 func nextNumbered(path string) (string, error) {
 	dir := filepath.Dir(path)
 	base := filepath.Base(path)
 	ext := filepath.Ext(base)
 	stem := strings.TrimSuffix(base, ext)
 	for i := 1; i < 100000; i++ {
-		candidate := filepath.Join(dir, fmt.Sprintf("%s (%d)%s", stem, i, ext))
+		candidate := filepath.Join(dir, fmt.Sprintf("%s_%d%s", stem, i, ext))
 		if !fileExists(candidate) {
 			return candidate, nil
 		}

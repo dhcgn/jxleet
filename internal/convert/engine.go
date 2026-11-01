@@ -42,7 +42,7 @@ const (
 	// CollisionOverwriteAll overwrites now and all later collisions without asking.
 	CollisionOverwriteAll
 	// CollisionRename keeps the existing output and writes this file to a
-	// numbered sibling ("photo (1).jxl") for this file only.
+	// numbered sibling ("photo_1.jxl") for this file only.
 	CollisionRename
 	// CollisionRenameAll numbers now and all later collisions without asking.
 	CollisionRenameAll

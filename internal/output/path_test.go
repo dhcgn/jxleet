@@ -82,8 +82,19 @@ func TestPrepareCollision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if num.Final != filepath.Join(dir, "photo (1).jxl") {
+	if num.Final != filepath.Join(dir, "photo_1.jxl") {
 		t.Errorf("numbered final = %s", num.Final)
+	}
+
+	// Numbering starts at one and uses the first free suffix.
+	touch(t, filepath.Join(dir, "photo_1.jxl"))
+	touch(t, filepath.Join(dir, "photo_3.jxl"))
+	num, err = Prepare(in, preset.Output{Policy: preset.PolicyAlongside, OnCollision: preset.CollisionNumber})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if num.Final != filepath.Join(dir, "photo_2.jxl") {
+		t.Errorf("numbered final with gap = %s", num.Final)
 	}
 
 	over, err := Prepare(in, preset.Output{Policy: preset.PolicyAlongside, OnCollision: preset.CollisionOverwrite})
@@ -112,8 +123,17 @@ func TestPrepareWithSuffix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if num.Final != filepath.Join(dir, "photo.d1.00-e7-cjxl0.11.1 (1).jxl") {
+	if num.Final != filepath.Join(dir, "photo.d1.00-e7-cjxl0.11.1_1.jxl") {
 		t.Errorf("numbered final = %s", num.Final)
+	}
+
+	touch(t, num.Final)
+	num, err = PrepareWithSuffix(in, preset.Output{Policy: preset.PolicyAlongside, OnCollision: preset.CollisionNumber}, "d1.00-e7-cjxl0.11.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if num.Final != filepath.Join(dir, "photo.d1.00-e7-cjxl0.11.1_2.jxl") {
+		t.Errorf("second numbered final = %s", num.Final)
 	}
 }
 

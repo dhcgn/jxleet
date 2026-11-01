@@ -288,7 +288,7 @@ export function RenamePreset(name: string, newName: string): $CancellablePromise
 /**
  * ResolveCollision answers the outstanding output-exists prompt. Actions are
  * "overwrite", "overwrite-all", "rename", "rename-all", "skip" and "skip-all".
- * Rename keeps the existing file and writes a numbered sibling ("photo (1).jxl").
+ * Rename keeps the existing file and writes a numbered sibling ("photo_1.jxl").
  */
 export function ResolveCollision(action: string): $CancellablePromise<void> {
     return $Call.ByID(1261619658, action);

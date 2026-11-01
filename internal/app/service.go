@@ -1021,7 +1021,7 @@ func (s *Service) askCollision(input, target string) convert.CollisionAction {
 
 // ResolveCollision answers the outstanding output-exists prompt. Actions are
 // "overwrite", "overwrite-all", "rename", "rename-all", "skip" and "skip-all".
-// Rename keeps the existing file and writes a numbered sibling ("photo (1).jxl").
+// Rename keeps the existing file and writes a numbered sibling ("photo_1.jxl").
 func (s *Service) ResolveCollision(action string) {
 	s.mu.Lock()
 	q := s.promptPending

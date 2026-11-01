@@ -426,7 +426,7 @@ When the target `.jxl` already exists, the preset's `on_collision` decides: `ski
 default), `number` a new name, `overwrite` silently. Under `skip`, the GUI asks instead of
 skipping silently: overwrite this file, overwrite all, rename this file, rename all, skip
 this file, or skip all — rename keeps the existing file and writes a numbered sibling
-(`photo (1).jxl`); presets configured for `number` or `overwrite` never prompt.
+(`photo_1.jxl`); presets configured for `number` or `overwrite` never prompt.
 
 ### Settings in the filename
 
