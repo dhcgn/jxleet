@@ -3,6 +3,7 @@ package preset
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dhcgn/jxleet/internal/cjxl"
@@ -199,8 +200,54 @@ func TestDefaultPresetIsReadOnly(t *testing.T) {
 	if custom.ReadOnly {
 		t.Error("duplicating a read-only preset should create a writable copy")
 	}
+	if data, _ := os.ReadFile(store.PathFor("custom")); !strings.Contains(string(data), "# --photon_noise_iso:") {
+		t.Error("duplicate should keep the commented flag reference")
+	}
 	if created, err := EnsureDefaults(store); err != nil || created {
 		t.Errorf("EnsureDefaults on existing defaults created=%v err=%v", created, err)
+	}
+
+	path := store.PathFor("default-gui")
+	if err := os.WriteFile(path, []byte("name: default-gui\nread_only: true\nversion: 1\noutput: {policy: replace}\nrules: [{match: ['*']}]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if created, err := EnsureDefaults(store); err != nil || !created {
+		t.Fatalf("EnsureDefaults on a stale default created=%v err=%v", created, err)
+	}
+	if p, _ := store.Load("default-gui"); p.Output.Policy != PolicyAlongside || len(p.Rules) != 4 {
+		t.Errorf("stale default not restored: %+v", p)
+	}
+}
+
+// Every commented flag line must join the last rule's args once uncommented
+// the way editors do it (strip "# ").
+func TestDefaultYAMLFlagLinesUncomment(t *testing.T) {
+	data, err := defaultYAML(DefaultPresets[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(string(data), "\n")
+	count := 0
+	for i, l := range lines {
+		trimmed := strings.TrimLeft(l, " ")
+		if trimmed == l || !strings.HasPrefix(trimmed, "# -") {
+			continue
+		}
+		count++
+		edited := append([]string{}, lines...)
+		edited[i] = strings.Replace(l, "# ", "", 1)
+		p, err := Unmarshal([]byte(strings.Join(edited, "\n")))
+		if err != nil {
+			t.Fatalf("uncommenting %q: %v", l, err)
+		}
+		args := p.Rules[len(p.Rules)-1].Args
+		key, _, _ := strings.Cut(strings.TrimPrefix(trimmed, "# "), ":")
+		if len(args) != 3 || args[2].Key != key {
+			t.Errorf("uncommenting %q gave args %+v", l, args)
+		}
+	}
+	if count < 40 {
+		t.Errorf("only %d flag lines in the reference", count)
 	}
 }
 

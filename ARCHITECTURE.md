@@ -129,6 +129,11 @@ One YAML file per preset in `%APPDATA%\jxleet\presets\`:
 Entry-point bindings (GUI, CLI, context menu) live in `config.yaml`. First start
 creates the read-only `default-gui`, `default-cli` and `default-explorer-context`
 presets and binds them; existing user bindings are never silently replaced.
+Every start compares the built-in files byte-for-byte against what this build
+renders (`preset.EnsureDefaults`) and rewrites any that differ. The rendering
+appends a commented reference of every flag from the generated `cjxl/flags`
+table, so a libjxl bump refreshes it. `Duplicate` copies the file text
+(rewriting only `name:` and dropping `read_only:`) so those comments survive.
 
 ## Output and safety
 

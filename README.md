@@ -257,7 +257,10 @@ wraps the encoder; the preset *is* the argument list.
 On first start jxleet creates three read-only presets — `default-gui`,
 `default-cli`, and `default-explorer-context` — and binds each to its corresponding entry
 point. Duplicate one to create a writable preset; the built-in defaults cannot be renamed,
-deleted, or overwritten.
+deleted, or overwritten. Each built-in file ends with a commented list of every `cjxl` flag
+(with its value range and help line), so a duplicate can switch options on by uncommenting
+lines. jxleet rewrites a built-in file on start whenever it differs from what the running
+version ships — after an upgrade, or after a hand edit.
 
 The selected preset supplies the file rules used for classification. Basic and Expert
 controls are temporary run overrides and do not yet mirror every value in a multi-rule

@@ -1,10 +1,14 @@
 package preset
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Store manages the preset YAML files in a directory.
@@ -217,8 +221,23 @@ func (s *Store) Duplicate(name, newName string) error {
 	}
 	p.ReadOnly = false
 	p.Name = newName
+	// Copy the file text so its comments (e.g. the flag reference in the
+	// built-in presets) survive; re-marshal only if the line edit fails.
+	if data, err := os.ReadFile(s.pathFor(name)); err == nil {
+		quoted, _ := yaml.Marshal(newName)
+		data = nameLine.ReplaceAllLiteral(data, append([]byte("name: "), bytes.TrimSpace(quoted)...))
+		data = readOnlyLine.ReplaceAllLiteral(data, nil)
+		if q, err := Unmarshal(data); err == nil && q.Name == newName && !q.ReadOnly {
+			return os.WriteFile(s.pathFor(newName), data, 0o644)
+		}
+	}
 	return s.Save(p)
 }
+
+var (
+	nameLine     = regexp.MustCompile(`(?m)^name:.*$`)
+	readOnlyLine = regexp.MustCompile(`(?m)^read_only:.*\n?`)
+)
 
 // Export writes a preset to an arbitrary file path.
 func (s *Store) Export(name, destPath string) error {
