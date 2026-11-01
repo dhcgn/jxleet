@@ -197,6 +197,36 @@ func TestPreviewPathsFlagsMissingFile(t *testing.T) {
 	}
 }
 
+func TestExplorerArgs(t *testing.T) {
+	root := t.TempDir()
+	file := filepath.Join(root, "a.jxl")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gone := filepath.Join(root, "gone.jxl")
+	orphan := filepath.Join(root, "no-such-dir", "gone.jxl")
+
+	if args, isGone, err := explorerArgs(file); err != nil || isGone || len(args) != 2 || args[0] != "/select," || args[1] != file {
+		t.Errorf("file: args=%v gone=%v err=%v, want select", args, isGone, err)
+	}
+	if args, isGone, err := explorerArgs(root); err != nil || isGone || len(args) != 1 || args[0] != root {
+		t.Errorf("folder: args=%v gone=%v err=%v, want open", args, isGone, err)
+	}
+	if args, isGone, err := explorerArgs(gone); err != nil || !isGone || len(args) != 1 || args[0] != root {
+		t.Errorf("vanished file: args=%v gone=%v err=%v, want parent folder", args, isGone, err)
+	}
+	if _, _, err := explorerArgs(orphan); err == nil {
+		t.Error("vanished file and folder: want error")
+	}
+}
+
+func TestOpenConvertedFileMissingSaysSo(t *testing.T) {
+	err := (&Service{}).OpenConvertedFile(filepath.Join(t.TempDir(), "gone.jxl"))
+	if err == nil || !strings.Contains(err.Error(), "no longer exists") {
+		t.Errorf("error = %v, want a no-longer-exists message", err)
+	}
+}
+
 func TestPresetSummaryValues(t *testing.T) {
 	uniform := preset.Preset{
 		Rules: []preset.Rule{{

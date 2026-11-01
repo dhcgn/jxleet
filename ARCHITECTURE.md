@@ -259,12 +259,17 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   results by input path, with live `waiting`/`running`/`done`/`failed`/`skipped`
   status (`running` from `conversion-file-start`), failed rows pinned on top
   with their reason, and the whole list scrolling inside its card. A new run
-  (first `run-inputs` after `conversion-done`) starts a fresh list. Its result rows opt into
-  the `result-row` native menu (`Open Folder` → `result-open-folder`, `Open with
-  Standard Viewer` → `result-open`) with the result `seq` as menu data; the
-  frontend resolves it to the output path (the source path for a failed file)
-  and calls `ShowInExplorer`/`OpenConvertedFile`. Stats is a static mock (no
-  backend calls) until wired to real run data.
+  (first `run-inputs` after `conversion-done`) starts a fresh list. Its result
+  rows and the History rows (`ref:jl:view.history`) share one `result-row`
+  native menu (`Open Explorer` → `result-open-explorer`, `Open Standard Viewer`
+  → `result-open-viewer`); `lib/menu.ts` builds the opt-in style, and the menu
+  data names the row (`r<seq>` for a run result, `h<index>` for a history
+  entry). `App.svelte` resolves it to the output path (the source path for a
+  failed file) and calls `ShowInExplorer`/`OpenConvertedFile`. A file that is
+  gone gets a short message: `ShowInExplorer` falls back to the containing
+  folder when it still exists (and reports that the file no longer exists),
+  `OpenConvertedFile` reports it. Stats is a static mock (no backend calls)
+  until wired to real run data.
 - **`components/`** — reusable widgets (EffortLadder, QualitySliders,
   CommandPreview, JxlInfoPanel); **`lib/`** — pure modules (effort ladder
   data, quality/distance math, formatters, route and cjxl-flag helpers).

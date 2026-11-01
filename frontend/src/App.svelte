@@ -276,10 +276,10 @@
     const offQueueCancel = Events.On('queue-cancel', (event: any) => cancelQueueItem(String(event?.data ?? '')));
     const offQueueClearDone = Events.On('queue-clear-done', () => clearDone());
     const offQueueClearAll = Events.On('queue-clear-all', () => void clearQueueAll());
-    // Running-view result-row menu (main.go "result-row"); the data is the
-    // result's seq (ref:jl:view.automatic).
-    const offResultOpenFolder = Events.On('result-open-folder', (event: any) => void showResultFolder(Number(event?.data)));
-    const offResultOpen = Events.On('result-open', (event: any) => void openResult(Number(event?.data)));
+    // Result-row menu of the Running view and History (main.go "result-row");
+    // the data names the row (ref:jl:view.automatic, ref:jl:view.history).
+    const offResultExplorer = Events.On('result-open-explorer', (event: any) => void openResultExplorer(String(event?.data ?? '')));
+    const offResultViewer = Events.On('result-open-viewer', (event: any) => void openResultViewer(String(event?.data ?? '')));
     // Fixed 1 s cadence for per-process CPU/RAM (ref:jl:tech.tool.resources):
     // rows keep their placeholder before the PID exists and after exit.
     const resourceTimer = setInterval(() => {
@@ -321,8 +321,8 @@
       offQueueCancel();
       offQueueClearDone();
       offQueueClearAll();
-      offResultOpenFolder();
-      offResultOpen();
+      offResultExplorer();
+      offResultViewer();
       clearInterval(resourceTimer);
     };
   });
@@ -563,27 +563,36 @@
     queue.push(item);
   }
 
-  // Running-view result rows: "Open Folder" reveals the converted file (the
-  // source when nothing was written), "Open with Standard Viewer" opens it.
-  async function showResultFolder(seq: number): Promise<void> {
-    const result = results.find((entry) => entry.seq === seq);
-    if (!result) return;
+  // Result-row menu (Running view and History): the token names the row, "r<seq>"
+  // for a run result and "h<index>" for a history entry (lib/menu.ts).
+  function resultTarget(token: string): { input: string; output: string } | null {
+    const id = Number(token.slice(1));
+    const row = token.startsWith('r') ? results.find((entry) => entry.seq === id) : token.startsWith('h') ? history.entries[id] : undefined;
+    return row ? { input: row.input, output: row.output } : null;
+  }
+
+  // "Open Explorer" reveals the converted file (the source when nothing was
+  // written); a file that is gone falls back to its folder, and the backend
+  // error says so.
+  async function openResultExplorer(token: string): Promise<void> {
+    const target = resultTarget(token);
+    if (!target) return;
     try {
-      await Service.ShowInExplorer(result.output || result.input);
+      await Service.ShowInExplorer(target.output || target.input);
     } catch (error) {
       errorMessage = errorText(error);
     }
   }
 
-  async function openResult(seq: number): Promise<void> {
-    const result = results.find((entry) => entry.seq === seq);
-    if (!result) return;
-    if (!result.output) {
+  async function openResultViewer(token: string): Promise<void> {
+    const target = resultTarget(token);
+    if (!target) return;
+    if (!target.output) {
       errorMessage = 'Nothing to open: this file produced no converted output.';
       return;
     }
     try {
-      await Service.OpenConvertedFile(result.output);
+      await Service.OpenConvertedFile(target.output);
     } catch (error) {
       errorMessage = errorText(error);
     }

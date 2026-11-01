@@ -883,30 +883,53 @@ func (s *Service) GetProcessResources(pid int) (ProcessResources, error) {
 }
 
 // ShowInExplorer reveals one path in Explorer (selecting the file, or opening
-// the folder). Used by the Queue row context menu (ref:jl:view.queue).
+// the folder). Used by the Queue row context menu (ref:jl:view.queue) and the
+// result rows of the Running and History views. A file that is gone falls back
+// to its containing folder when that still exists; the returned error then
+// says so, so the GUI can tell the user the file moved or was deleted.
 func (s *Service) ShowInExplorer(path string) error {
 	absolute, err := filepath.Abs(strings.TrimSpace(path))
 	if err != nil {
 		return fmt.Errorf("resolve explorer path: %w", err)
 	}
-	info, err := os.Stat(absolute)
+	args, gone, err := explorerArgs(absolute)
 	if err != nil {
-		return fmt.Errorf("stat explorer path: %w", err)
+		return err
 	}
-	var cmd *exec.Cmd
-	if info.IsDir() {
-		cmd = exec.Command("explorer.exe", absolute)
-	} else {
-		cmd = exec.Command("explorer.exe", "/select,", absolute)
-	}
+	cmd := exec.Command("explorer.exe", args...)
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("open explorer: %w", err)
 	}
-	return cmd.Process.Release()
+	if err := cmd.Process.Release(); err != nil {
+		return err
+	}
+	if gone {
+		return fmt.Errorf("%s no longer exists; opened its folder", filepath.Base(absolute))
+	}
+	return nil
+}
+
+// explorerArgs picks what Explorer is asked to show: a file is selected, a
+// folder is opened, and a vanished path falls back to its parent folder
+// (gone=true) when that still exists.
+func explorerArgs(absolute string) (args []string, gone bool, err error) {
+	info, err := os.Stat(absolute)
+	switch {
+	case err == nil && info.IsDir():
+		return []string{absolute}, false, nil
+	case err == nil:
+		return []string{"/select,", absolute}, false, nil
+	case errors.Is(err, fs.ErrNotExist):
+		if parent, parentErr := os.Stat(filepath.Dir(absolute)); parentErr == nil && parent.IsDir() {
+			return []string{filepath.Dir(absolute)}, true, nil
+		}
+	}
+	return nil, false, fmt.Errorf("stat explorer path: %w", err)
 }
 
 // OpenConvertedFile opens one converted file with its default application.
-// Used by the Queue row action (ref:jl:view.queue).
+// Used by the Queue row action (ref:jl:view.queue) and the result rows of the
+// Running and History views.
 func (s *Service) OpenConvertedFile(path string) error {
 	absolute, err := filepath.Abs(strings.TrimSpace(path))
 	if err != nil {
@@ -914,6 +937,9 @@ func (s *Service) OpenConvertedFile(path string) error {
 	}
 	info, err := os.Stat(absolute)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("%s no longer exists", filepath.Base(absolute))
+		}
 		return fmt.Errorf("stat converted file path: %w", err)
 	}
 	if !info.Mode().IsRegular() {

@@ -1,7 +1,8 @@
-<!-- jl:view.automatic=Running view: the compact window of an external CLI/Explorer run, with progress, every file's live status (failures with their reason) and a result-row menu to open the folder or the converted file. -->
+<!-- jl:view.automatic=Running view: the compact window of an external CLI/Explorer run, with progress, every file's live status (failures with their reason) and a result-row menu to open Explorer or the converted file. -->
 <script lang="ts">
   import type { FileUpdate, ProgressUpdate } from '../../bindings/github.com/dhcgn/jxleet/internal/app/models';
   import { formatBytes, formatDelta, formatEta, formatRate, savedPct } from '../lib/format';
+  import { resultMenuStyle } from '../lib/menu';
 
   interface Props {
     presetName: string;
@@ -53,10 +54,7 @@
     return list.sort((a, b) => Number(b.status === 'failed') - Number(a.status === 'failed'));
   });
 
-  // Result rows opt into the native "result-row" menu (main.go), carrying the
-  // result's seq as menu data.
-  const menuStyle = (result: FileUpdate | null): string | undefined =>
-    result ? `--custom-contextmenu: result-row; --custom-contextmenu-data: ${result.seq}; --default-contextmenu: hide` : undefined;
+  const menuStyle = (result: FileUpdate | null): string | undefined => (result ? resultMenuStyle(`r${result.seq}`) : undefined);
 </script>
 
 <div class="body">
