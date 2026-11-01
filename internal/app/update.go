@@ -27,12 +27,15 @@ type Update struct {
 // GetAppUpdate reports whether a newer jxleet release exists on GitHub, via
 // the silent update check wired in Callbacks (the Wails updater's Check — no
 // window ever opens here). All failure modes — offline, rate limit,
-// unconfigured updater, dev build — report "nothing available" instead of an
-// error, so a missing network never shows in the GUI.
+// unconfigured updater, dev build, portable mode — report "nothing available"
+// instead of an error, so a missing network never shows in the GUI.
 func (s *Service) GetAppUpdate() Update {
 	update := Update{
 		Current: s.appVersion,
 		URL:     "https://github.com/" + appRepo + "/releases/latest",
+	}
+	if s.Portable {
+		return update // portable builds update by replacing the binary
 	}
 	if s.appVersion == "" || s.appVersion == "dev" || s.cb.CheckAppUpdate == nil {
 		return update
@@ -57,6 +60,9 @@ func (s *Service) GetAppUpdate() Update {
 // without the user asking. The window itself stays open for the up-to-date
 // and error states, so the caller needs nothing back.
 func (s *Service) CheckForAppUpdate() error {
+	if s.Portable {
+		return errors.New("portable builds update by replacing the binary")
+	}
 	if s.cb.InstallAppUpdate == nil {
 		return errors.New("app updates are not available in this build")
 	}

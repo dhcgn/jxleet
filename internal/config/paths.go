@@ -14,9 +14,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const appDir = "jxleet"
+
+// portableDataDir is the single folder next to a portable executable holding
+// everything jxleet persists (config, presets, history, binaries, logs).
+const portableDataDir = "jxleet-files"
+
+// jl:tech.mode.portable=Portable mode: the executable name contains "portable", all files live in jxleet-files next to it, and app self-updates are off (replace the binary instead).
 
 // Paths holds the resolved absolute locations jxleet reads from and writes to.
 type Paths struct {
@@ -32,6 +39,27 @@ type Paths struct {
 	BinDir string
 	// LogsDir is %LOCALAPPDATA%\jxleet\logs.
 	LogsDir string
+}
+
+// IsPortableExe reports whether exePath selects portable mode: the file name
+// contains "portable" (case-insensitive), e.g. jxleet-portable.exe.
+func IsPortableExe(exePath string) bool {
+	return strings.Contains(strings.ToLower(filepath.Base(exePath)), "portable")
+}
+
+// ResolvePortablePaths roots every location under exeDir/jxleet-files, so a
+// portable copy keeps config, presets, history, binaries and logs next to the
+// executable instead of %APPDATA%/%LOCALAPPDATA% (ref:jl:tech.mode.portable).
+func ResolvePortablePaths(exeDir string) Paths {
+	root := filepath.Join(exeDir, portableDataDir)
+	return Paths{
+		ConfigDir:   root,
+		ConfigFile:  filepath.Join(root, "config.yaml"),
+		PresetsDir:  filepath.Join(root, "presets"),
+		HistoryFile: filepath.Join(root, "history.jsonl"),
+		BinDir:      filepath.Join(root, "bin"),
+		LogsDir:     filepath.Join(root, "logs"),
+	}
 }
 
 // ResolvePaths computes the standard jxleet paths from the environment.

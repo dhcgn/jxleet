@@ -114,3 +114,32 @@ func TestCheckForAppUpdateWithoutInstaller(t *testing.T) {
 		t.Error("expected an error when no installer is wired in")
 	}
 }
+
+func TestPortableDisablesAppUpdate(t *testing.T) {
+	service := updateTestService(t, "v1.0.0", Callbacks{
+		CheckAppUpdate: func(context.Context) (Update, error) {
+			return Update{Latest: "v9.9.9", Available: true}, nil
+		},
+		InstallAppUpdate: func(context.Context) error { return nil },
+	})
+	service.Portable = true
+
+	if update := service.GetAppUpdate(); update.Available {
+		t.Error("portable mode must not report an app update")
+	}
+	if err := service.CheckForAppUpdate(); err == nil {
+		t.Error("portable mode must refuse the update flow")
+	}
+	if !service.IsPortable() {
+		t.Error("IsPortable must report portable mode")
+	}
+}
+
+func TestPortableRefusesContextMenuRegistration(t *testing.T) {
+	service := updateTestService(t, "v1.0.0", Callbacks{})
+	service.Portable = true
+
+	if err := service.RegisterContextMenu(); err == nil {
+		t.Error("portable mode must refuse context-menu registration")
+	}
+}

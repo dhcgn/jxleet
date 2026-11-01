@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -35,7 +36,7 @@ var assets embed.FS
 
 // version is stamped at release time via -ldflags "-X main.version=v1.2.3";
 // local and CI builds report "dev".
-// jl:build.release-contract=Releases ship jxleet.exe + SHA256SUMS in a versioned zip; downloads verify checksums and pre-releases stay out of the update feed.
+// jl:build.release-contract=Releases ship jxleet.exe in its versioned zip plus the bare jxleet-portable.exe + SHA256SUMS; downloads verify checksums and pre-releases stay out of the update feed.
 var version = "dev"
 
 func init() {
@@ -81,9 +82,21 @@ func main() {
 		return
 	}
 
-	paths, err := config.ResolvePaths()
+	executable, err := os.Executable()
 	if err != nil {
 		log.Fatal(err)
+	}
+	// Portable mode (ref:jl:tech.mode.portable): the file name contains
+	// "portable", and everything is stored in jxleet-files next to it.
+	portable := config.IsPortableExe(executable)
+	var paths config.Paths
+	if portable {
+		paths = config.ResolvePortablePaths(filepath.Dir(executable))
+	} else {
+		paths, err = config.ResolvePaths()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	if err := paths.EnsureDirs(); err != nil {
 		log.Fatal(err)
@@ -126,9 +139,8 @@ func main() {
 		if _, err := preset.NewStore(paths.PresetsDir).Load(presetName); err != nil {
 			log.Fatal(err)
 		}
-		executable, err := os.Executable()
-		if err != nil {
-			log.Fatal(err)
+		if portable {
+			log.Fatal("context-menu registration is disabled in portable mode")
 		}
 		if err := shellext.Register(executable, presetName); err != nil {
 			log.Fatal(err)
@@ -138,10 +150,20 @@ func main() {
 
 	// Single-instance: become the owner, or hand our paths to the running
 	// instance and exit immediately (so callers like Lightroom are not blocked).
-	server, handedOver, err := ipc.Acquire(ipc.Message{Paths: arguments.Paths, Preset: arguments.Preset}, 500*time.Millisecond)
+	// Portable copies use their own pipe, so they never coalesce with an
+	// installed instance.
+	pipeName, err := ipc.PipeNameFor(portable)
 	if err != nil {
-		// Could neither own nor reach an owner; continue standalone without IPC.
 		log.Printf("ipc: %v (continuing without single-instance handover)", err)
+	}
+	var server *ipc.Server
+	var handedOver bool
+	if err == nil {
+		server, handedOver, err = ipc.AcquireName(pipeName, ipc.Message{Paths: arguments.Paths, Preset: arguments.Preset}, 500*time.Millisecond)
+		if err != nil {
+			// Could neither own nor reach an owner; continue standalone without IPC.
+			log.Printf("ipc: %v (continuing without single-instance handover)", err)
+		}
 	}
 	if handedOver {
 		return
@@ -202,6 +224,7 @@ func main() {
 			return wailsApp.Updater.CheckAndInstall(ctx)
 		},
 	})
+	svc.Portable = portable
 
 	wailsApp = application.New(application.Options{
 		Name:        "jxleet",
@@ -214,8 +237,12 @@ func main() {
 		},
 	})
 
+	windowTitle := "jxleet " + version
+	if portable {
+		windowTitle = "jxleet Portable " + version
+	}
 	window := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: "jxleet " + version,
+		Title: windowTitle,
 		// Window sized to the golden ratio (1000 / 618 ≈ 1.618).
 		Width:            1000,
 		Height:           618,
@@ -295,8 +322,9 @@ func main() {
 
 	// App updates are notify-only: the updater is initialized without a
 	// CheckInterval, so nothing is ever checked or downloaded automatically.
-	// Dev builds skip this entirely and never report updates.
-	if version != "" && version != "dev" {
+	// Dev builds skip this entirely and never report updates. Portable builds
+	// skip it too: they update by replacing the binary.
+	if !portable && version != "" && version != "dev" {
 		if err := initAppUpdater(wailsApp, version); err != nil {
 			log.Printf("updater: %v (app update checks disabled)", err)
 		}
@@ -338,6 +366,9 @@ func initAppUpdater(wailsApp *application.App, version string) error {
 	gh, err := githubprovider.New(githubprovider.Config{
 		Repository:    "dhcgn/jxleet",
 		ChecksumAsset: "SHA256SUMS",
+		// Never pick the portable zip: an installed copy must not self-update
+		// into the portable build (which updates by replacing the binary).
+		AssetMatcher: standardAssetMatcher,
 	})
 	if err != nil {
 		return fmt.Errorf("updater: github provider: %w", err)
@@ -349,6 +380,24 @@ func initAppUpdater(wailsApp *application.App, version string) error {
 		return fmt.Errorf("updater: init: %w", err)
 	}
 	return nil
+}
+
+// standardAssetMatcher behaves like the provider default but skips portable
+// assets, so the installed build never updates itself into the portable one.
+func standardAssetMatcher(req updater.CheckRequest, assets []githubprovider.ReleaseAsset) int {
+	filtered := make([]githubprovider.ReleaseAsset, 0, len(assets))
+	index := make([]int, 0, len(assets))
+	for i, asset := range assets {
+		if strings.Contains(strings.ToLower(asset.Name), "portable") {
+			continue
+		}
+		filtered = append(filtered, asset)
+		index = append(index, i)
+	}
+	if hit := githubprovider.DefaultAssetMatcher(req, filtered); hit >= 0 {
+		return index[hit]
+	}
+	return -1
 }
 
 func ensureDefaultBindings(cfg *config.Config, migrateLegacy bool) bool {

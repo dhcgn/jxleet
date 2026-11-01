@@ -72,14 +72,18 @@ jobs:
         run: task build
 
       # README promise: "Download the latest release, unzip, run jxleet.exe.
-      # No installer" — so the artifact is a zip with the exe at its root.
+      # No installer" — so the installed build ships as a zip with the exe at
+      # its root (exactly one top-level entry, which the updater contract
+      # requires). The portable build ships uncompressed as jxleet-portable.exe:
+      # download it, rename nothing, run it next to its jxleet-files folder.
       - name: Zip and checksums
         shell: bash
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           mkdir dist
-          cp bin/jxleet.exe dist/
+          cp bin/jxleet.exe dist/jxleet.exe
+          cp bin/jxleet.exe dist/jxleet-portable.exe
           cd dist
           7z a "jxleet_${VERSION#v}_windows_amd64.zip" jxleet.exe
           rm jxleet.exe

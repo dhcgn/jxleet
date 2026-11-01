@@ -103,12 +103,15 @@ task check      # build, vet, lint, race tests  (the CI gate)
 - A hyphenated tag (`v1.3.0-rc.1`) publishes as a pre-release automatically.
   Betas (`vX.Y.Z-beta.N`) come from pushes to `dev`, never from tags.
 - Watch the run to green (`gh run watch <id> --exit-status`) and verify with
-  `gh release view <tag>`: `isPrerelease` must match the tag form and both assets
-  must be present. Never move or re-push a published tag.
+  `gh release view <tag>`: `isPrerelease` must match the tag form and all three assets
+  (zip + portable exe + `SHA256SUMS`) must be present. Never move or re-push a published tag.
 - **The release format is an updater contract — do not change any of these:**
   - Tag keeps the leading `v` (`vX.Y.Z`); the app strips it for the update check.
   - Asset stays `jxleet_<version-without-v>_windows_amd64.zip` — the updater's
-    default matcher keys on the `windows`+`amd64` substrings.
+    matcher keys on the `windows`+`amd64` substrings and explicitly skips
+    `*portable*` assets (see `standardAssetMatcher` in `main.go`).
+  - The portable asset is the bare `jxleet-portable.exe` (no zip) — the file
+    name is what activates portable mode.
   - The zip contains exactly one top-level entry (`jxleet.exe` at its root);
     multi-entry archives are rejected by the updater.
   - `SHA256SUMS` ships next to the zip; downloads are checksum-verified against it.

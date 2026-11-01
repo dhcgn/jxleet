@@ -171,7 +171,7 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
 
 ## Concurrency and single instance
 
-- Named pipe `\\.\pipe\jxleet-<user-sid>`; the first process becomes the owner
+- Named pipe `\\.\pipe\jxleet-<user-sid>` (`jxleet-portable-<user-sid>` in portable mode); the first process becomes the owner
 - Subsequent invocations connect, send their paths (+ `--preset`), receive an
   ack and exit within milliseconds — the calling application never waits
 - The owner coalesces arriving batches into one run: one window, one progress
@@ -292,6 +292,11 @@ inside it. Dark by default, operable from 420 px. CSS stays one global sheet
 %LOCALAPPDATA%\jxleet\logs\        run logs
 ```
 
+Portable mode (ref:jl:tech.mode.portable) roots the same layout at
+`<exe-dir>\jxleet-files\` and disables app self-updates, context-menu
+registration and the shared single-instance pipe (it uses its own pipe, so a
+portable copy never coalesces with an installed instance).
+
 ## Testing and CI
 
 - Pure domain packages are unit-tested without a GUI or cjxl
@@ -303,8 +308,9 @@ inside it. Dark by default, operable from 420 px. CSS stays one global sheet
   (also when later steps fail)
 - Releases: `.github/workflows/release.yml` — on `v*` tags (a `-rc.N`/`-beta.N`
   suffix marks a pre-release) and on every `dev` push (`vX.Y.Z-beta.N`
-  pre-releases). Publishes a zip with `jxleet.exe` and a `SHA256SUMS` file to
-  a GitHub Release; the version is stamped into the binary via
+  pre-releases). Publishes `jxleet.exe` in its versioned zip plus the bare
+  `jxleet-portable.exe`, with a `SHA256SUMS` file covering all assets, to a
+  GitHub Release; the version is stamped into the binary via
   `-ldflags -X main.version` by `task build` with `VERSION` set
 - App updates: the Wails built-in updater (`pkg/updater` + `providers/github`,
   initialized in `main.go` without a `CheckInterval`) checks `dhcgn/jxleet`

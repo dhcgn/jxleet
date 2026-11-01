@@ -108,6 +108,9 @@
   });
   let appStatus = $state<Status | null>(null);
   let appUpdate = $state<Update | null>(null);
+  // Portable mode (ref:jl:tech.mode.portable): storage next to the exe, no
+  // app self-updates, no context-menu registration.
+  let isPortable = $state(false);
   let errorMessage = $state('');
   let loaded = $state(false);
   let sessionStats = $state({ count: 0, saved: 0 });
@@ -331,6 +334,7 @@
     try {
       appStatus = await Service.GetStatus();
       bindings = await Service.GetBindings();
+      isPortable = await Service.IsPortable();
       presets = (await Service.ListPresets()) ?? [];
       flagDefinitions = (await Service.ListCJXLFlags()) ?? [];
       presetName = bindings.gui;
@@ -1284,6 +1288,9 @@
     <button class="btn ghost" onclick={openHistory}>History</button>
     <button class="btn ghost" onclick={() => { view = 'stats'; }}>Stats</button>
     <span class="spacer"></span>
+    {#if isPortable}
+      <span class="mini" data-testid="portable-badge" title="Portable mode: everything is stored in jxleet-files next to the executable">Portable</span>
+    {/if}
     {#if view === 'presets' || view === 'tools' || view === 'history' || view === 'stats'}
       <button class="btn" onclick={() => { view = 'main'; }}>Back</button>
     {/if}
@@ -1313,7 +1320,7 @@
     </div>
   {/if}
 
-  {#if appUpdate?.available}
+  {#if appUpdate?.available && !isPortable}
     <div class="banner warn" role="status" data-testid="app-update">
       <span class="ic">!</span>
       <span>jxleet {appUpdate.latest} is available on GitHub — you are running {appUpdate.current}.</span>
@@ -1431,6 +1438,7 @@
       tools={tools}
       bindings={bindings}
       appUpdate={appUpdate}
+      portable={isPortable}
       onRefresh={() => void refreshToolchain()}
       onInstall={() => void installToolchain()}
       onCheckAppUpdate={() => void checkAppUpdate()}
@@ -1480,7 +1488,7 @@
     {:else}
       <span class="warning"><span class="dotled"></span>libjxl not installed</span>
     {/if}
-    {#if appUpdate?.available}
+    {#if appUpdate?.available && !isPortable}
       <span class="up" data-testid="app-version" title="jxleet {appUpdate.current} — {appUpdate.latest} available (see banner above)"><span class="dotled"></span>jxleet {appUpdate.current}</span>
     {:else if appUpdate}
       <span class="ok" data-testid="app-version" title="jxleet {appUpdate.current} — up to date"><span class="dotled"></span>jxleet {appUpdate.current || '…'}</span>

@@ -60,6 +60,7 @@ Implementation facts that surface in the UI — toolchain, IPC, recycle bin.
 | `jl:tech.ipc.handover` | 0 | Later invocations hand their paths over a named pipe to the first process and exit within milliseconds. |
 | `jl:tech.libjxl.cjxl` | 1 | libjxl's encoder binary; the sole writer of every .jxl byte jxleet produces. |
 | `jl:tech.libjxl.jxlinfo` | 1 | libjxl's metadata inspection binary; jxleet shows its output in drill-down and sidecars. |
+| `jl:tech.mode.portable` | 9 | Portable mode: the executable name contains "portable", all files live in jxleet-files next to it, and app self-updates are off (replace the binary instead). |
 | `jl:tech.tool.encode` | 5 | One cjxl invocation per file from the rule's verbatim args; cancellable per process. |
 | `jl:tech.tool.flags` | 1 | Accepted flags come from the installed cjxl's own --help snapshot; unknown flags refuse the run. |
 | `jl:tech.tool.hidden-window` | 0 | Tool children spawn with no visible console window. |
@@ -74,4 +75,4 @@ Release contract, updater feed and CI gates. Reserved, thin in v1.
 
 | Key | ref-count | Description |
 |---|---|---|
-| `jl:build.release-contract` | 0 | Releases ship jxleet.exe + SHA256SUMS in a versioned zip; downloads verify checksums and pre-releases stay out of the update feed. |
+| `jl:build.release-contract` | 0 | Releases ship jxleet.exe in its versioned zip plus the bare jxleet-portable.exe + SHA256SUMS; downloads verify checksums and pre-releases stay out of the update feed. |
