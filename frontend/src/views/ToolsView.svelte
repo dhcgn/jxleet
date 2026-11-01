@@ -13,6 +13,7 @@
     };
     bindings: Bindings;
     appUpdate: Update | null;
+    portable: boolean;
     onRefresh(): void;
     onInstall(): void;
     onCheckAppUpdate(): void;
@@ -20,7 +21,7 @@
     onUnregister(): void;
     onOpenStorage(location: string): void;
   }
-  let { tools, bindings, appUpdate, onRefresh, onInstall, onCheckAppUpdate, onRegister, onUnregister, onOpenStorage }: Props = $props();
+  let { tools, bindings, appUpdate, portable, onRefresh, onInstall, onCheckAppUpdate, onRegister, onUnregister, onOpenStorage }: Props = $props();
 </script>
 
 <div class="body">
@@ -64,9 +65,11 @@
           <div class="row"><span class="k">Installed</span><span class="v">{appUpdate?.current || '-'}</span></div>
           <div class="row"><span class="k">Latest</span><span class:warning={appUpdate?.available} class="v">{appUpdate?.latest || '-'}</span></div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn" data-testid="check-app-updates" onclick={() => void onCheckAppUpdate()}>Check for updates</button>
+            <button class="btn" data-testid="check-app-updates" onclick={() => void onCheckAppUpdate()} disabled={portable} title={portable ? 'Portable builds update by replacing the binary' : undefined}>Check for updates</button>
           </div>
-          {#if appUpdate?.available}
+          {#if portable}
+            <div class="mini" style="margin-top:6px">Portable mode: replace jxleet-portable.exe to update.</div>
+          {:else if appUpdate?.available}
             <div class="mini" style="margin-top:6px">jxleet {appUpdate.latest} is available — see the banner above to install.</div>
           {:else}
             <div class="mini" style="margin-top:6px">Checking opens the update window, which also reports when you are up to date.</div>
@@ -78,9 +81,9 @@
         <div class="in">
           <div class="row"><span class="k">Status</span><span class:success={tools.contextMenu} class:muted={!tools.contextMenu} class="v">{tools.contextMenu ? 'registered' : 'not registered'}</span></div>
           <div class="row"><span class="k">Preset</span><span class="v">{bindings.contextMenu || 'not bound'}</span></div>
-          <div class="mini" style="margin-top:8px">Per-user registration; Windows 11 shows it under Show more options.</div>
+          <div class="mini" style="margin-top:8px">{portable ? 'Portable mode: registration is disabled so a moved folder leaves no stale entry.' : 'Per-user registration; Windows 11 shows it under Show more options.'}</div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn" onclick={() => void onRegister()} disabled={!bindings.contextMenu}>Register</button>
+            <button class="btn" onclick={() => void onRegister()} disabled={!bindings.contextMenu || portable}>Register</button>
             <button class="btn danger" onclick={() => void onUnregister()} disabled={!tools.contextMenu}>Remove entry</button>
           </div>
         </div>
@@ -97,10 +100,10 @@
       <div class="card">
         <h3>Storage locations</h3>
         <div class="in kv">
-          <div><span>Settings</span><span>%APPDATA%\\jxleet\\config.yaml</span><button class="icon-btn" aria-label="Open settings folder" title="Open in Explorer" onclick={() => void onOpenStorage('config')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></div>
-          <div><span>Presets</span><span>%APPDATA%\\jxleet\\presets\\</span><button class="icon-btn" aria-label="Open presets folder" title="Open in Explorer" onclick={() => void onOpenStorage('presets')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></div>
-          <div><span>Binaries</span><span>%LOCALAPPDATA%\\jxleet\\bin\\</span><button class="icon-btn" aria-label="Open binaries folder" title="Open in Explorer" onclick={() => void onOpenStorage('bin')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></div>
-          <div><span>Logs</span><span>%LOCALAPPDATA%\\jxleet\\logs\\</span><button class="icon-btn" aria-label="Open logs folder" title="Open in Explorer" onclick={() => void onOpenStorage('logs')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></div>
+          <div><span>Settings</span><span>{portable ? 'jxleet-files\\config.yaml' : '%APPDATA%\\jxleet\\config.yaml'}</span><button class="icon-btn" aria-label="Open settings folder" title="Open in Explorer" onclick={() => void onOpenStorage('config')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></div>
+          <div><span>Presets</span><span>{portable ? 'jxleet-files\\presets\\' : '%APPDATA%\\jxleet\\presets\\'}</span><button class="icon-btn" aria-label="Open presets folder" title="Open in Explorer" onclick={() => void onOpenStorage('presets')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></div>
+          <div><span>Binaries</span><span>{portable ? 'jxleet-files\\bin\\' : '%LOCALAPPDATA%\\jxleet\\bin\\'}</span><button class="icon-btn" aria-label="Open binaries folder" title="Open in Explorer" onclick={() => void onOpenStorage('bin')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></div>
+          <div><span>Logs</span><span>{portable ? 'jxleet-files\\logs\\' : '%LOCALAPPDATA%\\jxleet\\logs\\'}</span><button class="icon-btn" aria-label="Open logs folder" title="Open in Explorer" onclick={() => void onOpenStorage('logs')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path><path d="M3 9h18"></path></svg></button></div>
         </div>
       </div>
     </div>

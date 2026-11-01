@@ -18,11 +18,21 @@ const pipePrefix = `\\.\pipe\jxleet-`
 // PipeName returns the per-user pipe name, keyed by the current user's SID so
 // separate users on the same machine never share an instance.
 func PipeName() (string, error) {
+	return PipeNameFor(false)
+}
+
+// PipeNameFor returns the per-user pipe name for the given mode. Portable
+// builds use their own pipe (ref:jl:tech.mode.portable), so a portable copy
+// never hands its paths to an installed instance or vice versa.
+func PipeNameFor(portable bool) (string, error) {
 	token := windows.GetCurrentProcessToken()
 	user, err := token.GetTokenUser()
 	if err != nil {
 		return "", fmt.Errorf("ipc: get token user: %w", err)
 	}
 	sid := user.User.Sid.String()
+	if portable {
+		return pipePrefix + "portable-" + sid, nil
+	}
 	return pipePrefix + sid, nil
 }

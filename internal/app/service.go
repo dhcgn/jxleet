@@ -52,6 +52,10 @@ type Service struct {
 	tools      *toolchain.Manager
 	cb         Callbacks
 	appVersion string // ldflags-stamped at release; "dev" in local builds
+	// Portable reports portable mode (ref:jl:tech.mode.portable): storage lives
+	// next to the executable and app self-updates are disabled. Set once at
+	// startup; read by the IsPortable binding and the update guards.
+	Portable bool
 
 	mu            sync.Mutex
 	pending       []string
@@ -82,6 +86,12 @@ func New(paths config.Paths, cfg config.Config, tools *toolchain.Manager, appVer
 type Status struct {
 	UnboundEntryPoints []string `json:"unboundEntryPoints"`
 	Ready              bool     `json:"ready"`
+}
+
+// IsPortable reports portable mode (ref:jl:tech.mode.portable) so the GUI can
+// badge itself and hide the app-update UI.
+func (s *Service) IsPortable() bool {
+	return s.Portable
 }
 
 // GetStatus reports whether the app is ready to run conversions.
@@ -510,8 +520,13 @@ func (s *Service) RenamePreset(name, newName string) error {
 }
 
 // RegisterContextMenu installs the per-user Explorer entries using the current
-// context-menu preset binding.
+// context-menu preset binding. It refuses in portable mode
+// (ref:jl:tech.mode.portable): the registered path would go stale as soon as
+// the folder moves. Unregistering still works for cleanup.
 func (s *Service) RegisterContextMenu() error {
+	if s.Portable {
+		return errors.New("context-menu registration is disabled in portable mode")
+	}
 	binding := s.GetBindings().ContextMenu
 	if binding == "" {
 		return errors.New("bind a context-menu preset first")

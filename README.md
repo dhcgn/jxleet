@@ -113,6 +113,13 @@ once.
 Download the latest release, unzip, run `jxleet.exe`. No installer, nothing written outside
 your user profile.
 
+For a self-contained copy, run the `jxleet-portable.exe` from the same release instead: it
+keeps everything — settings, presets, history, the managed libjxl binaries — in a
+`jxleet-files` folder next to the executable, shows "Portable" in the title bar, and never
+checks for app updates. Update it by replacing the binary.
+
+<!-- ref:jl:tech.mode.portable -->
+
 On first start jxleet notices that the libjxl tools are missing and offers to fetch them.
 Accept, pick a preset for each of the three entry points, and you are ready.
 
@@ -521,6 +528,16 @@ absent:
 %APPDATA%\jxleet\history.jsonl     one JSON line per successful conversion (History view)
 %LOCALAPPDATA%\jxleet\bin\         the managed libjxl binaries
 %LOCALAPPDATA%\jxleet\logs\        run logs
+```
+
+Portable mode keeps the same layout under `jxleet-files\` next to the executable instead:
+
+```
+<exe-dir>\jxleet-files\config.yaml
+<exe-dir>\jxleet-files\presets\
+<exe-dir>\jxleet-files\history.jsonl
+<exe-dir>\jxleet-files\bin\
+<exe-dir>\jxleet-files\logs\
 ```
 
 Uninstalling means deleting `jxleet.exe`, removing the context menu entry from within the

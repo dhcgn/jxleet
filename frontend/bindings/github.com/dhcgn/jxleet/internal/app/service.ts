@@ -94,8 +94,8 @@ export function GetActivePreset(): $CancellablePromise<string> {
  * GetAppUpdate reports whether a newer jxleet release exists on GitHub, via
  * the silent update check wired in Callbacks (the Wails updater's Check — no
  * window ever opens here). All failure modes — offline, rate limit,
- * unconfigured updater, dev build — report "nothing available" instead of an
- * error, so a missing network never shows in the GUI.
+ * unconfigured updater, dev build, portable mode — report "nothing available"
+ * instead of an error, so a missing network never shows in the GUI.
  */
 export function GetAppUpdate(): $CancellablePromise<$models.Update> {
     return $Call.ByID(1143653916);
@@ -196,6 +196,14 @@ export function InstallLatestToolchain(): $CancellablePromise<string> {
 }
 
 /**
+ * IsPortable reports portable mode (ref:jl:tech.mode.portable) so the GUI can
+ * badge itself and hide the app-update UI.
+ */
+export function IsPortable(): $CancellablePromise<boolean> {
+    return $Call.ByID(1277187305);
+}
+
+/**
  * ListCJXLFlags returns the generated cjxl flag surface and its help text.
  */
 export function ListCJXLFlags(): $CancellablePromise<$models.FlagInfo[] | null> {
@@ -287,7 +295,9 @@ export function ReceivePaths(paths: string[] | null, presetName: string): $Cance
 
 /**
  * RegisterContextMenu installs the per-user Explorer entries using the current
- * context-menu preset binding.
+ * context-menu preset binding. It refuses in portable mode
+ * (ref:jl:tech.mode.portable): the registered path would go stale as soon as
+ * the folder moves. Unregistering still works for cleanup.
  */
 export function RegisterContextMenu(): $CancellablePromise<void> {
     return $Call.ByID(286962749);

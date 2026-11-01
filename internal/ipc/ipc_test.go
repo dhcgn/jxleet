@@ -108,3 +108,20 @@ func TestPipeNamePerUser(t *testing.T) {
 		t.Errorf("unexpected pipe name %q", name)
 	}
 }
+
+func TestPipeNamePortableIsIsolated(t *testing.T) {
+	plain, err := PipeNameFor(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	portable, err := PipeNameFor(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain == portable {
+		t.Errorf("portable pipe %q must differ from installed pipe", portable)
+	}
+	if len(portable) < len(pipePrefix) || portable[:len(pipePrefix)] != pipePrefix {
+		t.Errorf("unexpected portable pipe name %q", portable)
+	}
+}
