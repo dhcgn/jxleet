@@ -167,6 +167,36 @@ func TestExpandPathsUsesDirectFilesAndDeduplicates(t *testing.T) {
 	}
 }
 
+// A vanished path must not drop its batch (nor freeze every later preview):
+// it stays in the list so the engine can fail it on its own row.
+func TestExpandPathsKeepsMissingFiles(t *testing.T) {
+	root := t.TempDir()
+	present := filepath.Join(root, "a.png")
+	if err := os.WriteFile(present, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(root, "gone.d0.75-e7-cjxl0.12.0.jxl")
+	paths, err := expandPaths([]string{missing, present})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 2 || paths[0] != missing || paths[1] != present {
+		t.Fatalf("expanded paths = %v", paths)
+	}
+}
+
+func TestPreviewPathsFlagsMissingFile(t *testing.T) {
+	root := t.TempDir()
+	missing := filepath.Join(root, "gone.jxl")
+	previews, err := (&Service{}).PreviewPaths([]string{missing}, ConversionOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(previews) != 1 || !previews[0].Skip || previews[0].Reason != "file not found" {
+		t.Fatalf("previews = %+v", previews)
+	}
+}
+
 func TestPresetSummaryValues(t *testing.T) {
 	uniform := preset.Preset{
 		Rules: []preset.Rule{{

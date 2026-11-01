@@ -34,6 +34,13 @@ func TestGetCPUCount(t *testing.T) {
 	}
 }
 
+func TestGetRunFilesEmptyWithoutRun(t *testing.T) {
+	files := testService(t).GetRunFiles()
+	if files.Inputs == nil || files.Finished == nil || files.Running == nil || len(files.Inputs) != 0 {
+		t.Errorf("GetRunFiles() = %+v, want empty non-nil lists", files)
+	}
+}
+
 func TestStartQueueRunRejectsEmpty(t *testing.T) {
 	if err := testService(t).StartQueueRun(nil); err == nil {
 		t.Error("StartQueueRun(nil): want error, got nil")

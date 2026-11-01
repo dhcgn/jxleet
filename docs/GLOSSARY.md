@@ -40,6 +40,7 @@ Views, command-line flags and context-menu entries the user touches.
 
 | Key | ref-count | Description |
 |---|---|---|
+| `jl:view.automatic` | 6 | Running view: the compact window of an external CLI/Explorer run, with progress, every file's live status (failures with their reason) and a result-row menu to open the folder or the converted file. |
 | `jl:view.cli` | 0 | Command-line path invocation using the CLI-bound preset, with --preset for a one-call override. |
 | `jl:view.context-menu` | 0 | Per-user Explorer context-menu entry carrying the bound preset's name; no admin rights needed. |
 | `jl:view.expert` | 1 | Expert view: full generated cjxl flag surface with help tooltips, effort ladder and command preview. |

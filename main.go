@@ -280,6 +280,17 @@ func main() {
 		wailsApp.Event.Emit("queue-cancel", ctx.ContextMenuData())
 	})
 	wailsApp.ContextMenu.Add("queue-row", queueMenu)
+	// Result rows of the Running view (AutomaticView.svelte); the menu data is
+	// the result's seq, which the frontend resolves to the output path
+	// (ref:jl:view.automatic).
+	resultMenu := wailsApp.ContextMenu.New()
+	resultMenu.Add("Open Folder").OnClick(func(ctx *application.Context) {
+		wailsApp.Event.Emit("result-open-folder", ctx.ContextMenuData())
+	})
+	resultMenu.Add("Open with Standard Viewer").OnClick(func(ctx *application.Context) {
+		wailsApp.Event.Emit("result-open", ctx.ContextMenuData())
+	})
+	wailsApp.ContextMenu.Add("result-row", resultMenu)
 
 	// App updates are notify-only: the updater is initialized without a
 	// CheckInterval, so nothing is ever checked or downloaded automatically.

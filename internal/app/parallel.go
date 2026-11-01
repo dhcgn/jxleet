@@ -84,11 +84,9 @@ func (s *Service) StartQueueRun(items []QueueItemInput) error {
 		if err != nil {
 			return fmt.Errorf("resolve %q: %w", item.Path, err)
 		}
-		info, err := os.Stat(absolute)
-		if err != nil {
-			return fmt.Errorf("stat %q: %w", item.Path, err)
-		}
-		if !info.Mode().IsRegular() {
+		// A file that vanished since staging fails on its own row in the engine
+		// rather than refusing the whole run.
+		if info, err := os.Stat(absolute); err == nil && !info.Mode().IsRegular() {
 			return fmt.Errorf("queue item %q is not a regular file", item.Path)
 		}
 		staged = append(staged, convert.WorkItem{Path: absolute, Preset: p, Threads: item.Options.Threads})
@@ -147,6 +145,9 @@ func (s *Service) checkExpertFlags(installed toolchain.Installation) error {
 func (s *Service) wireEngine(engine *convert.Engine, presetOf func(convert.FileResult) string) {
 	engine.OnProgress = func(progress convert.Progress) {
 		s.emit("progress", progressUpdate(progress))
+	}
+	engine.OnAdd = func(inputs []string) {
+		s.emit("run-inputs", inputs)
 	}
 	engine.OnFileStart = func(started convert.FileStarted) {
 		s.emit("conversion-file-start", FileStartUpdate{

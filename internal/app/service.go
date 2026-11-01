@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"os/exec"
@@ -635,9 +636,17 @@ func (s *Service) PreviewPaths(paths []string, options ConversionOptions) ([]Fil
 	result := make([]FilePreview, 0, len(inputs))
 	for _, path := range inputs {
 		item := FilePreview{Path: path, Name: filepath.Base(path)}
-		if info, statErr := os.Stat(path); statErr == nil {
-			item.Size = info.Size()
+		info, statErr := os.Stat(path)
+		if statErr != nil {
+			item.Skip = true
+			item.Reason = "file not found"
+			if !errors.Is(statErr, fs.ErrNotExist) {
+				item.Reason = "file not readable"
+			}
+			result = append(result, item)
+			continue
 		}
+		item.Size = info.Size()
 		format := convert.DetectFormat(path)
 		item.Format = string(format)
 		if format == routes.FormatUnknown {
@@ -1011,6 +1020,33 @@ func (s *Service) GetProgress() ProgressUpdate {
 		return ProgressUpdate{}
 	}
 	return progressUpdate(engine.Progress())
+}
+
+// RunFiles is the live run's file list for a window that opened after the
+// earlier events were emitted (ref:jl:view.automatic).
+type RunFiles struct {
+	Inputs   []string     `json:"inputs"`   // every input in arrival order
+	Finished []FileUpdate `json:"finished"` // results in completion order
+	Running  []string     `json:"running"`  // inputs encoding right now
+}
+
+// GetRunFiles snapshots the live run's files; it is empty when no run is live.
+func (s *Service) GetRunFiles() RunFiles {
+	files := RunFiles{Inputs: []string{}, Finished: []FileUpdate{}, Running: []string{}}
+	engine := s.currentEngine()
+	if engine == nil {
+		return files
+	}
+	inputs, finished, running := engine.Snapshot()
+	files.Inputs = append(files.Inputs, inputs...)
+	files.Running = append(files.Running, running...)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, result := range finished {
+		s.seq++
+		files.Finished = append(files.Finished, fileUpdate(s.seq, result))
+	}
+	return files
 }
 
 // ToolchainStatus is the compact toolchain state rendered by the Tools view.
@@ -1564,7 +1600,11 @@ func expandPaths(inputs []string) ([]string, error) {
 		}
 		info, err := os.Stat(absolute)
 		if err != nil {
-			return nil, fmt.Errorf("stat %q: %w", input, err)
+			// Keep an unreadable or vanished path in the batch: the engine
+			// reports it as one failed file, where an error here would drop the
+			// whole batch (and every later preview) with only a banner to show.
+			addPath(absolute, seen, &result)
+			continue
 		}
 		if !info.IsDir() {
 			addPath(absolute, seen, &result)

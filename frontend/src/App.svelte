@@ -46,6 +46,11 @@
   let inputPaths = $state<string[]>([]);
   let files = $state<FilePreview[]>([]);
   let results = $state<FileUpdate[]>([]);
+  // Running view data (ref:jl:view.automatic): the engine's own input list, the
+  // inputs with a started, unfinished encode, and whether the last run ended.
+  let runInputs = $state<string[]>([]);
+  let running = $state<string[]>([]);
+  let runEnded = false;
   // Session-only queue staging (ref:jl:view.queue): each item carries a frozen
   // copy of the run options, so later preset edits never touch staged items.
   let queue = $state<QueueItem[]>([]);
@@ -197,6 +202,7 @@
             saved: sessionStats.saved + (update.inputSize - update.outputSize),
           };
         }
+        running = running.filter((path) => path !== update.input);
         // Route the result back to its processing queue row, if any.
         // Anything else is an external/coalesced arrival.
         const item = queue.find((entry) => entry.path === update.input && entry.status === 'processing');
@@ -204,12 +210,15 @@
           fillQueueResult(item, update);
           if (succeeded) prependHistory(item, update);
           if (!queue.some((entry) => entry.status === 'processing')) resolveQueueWaiter();
+        } else if (queueRunning && !update.cancelled) {
+          addArrivalRow(update);
         }
       }
     });
     const offFileStart = Events.On('conversion-file-start', (event: any) => {
       const data = event?.data as { input?: string; pid?: number; startedAt?: number } | undefined;
       if (data?.input) {
+        if (!running.includes(data.input)) running = [...running, data.input];
         const item = queue.find((entry) => entry.path === data.input && entry.status === 'processing' && entry.pid === 0);
         if (item) {
           item.pid = data.pid ?? 0;
@@ -227,7 +236,21 @@
         tools.progress = event.data as ToolchainProgress;
       }
     });
+    // The engine announces every batch it accepts; the Running view lists
+    // exactly these, never the intake preview (ref:jl:view.automatic).
+    const offRunInputs = Events.On('run-inputs', (event: any) => {
+      if (!Array.isArray(event?.data)) return;
+      if (runEnded) {
+        // First batch of a new run: the previous run's list is stale.
+        runInputs = [];
+        results = [];
+        runEnded = false;
+      }
+      runInputs = [...runInputs, ...(event.data as string[])];
+    });
     const offDone = Events.On('conversion-done', (event: any) => {
+      running = [];
+      runEnded = true;
       run.summary = event?.data as ConversionSummary;
       progress = { ...progress, paused: false, percent: 100 };
       run.busy = false;
@@ -253,6 +276,10 @@
     const offQueueCancel = Events.On('queue-cancel', (event: any) => cancelQueueItem(String(event?.data ?? '')));
     const offQueueClearDone = Events.On('queue-clear-done', () => clearDone());
     const offQueueClearAll = Events.On('queue-clear-all', () => void clearQueueAll());
+    // Running-view result-row menu (main.go "result-row"); the data is the
+    // result's seq (ref:jl:view.automatic).
+    const offResultOpenFolder = Events.On('result-open-folder', (event: any) => void showResultFolder(Number(event?.data)));
+    const offResultOpen = Events.On('result-open', (event: any) => void openResult(Number(event?.data)));
     // Fixed 1 s cadence for per-process CPU/RAM (ref:jl:tech.tool.resources):
     // rows keep their placeholder before the PID exists and after exit.
     const resourceTimer = setInterval(() => {
@@ -281,6 +308,7 @@
       offFile();
       offFileStart();
       offClearTable();
+      offRunInputs();
       offDone();
       offError();
       offToolchainProgress();
@@ -293,6 +321,8 @@
       offQueueCancel();
       offQueueClearDone();
       offQueueClearAll();
+      offResultOpenFolder();
+      offResultOpen();
       clearInterval(resourceTimer);
     };
   });
@@ -330,6 +360,12 @@
       }
       const runningProgress = await Service.GetProgress();
       if (runningProgress.total > 0) {
+        // Events emitted before this window subscribed are gone: rebuild the
+        // run's file list from the engine, keeping what arrived meanwhile.
+        const snapshot = await Service.GetRunFiles();
+        runInputs = [...(snapshot.inputs ?? []), ...runInputs];
+        results = [...(snapshot.finished ?? []), ...results];
+        running = [...new Set([...(snapshot.running ?? []), ...running])];
         progress = runningProgress;
         view = runningProgress.coalesced > 1 ? 'automatic' : 'main';
         run.busy = true;
@@ -489,6 +525,67 @@
     } else {
       item.status = 'done';
       item.error = '';
+    }
+  }
+
+  // A result the queue never staged (an external invocation coalesced into the
+  // running queue) becomes its own row, so a failure is never just a counter in
+  // the status bar. A failed one can be retried like any staged row.
+  function addArrivalRow(update: FileUpdate): void {
+    queueSeq += 1;
+    const item: QueueItem = {
+      id: `q${Date.now()}-${queueSeq}`,
+      path: update.input,
+      name: update.input.split(/[\\/]/).pop() ?? update.input,
+      size: update.inputSize,
+      format: update.format,
+      route: update.route,
+      addedAt: Date.now(),
+      preset: presetName,
+      snapshot: update.settings || 'external invocation',
+      flagsSet: update.flagsSet,
+      options: currentOptions(),
+      status: 'processing',
+      pid: 0,
+      startedAt: 0,
+      output: '',
+      outputSize: 0,
+      error: '',
+      warning: '',
+      skipped: false,
+      skipReason: '',
+      cancelled: false,
+      durationSeconds: 0,
+      cpuPercent: null,
+      memoryBytes: null,
+    };
+    fillQueueResult(item, update);
+    queue.push(item);
+  }
+
+  // Running-view result rows: "Open Folder" reveals the converted file (the
+  // source when nothing was written), "Open with Standard Viewer" opens it.
+  async function showResultFolder(seq: number): Promise<void> {
+    const result = results.find((entry) => entry.seq === seq);
+    if (!result) return;
+    try {
+      await Service.ShowInExplorer(result.output || result.input);
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+  }
+
+  async function openResult(seq: number): Promise<void> {
+    const result = results.find((entry) => entry.seq === seq);
+    if (!result) return;
+    if (!result.output) {
+      errorMessage = 'Nothing to open: this file produced no converted output.';
+      return;
+    }
+    try {
+      await Service.OpenConvertedFile(result.output);
+    } catch (error) {
+      errorMessage = errorText(error);
     }
   }
 
@@ -1315,7 +1412,8 @@
       threads={settings.threads}
       progress={progress}
       results={results}
-      files={files}
+      inputs={runInputs}
+      running={running}
       onTogglePause={() => void togglePause()}
       onCancel={() => void cancelConversion()}
     />

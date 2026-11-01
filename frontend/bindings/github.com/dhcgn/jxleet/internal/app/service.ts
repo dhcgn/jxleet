@@ -157,6 +157,13 @@ export function GetProgress(): $CancellablePromise<$models.ProgressUpdate> {
 }
 
 /**
+ * GetRunFiles snapshots the live run's files; it is empty when no run is live.
+ */
+export function GetRunFiles(): $CancellablePromise<$models.RunFiles> {
+    return $Call.ByID(190292454);
+}
+
+/**
  * GetStatus reports whether the app is ready to run conversions.
  */
 export function GetStatus(): $CancellablePromise<$models.Status> {

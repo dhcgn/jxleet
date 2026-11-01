@@ -216,6 +216,16 @@ bar**, not twenty — and the calling application is never left waiting. A batch
 arrives after the previous run has finished starts a new run on its own, and while a
 run is in progress each completed row shows the output size and its saving ratio.
 
+The running window lists **every file of the run** — hundreds stay usable, the list
+scrolls inside its card — with its live status (waiting, running, done, failed). A file
+that fails, including one that disappeared before its turn, shows its reason right in its
+row instead of only a counter in the status bar. Right-click a result row for **Open
+Folder** (reveals the converted file in Explorer) or **Open with Standard Viewer**.
+
+<p align="center">
+  <img src="docs/screenshots/running.png" alt="The Running window of a coalesced external run: progress, every file with its live status, and one failed file with its reason">
+</p>
+
 ### 3. The Explorer context menu
 
 Right-click any file, folder, or folder background. Registration is per-user and needs no

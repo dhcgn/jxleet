@@ -1285,6 +1285,36 @@ tr.na .dot.on {
   color: var(--ink3);
 }
 
+.q .st.running {
+  color: var(--p-reencode);
+}
+
+.q .st.done {
+  color: var(--p-transcode);
+}
+
+.q .st.failed {
+  color: #f0a49e;
+}
+
+/* Running view list: every file, scrolling inside the card. */
+.q-scroll {
+  max-height: max(160px, calc(100vh - 290px));
+  overflow-y: auto;
+}
+
+.q .qrow {
+  overflow-wrap: anywhere;
+}
+
+.qerr {
+  flex-basis: 100%;
+  padding: 0 0 4px 12px;
+  color: #f0a49e;
+  font: 400 10.5px/1.4 var(--mono);
+  overflow-wrap: anywhere;
+}
+
 .statusbar {
   display: flex;
   align-items: center;
