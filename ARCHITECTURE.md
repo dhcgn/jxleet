@@ -22,7 +22,7 @@ so dangling pointers cannot merge silently.
 
 ## Stack
 
-- **Wails v3 (beta.11)** — Go backend, WebView frontend, native window
+- **Wails v3 (v3.0.0)** — Go backend, WebView frontend, native window
 - **Go 1.27**, **Svelte + TypeScript**, **Vite**
 - **Windows 10/11 x64 only.** Core features are Windows-specific: recycle bin,
   Explorer context menu, named pipes, `%APPDATA%`/`%LOCALAPPDATA%`
@@ -310,7 +310,10 @@ portable copy never coalesces with an installed instance).
 - `task check` = build, vet, lint, race tests
 - CI: `.github/workflows/build.yml` — `windows-latest`, Go 1.27 + Node,
   `task check`; every run uploads `bin/jxleet.exe` as a workflow artifact
-  (also when later steps fail)
+  (also when later steps fail). The build job caches the `wails3` binary
+  (keyed on `WAILS_VERSION`) and owns a Go module + build cache on the fast
+  `D:` drive, keyed on `go.sum` and `build.yml` — changing either costs one
+  cold run (~4 min) before runs drop back to ~1.5 min
 - Releases: `.github/workflows/release.yml` — on `v*` tags (a `-rc.N`/`-beta.N`
   suffix marks a pre-release) and on every `dev` push (`vX.Y.Z-beta.N`
   pre-releases). Publishes `jxleet.exe` in its versioned zip plus the bare
