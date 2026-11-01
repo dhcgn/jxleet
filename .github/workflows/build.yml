@@ -10,18 +10,32 @@ on:
 permissions:
   contents: read
 
+env:
+  WAILS_VERSION: v3.0.0-beta.16
+
 jobs:
   build:
     name: Build & test (windows)
     runs-on: windows-latest
+    # D: is the runner's fast local disk; restoring the Go caches' many small
+    # files to the default C: location is markedly slower.
+    env:
+      GOCACHE: D:\go-build
+      GOMODCACHE: D:\go-mod
     steps:
       - uses: actions/checkout@v7
 
+      # Hashing this workflow gives the job its own cache key: the lint job
+      # finishes first and would otherwise save the shared go.sum-keyed cache
+      # with only the module cache, leaving this job's build cache cold.
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
           go-version: '1.27'
           cache: true
+          cache-dependency-path: |
+            go.sum
+            .github/workflows/build.yml
 
       - name: Set up Node
         uses: actions/setup-node@v7
@@ -36,8 +50,20 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Cache wails3
+        id: wails3-cache
+        uses: actions/cache@v6
+        with:
+          path: ~\go\bin\wails3.exe
+          key: wails3-${{ runner.os }}-${{ env.WAILS_VERSION }}
+
       - name: Install wails3
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.16
+        if: steps.wails3-cache.outputs.cache-hit != 'true'
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+        # Keep wails3's own build out of the saved Go cache; the binary is cached above.
+        env:
+          GOCACHE: ${{ runner.temp }}\wails3-build
+          GOMODCACHE: ${{ runner.temp }}\wails3-mod
 
       - name: Install frontend dependencies
         working-directory: frontend
