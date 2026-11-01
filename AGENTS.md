@@ -41,7 +41,7 @@ is green.
   integrity-verified against the GitHub API per-asset `sha256` digest.
 - **Notify-only updates** for BOTH the app and libjxl — never silent/automatic;
   the user opts in to every download. First-run libjxl install is still offered.
-- Stack: **Wails v3 (beta.11), Go 1.27, Svelte + TypeScript, Vite.** Module path
+- Stack: **Wails v3 (v3.0.0), Go 1.27, Svelte + TypeScript, Vite.** Module path
   `github.com/dhcgn/jxleet` — regenerate the Wails bindings after backend changes.
 
 ## Core domain rules (get these right)

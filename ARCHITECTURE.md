@@ -22,7 +22,7 @@ so dangling pointers cannot merge silently.
 
 ## Stack
 
-- **Wails v3 (beta.11)** — Go backend, WebView frontend, native window
+- **Wails v3 (v3.0.0)** — Go backend, WebView frontend, native window
 - **Go 1.27**, **Svelte + TypeScript**, **Vite**
 - **Windows 10/11 x64 only.** Core features are Windows-specific: recycle bin,
   Explorer context menu, named pipes, `%APPDATA%`/`%LOCALAPPDATA%`
