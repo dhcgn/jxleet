@@ -1324,7 +1324,7 @@
     <div class="banner warn" role="status" data-testid="app-update">
       <span class="ic">!</span>
       <span>jxleet {appUpdate.latest} is available on GitHub — you are running {appUpdate.current}.</span>
-      <button class="btn primary" style="margin-left:auto" onclick={() => void checkAppUpdate()}>Update…</button>
+      <button class="btn primary" style="margin-left:auto;background:var(--p-encode)" onclick={() => void checkAppUpdate()}>Update…</button>
       <button class="alert-close" aria-label="Dismiss update notice" title="Dismiss" onclick={() => { appUpdate = null; }}>x</button>
     </div>
   {/if}
