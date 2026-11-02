@@ -1097,15 +1097,18 @@ input[type="range"] {
 }
 
 .ticks {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  display: flex;
+  justify-content: space-between;
   margin-bottom: 10px;
   padding: 0 7px;
   color: var(--ink3);
   font: 400 9.5px/1 var(--mono);
 }
 
+/* As wide as the native range thumb (16px), so each label centres on its
+   snap point: thumb centres run from 8px to width-8px, not 1fr columns. */
 .ticks span {
+  width: 16px;
   text-align: center;
 }
 
@@ -1195,6 +1198,7 @@ input[type="range"] {
 .cell {
   width: 16px;
   text-align: center;
+  cursor: pointer;
 }
 
 .dot {

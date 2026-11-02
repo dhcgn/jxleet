@@ -35,7 +35,7 @@
           {@const level = index + 1}
           {@const stageIndex = stageIndexAt(stages, level)}
           {@const rank = tool.alwaysYellow ? 2 : stages.length - 1 - stageIndex}
-          <td class:colhi={level === effort} class="cell" title={stageIndex >= 0 ? `${tool.name} (e${stages[stageIndex].from}+): ${stages[stageIndex].label}` : `${tool.name}: not active at e${level}`}>
+          <td class:colhi={level === effort} class="cell" onclick={() => onEffortInput(level)} title={stageIndex >= 0 ? `${tool.name} (e${stages[stageIndex].from}+): ${stages[stageIndex].label}` : `${tool.name}: not active at e${level}`}>
             <span class={`dot${stageIndex >= 0 ? ` d${rank}` : ''}`} class:on={stageIndex >= 0} class:cur={applicable && level === effort}></span>
           </td>
         {/each}
