@@ -133,7 +133,6 @@ export function GetPendingCollision(): $CancellablePromise<$models.CollisionProm
 
 /**
  * GetPresetCore reads the editable core of a preset for the GUI controls.
- * Absent distance/effort report the cjxl defaults (1.0 / 7).
  */
 export function GetPresetCore(name: string): $CancellablePromise<$models.PresetCore> {
     return $Call.ByID(3494567662, name);

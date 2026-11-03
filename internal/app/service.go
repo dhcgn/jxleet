@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -325,6 +324,7 @@ type PresetSummary struct {
 	Effort         string              `json:"effort"`
 	JPEGMode       string              `json:"jpegMode"`
 	Rules          []PresetRuleSummary `json:"rules"`
+	Problems       []string            `json:"problems"`
 }
 
 // PresetRuleSummary is one file-filter rule shown in the selected-preset details.
@@ -364,9 +364,26 @@ func (s *Service) ListPresets() ([]PresetSummary, error) {
 			Effort:         summarizeEffort(p),
 			JPEGMode:       summarizeJPEGMode(p),
 			Rules:          summarizeRules(p),
+			Problems:       presetProblems(p),
 		})
 	}
 	return result, nil
+}
+
+// presetProblems lists every validation problem of a stored preset, one line
+// each, so the GUI can show them as soon as the preset is loaded instead of
+// refusing the first drop. Empty for a usable preset.
+func presetProblems(p preset.Preset) []string {
+	problems := []string{}
+	for _, err := range []error{p.Validate(), p.ValidateArgs(flags.Default())} {
+		if err == nil {
+			continue
+		}
+		for line := range strings.SplitSeq(err.Error(), "\n") {
+			problems = append(problems, strings.TrimPrefix(line, "preset: "))
+		}
+	}
+	return problems
 }
 
 // SavePresetOutput persists output policy, collision handling, the
@@ -403,21 +420,35 @@ func (s *Service) SavePresetOutput(name, policy, collision string, embedSettings
 	return preset.NewStore(s.paths.PresetsDir).Save(p)
 }
 
-// PresetCore is the readable core of a preset: distance, effort, JPEG mode,
-// output policy, the settings-in-filename flag and the extra cjxl flags of the
-// fallback ("*") rule. The GUI snapshots it via GetPresetCore when a preset is
-// selected and uses the snapshot for the dirty check and the Revert action.
+// PresetCore is the readable core of a preset: the output settings plus the
+// editable core of every rule. The GUI snapshots it via GetPresetCore when a
+// preset is selected and uses the snapshot for the dirty check and the Revert
+// action.
 type PresetCore struct {
-	Name           string         `json:"name"`
-	ReadOnly       bool           `json:"readOnly"`
-	Distance       float64        `json:"distance"`
-	UseQuality     bool           `json:"useQuality"`
-	Effort         int            `json:"effort"`
-	JPEGMode       string         `json:"jpegMode"`
-	Policy         string         `json:"policy"`
-	EmbedSettings  bool           `json:"embedSettings"`
-	JXLInfoSidecar bool           `json:"jxlInfoSidecar"`
-	Flags          []FlagOverride `json:"flags"`
+	Name           string     `json:"name"`
+	ReadOnly       bool       `json:"readOnly"`
+	Policy         string     `json:"policy"`
+	EmbedSettings  bool       `json:"embedSettings"`
+	JXLInfoSidecar bool       `json:"jxlInfoSidecar"`
+	Rules          []RuleCore `json:"rules"`
+	// Selected is the rule the controls edit first: the fallback rule.
+	Selected int `json:"selected"`
+	// JPEGRule is the rule JPEG files match, or -1.
+	JPEGRule int `json:"jpegRule"`
+	// Problems are the preset's validation errors; a run refuses it until
+	// they are fixed in the YAML file.
+	Problems []string `json:"problems"`
+}
+
+// RuleCore is the editable core of one preset rule: distance, effort, JPEG mode
+// and the extra cjxl flags.
+type RuleCore struct {
+	Matches      []string       `json:"matches"`
+	Distance     float64        `json:"distance"`
+	Effort       int            `json:"effort"`
+	LosslessJPEG bool           `json:"losslessJpeg"`
+	JPEGOnly     bool           `json:"jpegOnly"`
+	Flags        []FlagOverride `json:"flags"`
 }
 
 // fallbackRuleIndex returns the index of the catch-all rule (matching "*");
@@ -434,52 +465,51 @@ func fallbackRuleIndex(p preset.Preset) int {
 }
 
 // GetPresetCore reads the editable core of a preset for the GUI controls.
-// Absent distance/effort report the cjxl defaults (1.0 / 7).
 func (s *Service) GetPresetCore(name string) (PresetCore, error) {
 	p, err := preset.NewStore(s.paths.PresetsDir).Load(strings.TrimSpace(name))
 	if err != nil {
 		return PresetCore{}, err
 	}
 	core := PresetCore{
-		Name: p.Name, ReadOnly: p.ReadOnly,
-		Distance: 1, Effort: 7, JPEGMode: "transcode", Policy: string(p.Output.Policy),
+		Name: p.Name, ReadOnly: p.ReadOnly, Policy: string(p.Output.Policy),
 		EmbedSettings: p.Output.EmbedSettings, JXLInfoSidecar: p.Output.JXLInfoSidecar,
+		Rules:    make([]RuleCore, 0, len(p.Rules)),
+		Selected: max(fallbackRuleIndex(p), 0),
+		JPEGRule: p.MatchIndex(routes.FormatJPEG),
+		Problems: presetProblems(p),
 	}
 	if core.Policy == "" {
 		core.Policy = string(preset.PolicyAlongside)
 	}
 	for _, rule := range p.Rules {
-		if ruleMatchesJPEG(rule) && !preset.EffectiveLosslessJPEG(rule.Args) {
-			core.JPEGMode = "reencode"
-			break
-		}
+		core.Rules = append(core.Rules, ruleCore(rule))
 	}
-	index := fallbackRuleIndex(p)
-	if index < 0 {
-		return core, nil
+	return core, nil
+}
+
+// ruleCore reads one rule for the GUI controls. Absent distance/effort report
+// the cjxl defaults (1.0 / 7).
+func ruleCore(rule preset.Rule) RuleCore {
+	core := RuleCore{
+		Matches:      append([]string(nil), rule.Match...),
+		Distance:     1,
+		Effort:       7,
+		LosslessJPEG: preset.EffectiveLosslessJPEG(rule.Args),
+		JPEGOnly:     jpegOnly(rule),
+		Flags:        []FlagOverride{},
 	}
-	rule := p.Rules[index]
 	if distance, specified := preset.EffectiveDistance(rule.Args); specified {
 		core.Distance = distance
 	}
-	core.Flags = []FlagOverride{}
-	for _, arg := range rule.Args {
-		switch arg.Key {
-		case "-e", "--effort":
-			if effort, parseErr := strconv.Atoi(arg.Value); parseErr == nil {
-				core.Effort = effort
-			}
-			continue
-		case "-q", "--quality":
-			core.UseQuality = true
-			continue
-		}
-		if isCoreFlag(arg.Key) {
-			continue
-		}
-		core.Flags = append(core.Flags, FlagOverride{Key: arg.Key, Value: arg.Value, Valueless: arg.Valueless})
+	if effort, specified := preset.EffectiveEffort(rule.Args); specified {
+		core.Effort = effort
 	}
-	return core, nil
+	for _, arg := range rule.Args {
+		if !isCoreFlag(arg.Key) {
+			core.Flags = append(core.Flags, FlagOverride{Key: arg.Key, Value: arg.Value, Valueless: arg.Valueless})
+		}
+	}
+	return core
 }
 
 // CreatePreset writes the commented starter template as a new preset.
@@ -579,22 +609,31 @@ func (s *Service) OpenStorageLocation(location string) error {
 // ConversionOptions are the temporary GUI settings applied to a preset for one
 // run. The stored preset is never modified by these overrides.
 type ConversionOptions struct {
-	Preset            string         `json:"preset"`
-	Processes         int            `json:"processes"`
-	Threads           int            `json:"threads"`
-	JPEGMode          string         `json:"jpegMode"`
-	Distance          float64        `json:"distance"`
-	UseDistance       bool           `json:"useDistance"`
-	UseQuality        bool           `json:"useQuality"`
-	Effort            int            `json:"effort"`
-	UseEffort         bool           `json:"useEffort"`
-	OutputPolicy      string         `json:"outputPolicy"`
-	EmbedSettings     bool           `json:"embedSettings"`
-	UseEmbedSettings  bool           `json:"useEmbedSettings"`
-	JXLInfoSidecar    bool           `json:"jxlInfoSidecar"`
-	UseJXLInfoSidecar bool           `json:"useJxlInfoSidecar"`
-	ExpertFlags       []FlagOverride `json:"expertFlags"`
-	ResetExpert       bool           `json:"resetExpert"`
+	Preset            string `json:"preset"`
+	Processes         int    `json:"processes"`
+	Threads           int    `json:"threads"`
+	OutputPolicy      string `json:"outputPolicy"`
+	EmbedSettings     bool   `json:"embedSettings"`
+	UseEmbedSettings  bool   `json:"useEmbedSettings"`
+	JXLInfoSidecar    bool   `json:"jxlInfoSidecar"`
+	UseJXLInfoSidecar bool   `json:"useJxlInfoSidecar"`
+	// Rules holds the edits per preset rule; a rule without one runs exactly
+	// as stored (ref:jl:domain.preset.args-verbatim).
+	Rules []RuleOverride `json:"rules"`
+}
+
+// RuleOverride is a temporary edit of the preset rule at Index. Only the parts
+// flagged with Use* (or a non-empty JPEGMode) are applied; Flags replaces the
+// rule's extra cjxl flags as a whole.
+type RuleOverride struct {
+	Index       int            `json:"index"`
+	JPEGMode    string         `json:"jpegMode"`
+	Distance    float64        `json:"distance"`
+	UseDistance bool           `json:"useDistance"`
+	Effort      int            `json:"effort"`
+	UseEffort   bool           `json:"useEffort"`
+	Flags       []FlagOverride `json:"flags"`
+	UseFlags    bool           `json:"useFlags"`
 }
 
 // FlagInfo describes one generated cjxl flag for the Expert UI.
@@ -608,7 +647,7 @@ type FlagInfo struct {
 	Description string `json:"description,omitempty"`
 }
 
-// FlagOverride is a temporary global cjxl flag override for one conversion.
+// FlagOverride is one extra cjxl flag of a rule, as read or edited by the GUI.
 type FlagOverride struct {
 	Key       string `json:"key"`
 	Value     string `json:"value"`
@@ -632,6 +671,9 @@ type FilePreview struct {
 	Reason   string `json:"reason"`
 	Settings string `json:"settings"`
 	FlagsSet bool   `json:"flagsSet"`
+	// Reversible reports whether the original can be restored from the result
+	// under the resolved rule; replacing an irreversible file needs confirming.
+	Reversible bool `json:"reversible"`
 }
 
 // PreviewPaths classifies files using the same preset/options as StartConversion.
@@ -684,6 +726,11 @@ func (s *Service) PreviewPaths(paths []string, options ConversionOptions) ([]Fil
 		}
 		item.Route = route.String()
 		item.Settings, item.FlagsSet = summarizeFileSettings(route, args)
+		distance, specified := preset.EffectiveDistance(args)
+		if !specified {
+			distance = 1 // cjxl's default for most input; errs towards confirming
+		}
+		item.Reversible = route.Reversible(distance)
 		result = append(result, item)
 	}
 	return result, nil
@@ -1242,23 +1289,28 @@ func (s *Service) effectivePreset(options ConversionOptions) (preset.Preset, err
 	if err != nil {
 		return preset.Preset{}, err
 	}
-	if options.JPEGMode != "" && options.JPEGMode != "transcode" && options.JPEGMode != "reencode" {
-		return preset.Preset{}, fmt.Errorf("unknown JPEG mode %q", options.JPEGMode)
-	}
 	if options.Processes < 0 || options.Threads < 0 {
 		return preset.Preset{}, errors.New("processes and threads cannot be negative")
 	}
 	if options.Processes == 0 {
 		options.Processes = AutoProcesses(0)
 	}
-	if options.UseDistance && (options.Distance < 0 || options.Distance > 25) {
-		return preset.Preset{}, errors.New("distance must be between 0 and 25")
-	}
-	if options.UseEffort && (options.Effort < 1 || options.Effort > 10) {
-		return preset.Preset{}, errors.New("effort must be between 1 and 10")
-	}
-	if err := validateExpertFlags(options.ExpertFlags); err != nil {
-		return preset.Preset{}, err
+	for _, override := range options.Rules {
+		if override.Index < 0 || override.Index >= len(p.Rules) {
+			return preset.Preset{}, fmt.Errorf("rule %d does not exist in preset %q", override.Index, p.Name)
+		}
+		if override.JPEGMode != "" && override.JPEGMode != "transcode" && override.JPEGMode != "reencode" {
+			return preset.Preset{}, fmt.Errorf("unknown JPEG mode %q", override.JPEGMode)
+		}
+		if override.UseDistance && (override.Distance < 0 || override.Distance > 25) {
+			return preset.Preset{}, errors.New("distance must be between 0 and 25")
+		}
+		if override.UseEffort && (override.Effort < 1 || override.Effort > 10) {
+			return preset.Preset{}, errors.New("effort must be between 1 and 10")
+		}
+		if err := validateExpertFlags(override.Flags); err != nil {
+			return preset.Preset{}, err
+		}
 	}
 	if options.OutputPolicy != "" {
 		policy := preset.Policy(options.OutputPolicy)
@@ -1276,35 +1328,31 @@ func (s *Service) effectivePreset(options ConversionOptions) (preset.Preset, err
 	if options.UseJXLInfoSidecar {
 		p.Output.JXLInfoSidecar = options.JXLInfoSidecar
 	}
-	for i := range p.Rules {
-		args := append([]cjxl.Arg(nil), p.Rules[i].Args...)
-		if options.ResetExpert {
-			args = clearExpertFlags(args)
+	for _, override := range options.Rules {
+		rule := &p.Rules[override.Index]
+		args := append([]cjxl.Arg(nil), rule.Args...)
+		if override.UseFlags {
+			args = applyExpertOverrides(clearExpertFlags(args), override.Flags)
 		}
-		args = applyExpertOverrides(args, options.ExpertFlags)
-		if options.JPEGMode != "" && ruleMatchesJPEG(p.Rules[i]) {
+		if override.JPEGMode != "" && ruleMatchesJPEG(*rule) {
 			value := "1"
-			if options.JPEGMode == "reencode" {
+			if override.JPEGMode == "reencode" {
 				value = "0"
 			}
 			args = setArg(args, []string{"-j", "--lossless_jpeg"}, cjxl.Arg{Key: "--lossless_jpeg", Value: value})
 		}
-		transcodeJPEG := ruleMatchesJPEG(p.Rules[i]) && preset.EffectiveLosslessJPEG(args)
-		if transcodeJPEG {
+		// A JPEG-only transcode rule takes no distance; cjxl rejects one there.
+		// Rules that also serve other formats keep theirs for those files.
+		if onlyJPEGTranscode(preset.Rule{Match: rule.Match, Args: args}) {
 			args = removeArgs(args, "-d", "--distance", "-q", "--quality")
-		} else if options.UseDistance {
-			if options.UseQuality {
-				args = removeArgs(args, "-d", "--distance")
-				args = setArg(args, []string{"-q", "--quality"}, cjxl.Arg{Key: "-q", Value: formatFloat(round1(cjxl.QualityFromDistance(options.Distance)))})
-			} else {
-				args = removeArgs(args, "-q", "--quality")
-				args = setArg(args, []string{"-d", "--distance"}, cjxl.Arg{Key: "--distance", Value: formatFloat(options.Distance)})
-			}
+		} else if override.UseDistance {
+			args = removeArgs(args, "-q", "--quality")
+			args = setArg(args, []string{"-d", "--distance"}, cjxl.Arg{Key: "--distance", Value: formatFloat(override.Distance)})
 		}
-		if options.UseEffort {
-			args = setArg(args, []string{"-e", "--effort"}, cjxl.Arg{Key: "--effort", Value: fmt.Sprintf("%d", options.Effort)})
+		if override.UseEffort {
+			args = setArg(args, []string{"-e", "--effort"}, cjxl.Arg{Key: "--effort", Value: fmt.Sprintf("%d", override.Effort)})
 		}
-		p.Rules[i].Args = args
+		rule.Args = args
 	}
 	if err := p.Validate(); err != nil {
 		return preset.Preset{}, err
@@ -1535,7 +1583,12 @@ func summarizeRules(p preset.Preset) []PresetRuleSummary {
 }
 
 func onlyJPEGTranscode(rule preset.Rule) bool {
-	if len(rule.Match) == 0 || !preset.EffectiveLosslessJPEG(rule.Args) {
+	return jpegOnly(rule) && preset.EffectiveLosslessJPEG(rule.Args)
+}
+
+// jpegOnly reports whether every match entry of the rule is JPEG.
+func jpegOnly(rule preset.Rule) bool {
+	if len(rule.Match) == 0 {
 		return false
 	}
 	for _, match := range rule.Match {
@@ -1600,12 +1653,6 @@ func removeArgs(args []cjxl.Arg, keys ...string) []cjxl.Arg {
 
 func formatFloat(value float64) string {
 	return strconv.FormatFloat(value, 'f', -1, 64)
-}
-
-// round1 keeps derived quality values tidy in the preset ("80" instead of
-// "79.9999") without changing cjxl's behaviour meaningfully.
-func round1(value float64) float64 {
-	return math.Round(value*10) / 10
 }
 
 func cloneBindings(bindings map[config.EntryPoint]string) map[config.EntryPoint]string {

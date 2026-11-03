@@ -1526,6 +1526,32 @@ tr.na .dot.on {
   color: var(--ink2);
   font: 11px var(--mono);
   white-space: nowrap;
+  cursor: pointer;
+}
+
+/* The chip whose rule the Main/Expert controls edit. */
+.rule-chip[aria-pressed='true'] {
+  border-color: var(--p-encode);
+  color: var(--ink);
+}
+
+/* Validation problems of a preset (banner list, library marker). */
+.problem-list {
+  margin: 4px 0 4px 18px;
+  padding: 0;
+  font: 12px var(--mono);
+}
+
+.problem-mark {
+  margin-left: 8px;
+  color: var(--p-reencode);
+  font-weight: 600;
+}
+
+/* A rule with session edits. */
+.rule-chip.chip-edited {
+  border-style: dashed;
+  color: var(--p-reencode);
 }
 
 /* Main view groups: one card per detected input type. */

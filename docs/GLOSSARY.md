@@ -23,12 +23,12 @@ User-visible domain language — routes, presets, output policies, quality.
 | `jl:domain.output.subfolder` | 1 | Result written into ./<subfolder>/ relative to the source. |
 | `jl:domain.output.verify` | 6 | Temp .jxl is decode-verified (byte-identical JPEG check on the transcode route) before the original is touched. |
 | `jl:domain.preset` | 2 | A preset pairs file filters with cjxl arguments in one YAML file. |
-| `jl:domain.preset.args-verbatim` | 3 | Preset args are passed to cjxl exactly as written, with no wrapper vocabulary. |
+| `jl:domain.preset.args-verbatim` | 4 | Preset args are passed to cjxl exactly as written, with no wrapper vocabulary. |
 | `jl:domain.preset.rule` | 1 | Rules evaluate top to bottom and the first match wins. |
 | `jl:domain.preset.rule-fallback` | 1 | Trailing "*" rule; without it unmatched files are skipped and reported. |
 | `jl:domain.quality.distance` | 1 | Distance (-d) is the single stored quality value; quality (-q) is a display transform only. |
 | `jl:domain.quality.effort` | 1 | Effort (-e) 1-10 trades encoding time for file size; default 7 (squirrel). |
-| `jl:domain.queue.item` | 6 | One staged file with a frozen settings snapshot (distance with quality, effort, extra-flags hint); later preset edits never touch it, and the same file may be queued twice with different settings. |
+| `jl:domain.queue.item` | 5 | One staged file with a frozen settings snapshot (distance with quality, effort, extra-flags hint); later preset edits never touch it, and the same file may be queued twice with different settings. |
 | `jl:domain.route` | 3 | Route = input format x active preset rule; never a property of the file alone. |
 | `jl:domain.route.encode` | 1 | PNG, APNG, GIF, EXR, NetPBM, PFM or PGX encoded from pixels; lossless only at -d 0. |
 | `jl:domain.route.reencode` | 1 | JPEG with --lossless_jpeg=0, or any JXL input, decoded and re-encoded; not reversible. |

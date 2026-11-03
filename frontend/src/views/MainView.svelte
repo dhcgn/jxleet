@@ -10,6 +10,8 @@
   interface Props {
     files: FilePreview[];
     settings: { distance: number; effort: number; jpegLossless: boolean; outputPolicy: string; embedSettings: boolean; jxlInfoSidecar: boolean };
+    ruleLabel: string;
+    distanceLocked: boolean;
     routeMode: RouteMode;
     quality: number;
     outOfRange: boolean;
@@ -34,6 +36,8 @@
   let {
     files,
     settings,
+    ruleLabel,
+    distanceLocked,
     routeMode,
     quality,
     outOfRange,
@@ -167,9 +171,9 @@
 
     <div style="display:flex;flex-direction:column;gap:12px">
       <div class="card">
-        <h3>Compression <span class="r">stored in the preset</span></h3>
+        <h3>Compression <span class="r" data-testid="rule-scope">rule {ruleLabel}</span></h3>
         <div class="in">
-          <QualitySliders distance={settings.distance} quality={quality} outOfRange={outOfRange} routeMode={routeMode} onDistance={onSetDistance} onQuality={onSetQuality} />
+          <QualitySliders distance={settings.distance} quality={quality} outOfRange={outOfRange} routeMode={routeMode} locked={distanceLocked} onDistance={onSetDistance} onQuality={onSetQuality} />
           <div class="effort-basic" style="border-top:1px solid var(--line-soft);margin-top:8px;padding-top:8px">
             <div style="display:flex;align-items:baseline;gap:8px">
               <span class="k">Effort</span>
@@ -181,7 +185,7 @@
           </div>
           <div class="banner info" style="margin:9px 0 0">
             <span class="ic">i</span>
-            <span>{settings.jpegLossless ? 'JPEG files use lossless transcode and ignore compression settings.' : 'JPEG files are included in the lossy reencode route.'}</span>
+            <span>{distanceLocked ? 'JPEG transcode is lossless and takes no distance; effort still applies.' : `Edits apply to the ${ruleLabel} rule only; pick another rule in the preset strip.`}</span>
           </div>
         </div>
       </div>

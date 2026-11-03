@@ -83,8 +83,8 @@ const presetSchema = `{
           "match": {
             "type": "array",
             "minItems": 1,
-            "description": "Format names (JPEG, PNG, APNG, GIF, EXR, PPM, PGM, PAM, PFM, PGX, JXL) or '*' for the catch-all.",
-            "items": { "type": "string" }
+            "description": "Format names or '*' for the catch-all. JPEG covers .jpg, .jpeg and .jpe files.",
+            "items": { "enum": ["JPEG", "PNG", "APNG", "GIF", "EXR", "PPM", "PGM", "PAM", "PFM", "PGX", "JXL", "*"] }
           },
           "args": {
             "type": "object",

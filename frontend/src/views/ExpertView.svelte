@@ -11,6 +11,8 @@
   interface Props {
     routeMode: RouteMode;
     presetName: string;
+    ruleLabel: string;
+    distanceLocked: boolean;
     settings: { distance: number; effort: number; jpegLossless: boolean; threads: number };
     quality: number;
     outOfRange: boolean;
@@ -33,6 +35,8 @@
   let {
     routeMode,
     presetName,
+    ruleLabel,
+    distanceLocked,
     settings,
     quality,
     outOfRange,
@@ -108,7 +112,7 @@
       </div>
     </div>
     <span class="spacer"></span>
-    <span class="mini">Editing preset: {presetName || 'none'}</span>
+    <span class="mini" data-testid="rule-scope">Editing rule {ruleLabel} · {presetName || 'no preset'}</span>
   </div>
   <div class="cols wide-right">
     <div class="card">
@@ -123,7 +127,7 @@
       <div class="card">
         <h3>Quality</h3>
         <div class="in">
-          <QualitySliders distance={settings.distance} quality={quality} outOfRange={outOfRange} routeMode={routeMode} locked={routeMode === 'lossless'} onDistance={onSetDistance} onQuality={onSetQuality} />
+          <QualitySliders distance={settings.distance} quality={quality} outOfRange={outOfRange} routeMode={routeMode} locked={routeMode === 'lossless' || distanceLocked} onDistance={onSetDistance} onQuality={onSetQuality} />
           <div class="banner info" style="margin:10px 0 0"><span class="ic">i</span><span>Distance and quality control the same quantity; moving either slider moves the other. The run always uses -d.</span></div>
         </div>
       </div>
@@ -132,14 +136,14 @@
         <div class="in">
           <div class="banner info flag-notice">
             <span class="ic">i</span>
-            <span>Changes apply to this session only and are not saved to the preset. Persist them in the YAML file (Presets → Open in Editor); Reset restores the preset values.</span>
+            <span>Changes apply to the selected rule for this session only and are not saved to the preset. Persist them in the YAML file (Presets → Open in Editor); Revert restores the preset values.</span>
           </div>
           {#if flagsLocked}
             <div class="banner warn"><span class="ic">!</span><span>Expert flags are locked because the installed cjxl version differs from the generated help.</span></div>
           {/if}
           <div class="flag-actions">
             <button class="btn ghost" onclick={onResetFlags} disabled={flagsLocked}>Reset Expert flags</button>
-            <span class="mini">Reset removes the extra flags stored in the preset so cjxl defaults apply.</span>
+            <span class="mini">Reset removes the selected rule's extra flags so cjxl defaults apply.</span>
           </div>
           {#each flagSections as section}
             <div class="flag-section">

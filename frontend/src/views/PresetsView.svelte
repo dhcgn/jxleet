@@ -72,7 +72,7 @@
           <tbody>
             {#each presets as preset}
               <tr class:selected={selectedPreset === preset.name} aria-selected={selectedPreset === preset.name} onclick={() => onSelect(preset.name)}>
-                <td class="fn" title={preset.description}>{preset.name}{preset.readOnly ? ' (read-only)' : ''}</td>
+                <td class="fn" title={preset.description}>{preset.name}{preset.readOnly ? ' (read-only)' : ''}{#if preset.problems?.length}<span class="problem-mark" title={preset.problems.join('\n')}>! {preset.problems.length} problem{preset.problems.length === 1 ? '' : 's'}</span>{/if}</td>
                 <td class="num">{preset.coreValue}</td>
                 <td class="num">{preset.effort}</td>
                 <td class="num">{preset.jpegMode}</td>
@@ -93,6 +93,17 @@
         <div class="preset-details" data-testid="preset-details">
           <h3>{selectedData.name} <span class="r">{readOnly ? 'read-only' : 'details'}</span></h3>
           <div class="in">
+            {#if selectedData.problems?.length}
+              <div class="banner warn" role="alert" data-testid="preset-detail-problems">
+                <span class="ic">!</span>
+                <div>
+                  <b>Problems in this preset's YAML file (Open in Editor, then Reload):</b>
+                  <ul class="problem-list">
+                    {#each selectedData.problems as problem}<li>{problem}</li>{/each}
+                  </ul>
+                </div>
+              </div>
+            {/if}
             <div class="preset-policy-editor">
               <label for="preset-output-policy">Output policy</label>
               <div class="preset-policy-controls">
