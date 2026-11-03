@@ -15,6 +15,8 @@
     HistoryEntry,
     PresetSummary,
     ProgressUpdate,
+    RuleCore,
+    RuleOverride,
     Status,
     ToolchainProgress,
     ToolchainStatus,
@@ -41,7 +43,6 @@
   let selectedPreset = $state('');
   let presets = $state<PresetSummary[]>([]);
   let flagDefinitions = $state<FlagInfo[]>([]);
-  let expertOverrides = $state<FlagOverride[]>([]);
   let bindings = $state<Bindings>({ gui: '', cli: '', contextMenu: '' });
   let inputPaths = $state<string[]>([]);
   let files = $state<FilePreview[]>([]);
@@ -74,9 +75,6 @@
     meta: { entry: HistoryEntry | null; output: string; error: string; loading: boolean };
   }>({ entries: [], loaded: false, meta: { entry: null, output: '', error: '', loading: false } });
   let settings = $state({
-    distance: 1.0,
-    effort: 7,
-    jpegLossless: true,
     outputPolicy: 'alongside',
     embedSettings: false,
     jxlInfoSidecar: false,
@@ -84,6 +82,24 @@
     threads: 0, // 0 = leave --num_threads to the preset / cjxl default
     lossyDistance: 1.0,
   });
+  // Session edits per rule of the active preset: Main/Expert edit
+  // rules[selectedRule], the JPEG card edits rules[jpegRule]. base is the stored
+  // rule (dirty check, Revert); a rule nobody edited runs exactly as stored.
+  interface RuleState {
+    label: string;
+    jpegOnly: boolean;
+    distance: number;
+    effort: number;
+    losslessJpeg: boolean;
+    flags: FlagOverride[];
+    base: RuleCore;
+  }
+  let rules = $state<RuleState[]>([]);
+  let selectedRule = $state(0);
+  let jpegRule = $state(-1);
+  let outputSnapshot = $state<{ policy: string; embedSettings: boolean; jxlInfoSidecar: boolean } | null>(null);
+  // Validation problems of the active preset, shown as soon as it is loaded.
+  let presetProblems = $state<string[]>([]);
   let cpuCount = $state(0);
 
   // Request counters and timers are not reactive state.
@@ -130,8 +146,13 @@
         presetEmbedDraft !== Boolean(selectedPresetData?.embedSettings) ||
         presetSidecarDraft !== Boolean(selectedPresetData?.jxlInfoSidecar)),
   );
-  let quality = $derived(Math.round(qualityFromDistance(settings.distance)));
-  let outOfRange = $derived(routeMode !== 'lossless' && (settings.distance < 0.5 || settings.distance > 3));
+  let rule = $derived<RuleState>(rules[selectedRule] ?? ruleState({ matches: ['*'], distance: 1, effort: 7, losslessJpeg: true, jpegOnly: false, flags: [] }));
+  let jpegLossless = $derived(rules[jpegRule]?.losslessJpeg ?? true);
+  // A JPEG-only transcode rule takes no distance; effort still applies.
+  let distanceLocked = $derived(rule.jpegOnly && rule.losslessJpeg);
+  let controls = $derived({ ...settings, distance: rule.distance, effort: rule.effort, jpegLossless });
+  let quality = $derived(Math.round(qualityFromDistance(rule.distance)));
+  let outOfRange = $derived(routeMode !== 'lossless' && (rule.distance < 0.5 || rule.distance > 3));
   let canQueue = $derived(inputPaths.length > 0 && files.length > 0 && presetName !== '' && !tools.installing);
   let queueOpen = $derived(queue.filter((item) => item.status === 'waiting' || item.status === 'processing').length);
   let queueDoneCount = $derived(queue.filter((item) => item.status === 'done').length);
@@ -141,16 +162,12 @@
   let activePresetSummary = $derived(presets.find((preset) => preset.name === presetName) ?? null);
 
   let presetChanged = $derived.by(() => {
-    if (!coreSnapshot || presetName === '') return false;
-    const snapshot: CoreSnapshot = coreSnapshot;
+    if (!outputSnapshot || presetName === '') return false;
     return (
-      settings.distance !== snapshot.distance ||
-      settings.effort !== snapshot.effort ||
-      settings.jpegLossless !== snapshot.jpegLossless ||
-      settings.outputPolicy !== snapshot.policy ||
-      settings.embedSettings !== snapshot.embedSettings ||
-      settings.jxlInfoSidecar !== snapshot.jxlInfoSidecar ||
-      !sameFlags(expertOverrides, snapshot.flags)
+      rules.some(ruleEdited) ||
+      settings.outputPolicy !== outputSnapshot.policy ||
+      settings.embedSettings !== outputSnapshot.embedSettings ||
+      settings.jxlInfoSidecar !== outputSnapshot.jxlInfoSidecar
     );
   });
   // The strip spells out every rule of the active preset, so file types with
@@ -388,34 +405,38 @@
     }
   }
 
-  // Frozen snapshot label for one staged file: distance with quality in
-  // brackets, effort, and a hint when extra cjxl flags apply
-  // (ref:jl:domain.queue.item).
-  function snapshotLabel(file: FilePreview): string {
-    if (file.route === 'Transcode') return 'lossless (reversible)';
-    const q = Math.round(qualityFromDistance(settings.distance));
-    return `D ${settings.distance.toFixed(2)} (Q ${q}) · E ${settings.effort}`;
-  }
-
   function currentOptions(): ConversionOptions {
     return {
       preset: presetName,
       processes: settings.processes,
       threads: settings.threads,
-      jpegMode: settings.jpegLossless ? 'transcode' : 'reencode',
-      distance: settings.distance,
-      useDistance: true,
-      useQuality: false, // distance is the stored value; -q is a display transform only
-      effort: settings.effort,
-      useEffort: true,
       outputPolicy: settings.outputPolicy,
       embedSettings: settings.embedSettings,
       useEmbedSettings: true,
       jxlInfoSidecar: settings.jxlInfoSidecar,
       useJxlInfoSidecar: true,
-      expertFlags: expertOverrides,
-      resetExpert: false, // flags live in the preset; Expert edits persist there
+      rules: rules.map(ruleOverride).filter((override): override is RuleOverride => override !== null),
     };
+  }
+
+  // Only the edited parts of a rule are sent; the rest stays as stored. The run
+  // always uses -d: distance is the stored value, -q a display transform only.
+  function ruleOverride(state: RuleState, index: number): RuleOverride | null {
+    const override: RuleOverride = {
+      index,
+      jpegMode: state.losslessJpeg === state.base.losslessJpeg ? '' : state.losslessJpeg ? 'transcode' : 'reencode',
+      distance: state.distance,
+      useDistance: state.distance !== state.base.distance,
+      effort: state.effort,
+      useEffort: state.effort !== state.base.effort,
+      flags: state.flags.map((flag) => ({ ...flag })),
+      useFlags: !sameFlags(state.flags, state.base.flags ?? []),
+    };
+    return override.jpegMode || override.useDistance || override.useEffort || override.useFlags ? override : null;
+  }
+
+  function ruleEdited(state: RuleState, index: number): boolean {
+    return ruleOverride(state, index) !== null;
   }
 
   async function refreshPreview(): Promise<FilePreview[] | null> {
@@ -436,7 +457,8 @@
       return preview;
     } catch (error) {
       if (request !== previewRequest) return null;
-      errorMessage = errorText(error);
+      // An invalid preset already has its own banner listing the problems.
+      errorMessage = presetProblems.length > 0 ? '' : errorText(error);
       return null;
     }
   }
@@ -544,6 +566,7 @@
       size: update.inputSize,
       format: update.format,
       route: update.route,
+      reversible: false, // unknown for an external arrival; a retry confirms
       addedAt: Date.now(),
       preset: presetName,
       snapshot: update.settings || 'external invocation',
@@ -633,7 +656,6 @@
       errorMessage = 'Select a preset in the toolbar before staging.';
       return;
     }
-    const options = currentOptions();
     for (const file of files) {
       queueSeq += 1;
       queue.push({
@@ -643,11 +665,12 @@
         size: file.size,
         format: file.format,
         route: file.route,
+        reversible: file.reversible,
         addedAt: Date.now(),
         preset: presetName,
-        snapshot: snapshotLabel(file),
+        snapshot: file.settings || '-',
         flagsSet: file.flagsSet,
-        options: { ...options, expertFlags: [...(options.expertFlags ?? [])] },
+        options: currentOptions(),
         status: file.skip ? 'skipped' : 'waiting',
         pid: 0,
         startedAt: 0,
@@ -701,7 +724,7 @@
       return;
     }
     const irreversible = startable.filter(
-      (item) => item.options.outputPolicy === 'replace' && (item.route === 'Reencode' || (item.route === 'Encode' && item.options.distance > 0)),
+      (item) => item.options.outputPolicy === 'replace' && !item.reversible,
     ).length;
     if (irreversible > 0 && !window.confirm(`Replace the originals for ${irreversible} irreversible file${irreversible === 1 ? '' : 's'}? They will be sent to the recycle bin after verification.`)) {
       return;
@@ -771,33 +794,34 @@
     queue = queue.filter((entry) => entry.id !== id);
   }
 
-  // Reclaim restores the file to the Main intake and applies its frozen
-  // snapshot to the session settings, then drops the queue entry.
-  function reclaimItem(id: string): void {
+  // Reclaim restores the file to the Main intake with its staged preset and
+  // re-applies the frozen rule edits on top, then drops the queue entry.
+  async function reclaimItem(id: string): Promise<void> {
     const item = queue.find((entry) => entry.id === id);
     if (!item) return;
     if (item.status === 'processing') {
       errorMessage = 'Stop the file before reclaiming it to Main.';
       return;
     }
-    settings.distance = item.options.distance;
-    if (settings.distance === 0) {
-      routeMode = 'lossless';
-    } else {
-      routeMode = 'lossy';
-      settings.lossyDistance = settings.distance;
+    queue = queue.filter((entry) => entry.id !== id);
+    errorMessage = '';
+    view = 'main';
+    presetName = item.preset;
+    await applyPresetCore();
+    for (const override of item.options.rules ?? []) {
+      const state = rules[override.index];
+      if (!state) continue;
+      if (override.useDistance) state.distance = override.distance;
+      if (override.useEffort) state.effort = override.effort;
+      if (override.jpegMode) state.losslessJpeg = override.jpegMode === 'transcode';
+      if (override.useFlags) state.flags = (override.flags ?? []).map((flag) => ({ ...flag }));
     }
-    settings.effort = item.options.effort;
-    settings.jpegLossless = item.options.jpegMode !== 'reencode';
+    selectRule(selectedRule);
     settings.processes = item.options.processes;
     settings.threads = item.options.threads;
     settings.outputPolicy = item.options.outputPolicy || 'alongside';
     settings.embedSettings = item.options.embedSettings;
     settings.jxlInfoSidecar = item.options.jxlInfoSidecar;
-    expertOverrides = [...(item.options.expertFlags ?? [])];
-    queue = queue.filter((entry) => entry.id !== id);
-    errorMessage = '';
-    view = 'main';
     acceptPaths([item.path]);
     onSettingsChanged();
   }
@@ -965,6 +989,17 @@
     presets = (await Service.ListPresets()) ?? [];
   }
 
+  // Reload re-reads the folder and the active preset, so a fixed (or newly
+  // broken) YAML file takes effect, problems included, without a restart.
+  async function reloadPresets(): Promise<void> {
+    try {
+      await refreshPresets();
+    } catch (error) {
+      errorMessage = errorText(error);
+    }
+    await applyPresetCore();
+  }
+
   function selectPreset(name: string): void {
     selectedPreset = name;
     const selected = presets.find((preset) => preset.name === name);
@@ -1106,75 +1141,61 @@
   }
 
   // Selecting a preset snapshots its core (applyPresetCore). GUI edits are
-  // session-only: preview and conversion run with the overrides, the preset
-  // file is never touched, and presetChanged marks the strip. Revert restores
-  // the snapshot; persisting happens by editing the YAML (Presets view).
-  interface CoreSnapshot {
-    distance: number;
-    effort: number;
-    jpegLossless: boolean;
-    policy: string;
-    embedSettings: boolean;
-    jxlInfoSidecar: boolean;
-    flags: FlagOverride[];
-  }
-
-  let coreSnapshot = $state<CoreSnapshot | null>(null);
-
-  function applyCore(core: {
-    distance: number;
-    effort: number;
-    jpegMode: string;
-    policy: string;
-    embedSettings: boolean;
-    jxlInfoSidecar: boolean;
-    flags: FlagOverride[] | null;
-  }): CoreSnapshot {
-    const flags = core.flags ?? [];
-    settings.distance = core.distance;
-    settings.effort = core.effort;
-    routeMode = core.distance === 0 ? 'lossless' : 'lossy';
-    if (core.distance > 0) settings.lossyDistance = core.distance;
-    settings.jpegLossless = core.jpegMode !== 'reencode';
-    settings.outputPolicy = core.policy || 'alongside';
-    settings.embedSettings = core.embedSettings ?? false;
-    settings.jxlInfoSidecar = core.jxlInfoSidecar ?? false;
-    expertOverrides = flags.map((flag) => ({ ...flag }));
+  // session-only and per rule: preview and conversion run with the edited
+  // rules, the preset file is never touched, and presetChanged marks the strip.
+  // Revert restores the snapshot; persisting happens by editing the YAML.
+  function ruleState(core: RuleCore): RuleState {
     return {
+      label: (core.matches ?? []).join(' / ') || '*',
+      jpegOnly: core.jpegOnly,
       distance: core.distance,
       effort: core.effort,
-      jpegLossless: settings.jpegLossless,
-      policy: settings.outputPolicy,
-      embedSettings: settings.embedSettings,
-      jxlInfoSidecar: settings.jxlInfoSidecar,
-      flags,
+      losslessJpeg: core.losslessJpeg,
+      flags: (core.flags ?? []).map((flag) => ({ ...flag })),
+      base: core,
     };
+  }
+
+  // The strip chips pick the rule Main and Expert edit.
+  function selectRule(index: number): void {
+    selectedRule = index;
+    routeMode = rule.distance === 0 ? 'lossless' : 'lossy';
+    if (rule.distance > 0) settings.lossyDistance = rule.distance;
+  }
+
+  function applyOutput(output: { policy: string; embedSettings: boolean; jxlInfoSidecar: boolean }): void {
+    settings.outputPolicy = output.policy;
+    settings.embedSettings = output.embedSettings;
+    settings.jxlInfoSidecar = output.jxlInfoSidecar;
   }
 
   async function applyPresetCore(): Promise<void> {
     if (presetName === '') {
-      coreSnapshot = null;
+      rules = [];
+      outputSnapshot = null;
+      presetProblems = [];
       return;
     }
     try {
-      coreSnapshot = applyCore(await Service.GetPresetCore(presetName));
+      const core = await Service.GetPresetCore(presetName);
+      presetProblems = core.problems ?? [];
+      rules = (core.rules ?? []).map(ruleState);
+      jpegRule = core.jpegRule;
+      outputSnapshot = { policy: core.policy || 'alongside', embedSettings: core.embedSettings ?? false, jxlInfoSidecar: core.jxlInfoSidecar ?? false };
+      applyOutput(outputSnapshot);
+      selectRule(core.selected);
     } catch (error) {
+      presetProblems = [];
       errorMessage = errorText(error);
     }
     if (!run.busy) void refreshPreview();
   }
 
   function revertToPreset(): void {
-    if (!coreSnapshot) return;
-    applyCore({
-      distance: coreSnapshot.distance,
-      effort: coreSnapshot.effort,
-      jpegMode: coreSnapshot.jpegLossless ? 'transcode' : 'reencode',
-      policy: coreSnapshot.policy,
-      embedSettings: coreSnapshot.embedSettings,
-      jxlInfoSidecar: coreSnapshot.jxlInfoSidecar,
-      flags: coreSnapshot.flags,
-    });
+    if (!outputSnapshot) return;
+    rules = rules.map((state) => ruleState(state.base));
+    applyOutput(outputSnapshot);
+    selectRule(selectedRule);
     onSettingsChanged();
   }
 
@@ -1186,52 +1207,58 @@
   }
 
   function setDistanceValue(value: number): void {
-    settings.distance = value;
-    if (routeMode === 'lossy') settings.lossyDistance = settings.distance;
+    rule.distance = value;
+    if (routeMode === 'lossy') settings.lossyDistance = rule.distance;
     onSettingsChanged();
   }
 
   function setQualityValue(value: number): void {
-    settings.distance = distanceFromQuality(value);
-    if (routeMode === 'lossy') settings.lossyDistance = settings.distance;
+    rule.distance = distanceFromQuality(value);
+    if (routeMode === 'lossy') settings.lossyDistance = rule.distance;
     onSettingsChanged();
   }
 
   function setEffortValue(value: number): void {
-    settings.effort = value;
+    rule.effort = value;
+    onSettingsChanged();
+  }
+
+  function setJpegMode(lossless: boolean): void {
+    if (!rules[jpegRule]) return;
+    rules[jpegRule].losslessJpeg = lossless;
     onSettingsChanged();
   }
 
   function setExpertFlagValue(key: string, value: string): void {
-    const next = expertOverrides.filter((override) => override.key !== key);
+    const next = rule.flags.filter((override) => override.key !== key);
     if (value.trim() !== '') {
       next.push({ key, value, valueless: false });
     }
-    expertOverrides = next;
+    rule.flags = next;
     onSettingsChanged();
   }
 
   function setExpertFlagEnabled(key: string, enabled: boolean): void {
-    const next = expertOverrides.filter((override) => override.key !== key);
+    const next = rule.flags.filter((override) => override.key !== key);
     if (enabled) {
       next.push({ key, value: '', valueless: true });
     }
-    expertOverrides = next;
+    rule.flags = next;
     onSettingsChanged();
   }
 
   function resetExpertFlags(): void {
-    expertOverrides = [];
+    rule.flags = [];
     onSettingsChanged();
   }
 
   function setRouteMode(next: RouteMode): void {
     if (next === routeMode) return;
     if (next === 'lossless') {
-      settings.lossyDistance = settings.distance > 0 ? settings.distance : settings.lossyDistance;
-      settings.distance = 0;
+      settings.lossyDistance = rule.distance > 0 ? rule.distance : settings.lossyDistance;
+      rule.distance = 0;
     } else {
-      settings.distance = settings.lossyDistance > 0 ? settings.lossyDistance : 1.0;
+      rule.distance = settings.lossyDistance > 0 ? settings.lossyDistance : 1.0;
     }
     routeMode = next;
     onSettingsChanged();
@@ -1301,8 +1328,16 @@
       <span class="strip-label">Preset</span>
       <strong>{presetName}</strong>
       {#if activePresetSummary?.readOnly}<span class="mini" title="Factory preset; it cannot be modified">read-only</span>{/if}
-      {#each stripRules as rule}
-        <code class="rule-chip">{rule}</code>
+      {#each stripRules as label, index}
+        <button
+          type="button"
+          class="rule-chip"
+          class:chip-edited={rules[index] ? ruleEdited(rules[index], index) : false}
+          aria-pressed={index === selectedRule}
+          title="Edit this rule with the Main and Expert controls"
+          data-testid="rule-chip"
+          onclick={() => selectRule(index)}
+        >{label}</button>
       {/each}
       <span class="mini">output: {settings.outputPolicy}</span>
       {#if presetChanged}
@@ -1310,6 +1345,19 @@
         <span class="strip-warning" role="status">! settings differ — preset “{presetName}” is not in effect</span>
         <button class="btn ghost strip-btn" data-testid="revert-preset" onclick={revertToPreset}>Revert</button>
       {/if}
+    </div>
+  {/if}
+
+  {#if presetProblems.length > 0 && presetName !== '' && view !== 'presets'}
+    <div class="banner warn" role="alert" data-testid="preset-problems">
+      <span class="ic">!</span>
+      <div>
+        <b>Preset “{presetName}” has {presetProblems.length === 1 ? 'a problem' : `${presetProblems.length} problems`} — fix {presetProblems.length === 1 ? 'it' : 'them'} in its YAML file, then Presets → Reload:</b>
+        <ul class="problem-list">
+          {#each presetProblems as problem}<li>{problem}</li>{/each}
+        </ul>
+        <span class="mini">Files that cannot be classified yet are kept and listed once it is fixed.</span>
+      </div>
     </div>
   {/if}
 
@@ -1352,7 +1400,9 @@
   {:else if view === 'main'}
     <MainView
       files={files}
-      settings={settings}
+      settings={controls}
+      ruleLabel={rule.label}
+      distanceLocked={distanceLocked}
       routeMode={routeMode}
       quality={quality}
       outOfRange={outOfRange}
@@ -1368,7 +1418,7 @@
       onSetDistance={setDistanceValue}
       onSetQuality={setQualityValue}
       onSetEffort={setEffortValue}
-      onSetJpegMode={(lossless) => { settings.jpegLossless = lossless; onSettingsChanged(); }}
+      onSetJpegMode={setJpegMode}
       onSetOutputPolicy={(policy) => { settings.outputPolicy = policy; onSettingsChanged(); }}
       onSetEmbedSettings={(embed) => { settings.embedSettings = embed; onSettingsChanged(); }}
       onSetJxlInfoSidecar={(sidecar) => { settings.jxlInfoSidecar = sidecar; onSettingsChanged(); }}
@@ -1402,13 +1452,15 @@
     <ExpertView
       routeMode={routeMode}
       presetName={presetName}
-      settings={settings}
+      ruleLabel={rule.label}
+      distanceLocked={distanceLocked}
+      settings={controls}
       quality={quality}
       outOfRange={outOfRange}
       previews={cmdPreview.previews}
       previewError={cmdPreview.error}
       flagDefinitions={flagDefinitions}
-      expertOverrides={expertOverrides}
+      expertOverrides={rule.flags}
       flagsLocked={Boolean(tools.status?.flagsLocked)}
       canQueue={canQueue}
       filesCount={files.length}
@@ -1464,7 +1516,7 @@
       onRename={() => void renamePreset()}
       onDelete={() => void deletePreset()}
       onOpenInEditor={() => void openPresetInEditor()}
-      onReload={() => void refreshPresets()}
+      onReload={() => void reloadPresets()}
       onOpenStorage={(location) => void openStorage(location)}
       onSaveOutput={() => void savePresetOutput()}
       onSetBinding={(entryPoint, value) => void setBinding(entryPoint, value)}

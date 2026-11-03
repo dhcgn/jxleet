@@ -10,7 +10,7 @@
 [![License](https://img.shields.io/github/license/dhcgn/jxleet)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4?logo=windows)](#requirements)
 
-<img src="docs/screenshots/basic.png" alt="The jxleet main view: drop zone, preset strip, files grouped by type with route badges">
+<img src="docs/screenshots/basic.png" alt="The jxleet main view: preset strip with rule chips, files with route badges and their per-rule settings">
 
 </div>
 
@@ -103,7 +103,7 @@ Change the rule that governs JPEG and the counts, badges and size estimates all 
 once.
 
 <p align="center">
-  <img src="docs/screenshots/basic.png" alt="The Main view: the file list with mixed route badges and per-type settings">
+  <img src="docs/screenshots/basic.png" alt="The Main view: the file list with mixed route badges, each file's per-rule settings, and the clickable rule chips of the preset strip">
 </p>
 
 ## Install
@@ -151,14 +151,17 @@ Settings split into **Main** - the essentials - and **Expert**, which exposes th
 generated `cjxl` flag surface; every flag includes its help text as a tooltip. The selected
 preset seeds the controls: switching presets re-resolves everything immediately, and the
 preset strip under the toolbar spells out each rule - the catch-all and every format with
-its own settings. Edits in Main/Expert are session-only overrides; the strip then warns
-in amber ("settings differ — preset not in effect") and a **Revert** button restores the
-preset values. Persisting changes happens in the preset YAML itself (Presets → Open in
-Editor). The live preview shows the exact command line that will run.
+its own settings. The chips in the strip are clickable: the Main and Expert controls edit
+the selected rule (the catch-all at first), and **JPEG handling** edits the rule JPEG files
+actually hit. A rule nobody edited runs exactly as written in the preset. Edits are
+session-only overrides; an edited chip turns amber, the strip warns ("settings differ —
+preset not in effect") and a **Revert** button restores the preset values. Persisting
+changes happens in the preset YAML itself (Presets → Open in Editor). The live preview
+shows the exact command line that will run.
 
 The Main view is intake only: files list flat in the order they were added, each
-with its route badge and the resolved settings it will be staged with (e.g.
-`D 1.00 (Q 90) · E 7`, with a `+flags` chip when extra cjxl flags apply); Effort
+with its route badge and the settings its rule resolves to (e.g. `D 0.5 · E 7`, with a
+`+flags` chip when extra cjxl flags apply); Effort
 is a simple slider alongside Distance/Quality. Nothing converts here — **Move to
 queue** stages each listed file with a frozen copy of the current settings and starts
 the run, so
@@ -176,7 +179,7 @@ windows instead of clipping its controls);
 every item spans two rows: file, sizes, saving, route and the status (waiting, done
 with needed time, or the failure reason) on top, the child PID with its CPU usage and
 RAM (updated every second) plus the actions below — buttons never wrap. Right-click a row to remove
-it, reclaim it back to Main (restoring its snapshot to the session settings), show source
+it, reclaim it back to Main (restoring its preset and rule edits to the session), show source
 or JXL in Explorer, open the converted file, clear done or all rows, or cancel just that
 file. Successful conversions are recorded to
 History with their needed time; failed, cancelled and skipped rows stay in the Queue
@@ -188,7 +191,7 @@ pending items warns once and discards them on confirm.
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/expert.png" alt="The Expert view: every generated cjxl flag with help tooltips, effort ladder, live command preview">
+  <img src="docs/screenshots/expert.png" alt="The Expert view editing the JXL rule: effort ladder, quality sliders, every generated cjxl flag with help tooltips, live command preview">
 </p>
 
 After a conversion, click a finished file to run `jxlinfo -v` for its JXL output and show the
@@ -262,9 +265,9 @@ deleted, or overwritten. Each built-in file ends with a commented list of every 
 lines. jxleet rewrites a built-in file on start whenever it differs from what the running
 version ships — after an upgrade, or after a hand edit.
 
-The selected preset supplies the file rules used for classification. Basic and Expert
-controls are temporary run overrides and do not yet mirror every value in a multi-rule
-preset; the Presets view shows those format-specific rules.
+The selected preset supplies the file rules used for classification. Main and Expert
+controls are temporary overrides of one rule at a time (pick it in the preset strip); every
+other rule runs exactly as stored.
 
 Presets are edited by changing the YAML files directly. The Preset library has an
 **open-folder** button and a **Reload** button so you can edit a file and pull the change back
@@ -310,6 +313,14 @@ rules:
 as the fallback; without one, unmatched files are skipped and reported.
 
 `match` takes format names as listed under [Supported formats](#supported-formats), or `"*"`.
+Formats are detected from content, not file extensions, so `JPEG` covers `.jpg` and `.jpeg`
+files; any other name (`JPG`, `TIFF`, …) is rejected with an error rather than silently
+matching nothing.
+
+A preset with mistakes still loads. Every problem in it (unknown format names, unknown
+`cjxl` flags, missing output settings) is listed with its 1-based rule number as soon as
+the preset is selected, in a banner under the preset strip and in the Preset library; fix
+the YAML file and press **Reload**.
 
 `args` are keys and values exactly as `cjxl` expects them. Both spellings work, because both
 are `cjxl`'s:

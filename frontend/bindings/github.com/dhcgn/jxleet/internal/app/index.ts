@@ -24,6 +24,8 @@ export type {
     ProcessResources,
     ProgressUpdate,
     QueueItemInput,
+    RuleCore,
+    RuleOverride,
     RunFiles,
     Status,
     ToolchainProgress,

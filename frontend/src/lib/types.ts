@@ -15,9 +15,10 @@ export interface QueueItem {
   size: number;
   format: string;
   route: string;
+  reversible: boolean; // the original can be restored; replace needs no confirmation
   addedAt: number;
   preset: string;
-  snapshot: string; // frozen label: distance with quality, effort, +flags hint
+  snapshot: string; // frozen label: the file's resolved settings, +flags hint
   flagsSet: boolean;
   options: ConversionOptions; // frozen per-item run options
   status: QueueStatus;

@@ -32,7 +32,6 @@ is green.
 
 **Open (pick from here):**
 - Log view with tool messages; persistent run logs
-- Full multi-rule preset → global-controls sync (session-only overrides today)
 
 ## Locked decisions (do not silently change)
 - **Windows 10/11 x64 only** for v1. Core features are Windows-specific (recycle

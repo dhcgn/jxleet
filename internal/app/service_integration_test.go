@@ -119,11 +119,6 @@ func TestStartConversionWithRealToolchain(t *testing.T) {
 		Preset:       "test",
 		Processes:    1,
 		Threads:      2,
-		JPEGMode:     "transcode",
-		Distance:     0,
-		UseDistance:  true,
-		Effort:       3,
-		UseEffort:    true,
 		OutputPolicy: string(preset.PolicyAlongside),
 	})
 	if err != nil {

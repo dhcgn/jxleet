@@ -104,6 +104,11 @@ func Determine(f Format, losslessJPEG bool) Route {
 	}
 }
 
+// Known reports whether f is one of the input formats above.
+func Known(f Format) bool {
+	return Determine(f, true) != RouteSkip
+}
+
 // Dominant returns the route that should colour a batch's Convert button: the
 // route with the most files, breaking ties by irreversibility (Reencode over
 // Encode over Transcode) so the more consequential route wins.

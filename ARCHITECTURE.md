@@ -121,6 +121,8 @@ One YAML file per preset in `%APPDATA%\jxleet\presets\`:
 
 - Schema: `name`, `description`, `version`, `output{policy, subfolder, on_collision, embed_settings, jxlinfo_sidecar}`, `rules[]{match[], args{}}`
 - Rules evaluate top to bottom, first match wins; a trailing `"*"` rule is the fallback; without one, unmatched files are skipped and reported
+- `match` entries must be `"*"` or a known format name (case-insensitive); `Validate` rejects anything else (e.g. `JPG` — `JPEG` already covers `.jpg`), and the schema enumerates the names
+- `Validate`/`ValidateArgs` report every problem (joined, 1-based rule numbers), not just the first. Loading never validates; `ListPresets` and `GetPresetCore` attach the problems so the GUI shows them when a preset is selected or reloaded, while `effectivePreset` still refuses an invalid preset before any run
 - `args` are passed to `cjxl` **verbatim** — short and long forms both valid, valueless flags as `true`. No wrapper vocabulary
 - Presets carry a `# yaml-language-server` modeline pointing at the committed `preset.schema.json`
 - Keys are validated against the **installed** `cjxl` help before a run; an unknown flag refuses the run
@@ -280,7 +282,11 @@ as `FileUpdate.warning`) and a failed conversion never leaves a sidecar behind.
   data, quality/distance math, formatters, route and cjxl-flag helpers).
 
 The active preset is the single source for the controls; Main and Expert
-edits are session-only overrides with an amber warning and Revert. The
+edits are session-only overrides with an amber warning and Revert. They are
+per rule: `GetPresetCore` returns every rule's core, the strip chips select
+the rule the controls edit, and `ConversionOptions.Rules` carries a
+`RuleOverride` (by rule index) only for the parts the user changed, so
+`effectivePreset` leaves untouched rules byte-for-byte as stored. The
 Expert view exposes the full generated flag surface with help tooltips, the
 effort ladder, and the exact command preview. Native Wails file drops target
 the whole window; a selected folder contributes only regular files directly

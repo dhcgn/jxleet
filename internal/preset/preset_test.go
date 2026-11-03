@@ -1,6 +1,7 @@
 package preset
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/dhcgn/jxleet/internal/cjxl/flags"
@@ -151,6 +152,32 @@ func TestValidate(t *testing.T) {
 	sub.Output = Output{Policy: PolicySubfolder}
 	if err := sub.Validate(); err == nil {
 		t.Error("subfolder policy without subfolder should fail")
+	}
+
+	jpg := good
+	jpg.Rules = []Rule{{Match: []string{"PNG"}}, {Match: []string{"JPEG", "JPG"}}}
+	if err := jpg.Validate(); err == nil || !strings.Contains(err.Error(), `rule 2: unknown format "JPG"; use JPEG`) {
+		t.Errorf("JPG match should fail naming the 1-based rule and the fix, got %v", err)
+	}
+
+	// Every problem is reported, one per line, not just the first.
+	many := good
+	many.Name = ""
+	many.Rules = []Rule{{Match: []string{"TIFF"}}, {}}
+	err := many.Validate()
+	for _, want := range []string{"name is required", `rule 1: unknown format "TIFF"`, "rule 2 has no match filters"} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("missing %q in %v", want, err)
+		}
+	}
+	if err != nil && strings.Contains(err.Error(), "use JPEG") {
+		t.Errorf("JPEG hint is only for JPG: %v", err)
+	}
+
+	lower := good
+	lower.Rules = []Rule{{Match: []string{"jpeg"}}, {Match: []string{"*"}}}
+	if err := lower.Validate(); err != nil {
+		t.Errorf("lowercase format rejected: %v", err)
 	}
 }
 

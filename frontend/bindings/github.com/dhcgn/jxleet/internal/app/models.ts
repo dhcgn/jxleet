@@ -35,19 +35,17 @@ export interface ConversionOptions {
     "preset": string;
     "processes": number;
     "threads": number;
-    "jpegMode": string;
-    "distance": number;
-    "useDistance": boolean;
-    "useQuality": boolean;
-    "effort": number;
-    "useEffort": boolean;
     "outputPolicy": string;
     "embedSettings": boolean;
     "useEmbedSettings": boolean;
     "jxlInfoSidecar": boolean;
     "useJxlInfoSidecar": boolean;
-    "expertFlags": FlagOverride[] | null;
-    "resetExpert": boolean;
+
+    /**
+     * Rules holds the edits per preset rule; a rule without one runs exactly
+     * as stored (ref:jl:domain.preset.args-verbatim).
+     */
+    "rules": RuleOverride[] | null;
 }
 
 /**
@@ -76,6 +74,12 @@ export interface FilePreview {
     "reason": string;
     "settings": string;
     "flagsSet": boolean;
+
+    /**
+     * Reversible reports whether the original can be restored from the result
+     * under the resolved rule; replacing an irreversible file needs confirming.
+     */
+    "reversible": boolean;
 }
 
 /**
@@ -131,7 +135,7 @@ export interface FlagInfo {
 }
 
 /**
- * FlagOverride is a temporary global cjxl flag override for one conversion.
+ * FlagOverride is one extra cjxl flag of a rule, as read or edited by the GUI.
  */
 export interface FlagOverride {
     "key": string;
@@ -158,22 +162,34 @@ export interface HistoryEntry {
 }
 
 /**
- * PresetCore is the readable core of a preset: distance, effort, JPEG mode,
- * output policy, the settings-in-filename flag and the extra cjxl flags of the
- * fallback ("*") rule. The GUI snapshots it via GetPresetCore when a preset is
- * selected and uses the snapshot for the dirty check and the Revert action.
+ * PresetCore is the readable core of a preset: the output settings plus the
+ * editable core of every rule. The GUI snapshots it via GetPresetCore when a
+ * preset is selected and uses the snapshot for the dirty check and the Revert
+ * action.
  */
 export interface PresetCore {
     "name": string;
     "readOnly": boolean;
-    "distance": number;
-    "useQuality": boolean;
-    "effort": number;
-    "jpegMode": string;
     "policy": string;
     "embedSettings": boolean;
     "jxlInfoSidecar": boolean;
-    "flags": FlagOverride[] | null;
+    "rules": RuleCore[] | null;
+
+    /**
+     * Selected is the rule the controls edit first: the fallback rule.
+     */
+    "selected": number;
+
+    /**
+     * JPEGRule is the rule JPEG files match, or -1.
+     */
+    "jpegRule": number;
+
+    /**
+     * Problems are the preset's validation errors; a run refuses it until
+     * they are fixed in the YAML file.
+     */
+    "problems": string[] | null;
 }
 
 /**
@@ -201,6 +217,7 @@ export interface PresetSummary {
     "effort": string;
     "jpegMode": string;
     "rules": PresetRuleSummary[] | null;
+    "problems": string[] | null;
 }
 
 /**
@@ -238,6 +255,35 @@ export interface ProgressUpdate {
 export interface QueueItemInput {
     "path": string;
     "options": ConversionOptions;
+}
+
+/**
+ * RuleCore is the editable core of one preset rule: distance, effort, JPEG mode
+ * and the extra cjxl flags.
+ */
+export interface RuleCore {
+    "matches": string[] | null;
+    "distance": number;
+    "effort": number;
+    "losslessJpeg": boolean;
+    "jpegOnly": boolean;
+    "flags": FlagOverride[] | null;
+}
+
+/**
+ * RuleOverride is a temporary edit of the preset rule at Index. Only the parts
+ * flagged with Use* (or a non-empty JPEGMode) are applied; Flags replaces the
+ * rule's extra cjxl flags as a whole.
+ */
+export interface RuleOverride {
+    "index": number;
+    "jpegMode": string;
+    "distance": number;
+    "useDistance": boolean;
+    "effort": number;
+    "useEffort": boolean;
+    "flags": FlagOverride[] | null;
+    "useFlags": boolean;
 }
 
 /**

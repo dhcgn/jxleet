@@ -12,14 +12,23 @@ import (
 // first-match-wins order. A "*" entry matches any format. The bool is false when
 // no rule matches (the file is skipped and reported).
 func (p Preset) Match(format routes.Format) (Rule, bool) {
-	for _, r := range p.Rules {
+	i := p.MatchIndex(format)
+	if i < 0 {
+		return Rule{}, false
+	}
+	return p.Rules[i], true
+}
+
+// MatchIndex returns the index of the rule Match would pick, or -1.
+func (p Preset) MatchIndex(format routes.Format) int {
+	for i, r := range p.Rules {
 		for _, m := range r.Match {
 			if m == "*" || strings.EqualFold(m, string(format)) {
-				return r, true
+				return i
 			}
 		}
 	}
-	return Rule{}, false
+	return -1
 }
 
 // Route resolves the route and the cjxl argument list for a file of the given

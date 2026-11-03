@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -48,7 +49,45 @@ func saveTestPreset(t *testing.T, service *Service) {
 	}
 }
 
-func TestEffectivePresetAppliesGUIOverridesWithoutSaving(t *testing.T) {
+// Issue 75: a rule nobody edited must run exactly as stored, not with the
+// fallback rule's values the GUI controls start from.
+func TestEffectivePresetKeepsUntouchedRulesVerbatim(t *testing.T) {
+	service := testService(t)
+	store := preset.NewStore(service.paths.PresetsDir)
+	if _, err := preset.EnsureDefaults(store); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Save(preset.Preset{
+		Name:    "issue-75",
+		Version: preset.CurrentVersion,
+		Output:  preset.Output{Policy: preset.PolicySubfolder, Subfolder: "jxl", EmbedSettings: true},
+		Rules: []preset.Rule{
+			{Match: []string{"JXL"}, Args: []cjxl.Arg{{Key: "-d", Value: "0.7"}, {Key: "-e", Value: "3"}}},
+			{Match: []string{"JPEG"}, Args: []cjxl.Arg{{Key: "--lossless_jpeg", Value: "0"}, {Key: "-d", Value: "2.90"}, {Key: "-e", Value: "1"}}},
+			{Match: []string{"PNG"}, Args: []cjxl.Arg{{Key: "-d", Value: "0"}, {Key: "-e", Value: "9"}}},
+			{Match: []string{"*"}, Args: []cjxl.Arg{{Key: "-d", Value: "0.9"}, {Key: "-e", Value: "2"}}},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"issue-75", "default-gui"} {
+		t.Run(name, func(t *testing.T) {
+			stored, err := store.Load(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			p, err := service.effectivePreset(ConversionOptions{Preset: name, OutputPolicy: string(stored.Output.Policy)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(p.Rules, stored.Rules) {
+				t.Errorf("untouched rules changed:\n got %+v\nwant %+v", p.Rules, stored.Rules)
+			}
+		})
+	}
+}
+
+func TestEffectivePresetOverrideTouchesOnlyItsRule(t *testing.T) {
 	service := testService(t)
 	saveTestPreset(t, service)
 
@@ -56,12 +95,15 @@ func TestEffectivePresetAppliesGUIOverridesWithoutSaving(t *testing.T) {
 		Preset:       "test",
 		Processes:    2,
 		Threads:      4,
-		JPEGMode:     "reencode",
-		Distance:     1.5,
-		UseDistance:  true,
-		Effort:       3,
-		UseEffort:    true,
 		OutputPolicy: string(preset.PolicySubfolder),
+		Rules: []RuleOverride{{
+			Index:       1,
+			JPEGMode:    "reencode",
+			Distance:    1.5,
+			UseDistance: true,
+			Effort:      3,
+			UseEffort:   true,
+		}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -69,34 +111,31 @@ func TestEffectivePresetAppliesGUIOverridesWithoutSaving(t *testing.T) {
 	if p.Output.Policy != preset.PolicySubfolder || p.Output.Subfolder != "jxl" {
 		t.Fatalf("output override = %+v", p.Output)
 	}
-	for i, rule := range p.Rules {
-		if i == 0 {
-			for _, arg := range rule.Args {
-				if arg.Key == "--lossless_jpeg" && arg.Value != "0" {
-					t.Errorf("JPEG mode = %s", arg.Value)
-				}
-			}
-			continue
-		}
-		for _, arg := range rule.Args {
-			if arg.Key == "-q" || arg.Key == "--quality" {
-				t.Error("quality flag should be replaced by distance")
-			}
-			if arg.Key == "--distance" && arg.Value != "1.5" {
-				t.Errorf("distance = %s", arg.Value)
-			}
-			if arg.Key == "--effort" && arg.Value != "3" {
-				t.Errorf("effort = %s", arg.Value)
-			}
-		}
+	want := []cjxl.Arg{{Key: "--distance", Value: "1.5"}, {Key: "--effort", Value: "3"}, {Key: "--lossless_jpeg", Value: "0"}}
+	if !reflect.DeepEqual(p.Rules[1].Args, want) {
+		t.Errorf("edited rule = %+v, want %+v", p.Rules[1].Args, want)
 	}
 
 	stored, err := preset.NewStore(service.paths.PresetsDir).Load("test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Rules[0].Args[0].Key != "-q" {
+	if !reflect.DeepEqual(p.Rules[0], stored.Rules[0]) {
+		t.Errorf("unedited rule changed: %+v", p.Rules[0].Args)
+	}
+	if stored.Rules[1].Args[0].Key != "-d" || stored.Rules[1].Args[0].Value != "1.0" {
 		t.Error("GUI overrides must not modify the stored preset")
+	}
+}
+
+func TestEffectivePresetRejectsUnknownRuleIndex(t *testing.T) {
+	service := testService(t)
+	saveTestPreset(t, service)
+	for _, index := range []int{-1, 2} {
+		_, err := service.effectivePreset(ConversionOptions{Preset: "test", Rules: []RuleOverride{{Index: index, UseEffort: true, Effort: 3}}})
+		if err == nil {
+			t.Errorf("override for rule %d should be rejected", index)
+		}
 	}
 }
 
@@ -122,12 +161,15 @@ func TestEffectivePresetOmitsDistanceForJPEGTranscode(t *testing.T) {
 	service := testService(t)
 	saveTestPreset(t, service)
 	p, err := service.effectivePreset(ConversionOptions{
-		Preset:      "test",
-		JPEGMode:    "transcode",
-		Distance:    1.5,
-		UseDistance: true,
-		UseEffort:   true,
-		Effort:      7,
+		Preset: "test",
+		Rules: []RuleOverride{{
+			Index:       0,
+			JPEGMode:    "transcode",
+			Distance:    1.5,
+			UseDistance: true,
+			UseEffort:   true,
+			Effort:      7,
+		}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -373,27 +415,32 @@ func TestEffectivePresetAppliesExpertFlagOverrides(t *testing.T) {
 	saveTestPreset(t, service)
 	p, err := service.effectivePreset(ConversionOptions{
 		Preset: "test",
-		ExpertFlags: []FlagOverride{
-			{Key: "--progressive", Valueless: true},
-			{Key: "--modular", Value: "1"},
-		},
+		Rules: []RuleOverride{{
+			Index:    1,
+			UseFlags: true,
+			Flags: []FlagOverride{
+				{Key: "--progressive", Valueless: true},
+				{Key: "--modular", Value: "1"},
+			},
+		}},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, rule := range p.Rules {
-		var progressive, modular bool
-		for _, arg := range rule.Args {
-			switch arg.Key {
-			case "--progressive":
-				progressive = arg.Valueless
-			case "--modular":
-				modular = arg.Value == "1"
-			}
+	var progressive, modular bool
+	for _, arg := range p.Rules[1].Args {
+		switch arg.Key {
+		case "--progressive":
+			progressive = arg.Valueless
+		case "--modular":
+			modular = arg.Value == "1"
 		}
-		if !progressive || !modular {
-			t.Fatalf("expert overrides missing from rule: %+v", rule.Args)
-		}
+	}
+	if !progressive || !modular {
+		t.Fatalf("expert overrides missing from edited rule: %+v", p.Rules[1].Args)
+	}
+	if hasExpertArguments(preset.Preset{Rules: p.Rules[:1]}) {
+		t.Errorf("expert overrides leaked into another rule: %+v", p.Rules[0].Args)
 	}
 }
 
@@ -416,13 +463,15 @@ func TestPreviewCommandsIncludesResolvedPresetFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 	previews, err := service.PreviewCommands(ConversionOptions{
-		Preset:      "preview",
-		Threads:     4,
-		JPEGMode:    "reencode",
-		Distance:    1.5,
-		UseDistance: true,
-		Effort:      3,
-		UseEffort:   true,
+		Preset:  "preview",
+		Threads: 4,
+		Rules: []RuleOverride{{
+			JPEGMode:    "reencode",
+			Distance:    1.5,
+			UseDistance: true,
+			Effort:      3,
+			UseEffort:   true,
+		}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -448,8 +497,8 @@ func TestEffectivePresetRejectsInvalidExpertFlagShape(t *testing.T) {
 	for _, override := range tests {
 		t.Run(override.Key, func(t *testing.T) {
 			_, err := service.effectivePreset(ConversionOptions{
-				Preset:      "test",
-				ExpertFlags: []FlagOverride{override},
+				Preset: "test",
+				Rules:  []RuleOverride{{UseFlags: true, Flags: []FlagOverride{override}}},
 			})
 			if err == nil {
 				t.Fatalf("override %+v should be rejected", override)
@@ -479,11 +528,8 @@ func TestEffectivePresetResetsPresetExpertFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 	resolved, err := service.effectivePreset(ConversionOptions{
-		Preset:      presetName,
-		ResetExpert: true,
-		ExpertFlags: []FlagOverride{{Key: "--container", Value: "1"}},
-		UseDistance: false,
-		UseEffort:   false,
+		Preset: presetName,
+		Rules:  []RuleOverride{{UseFlags: true, Flags: []FlagOverride{{Key: "--container", Value: "1"}}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -566,14 +612,53 @@ func TestGetPresetCore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if core.Effort != 8 || core.JPEGMode != "reencode" || core.Policy != "subfolder" || !core.UseQuality {
-		t.Errorf("core = %+v", core)
+	if core.Policy != "subfolder" || len(core.Rules) != 2 || core.Selected != 1 || core.JPEGRule != 0 {
+		t.Fatalf("core = %+v", core)
 	}
-	if want := cjxl.DistanceFromQuality(90); core.Distance != want {
-		t.Errorf("distance = %v, want %v (from -q 90)", core.Distance, want)
+	jpegRule, fallback := core.Rules[0], core.Rules[1]
+	if jpegRule.LosslessJPEG || !jpegRule.JPEGOnly || jpegRule.Distance != 1 || jpegRule.Effort != 7 || len(jpegRule.Flags) != 0 {
+		t.Errorf("JPEG rule core = %+v", jpegRule)
 	}
-	if len(core.Flags) != 1 || core.Flags[0].Key != "--progressive" {
-		t.Errorf("flags = %+v", core.Flags)
+	if fallback.Effort != 8 || fallback.JPEGOnly {
+		t.Errorf("fallback rule core = %+v", fallback)
+	}
+	if want := cjxl.DistanceFromQuality(90); fallback.Distance != want {
+		t.Errorf("distance = %v, want %v (from -q 90)", fallback.Distance, want)
+	}
+	if len(fallback.Flags) != 1 || fallback.Flags[0].Key != "--progressive" {
+		t.Errorf("flags = %+v", fallback.Flags)
+	}
+}
+
+// A hand-edited preset with mistakes still loads, and reports every problem so
+// the GUI can show them before anything is dropped.
+func TestPresetProblemsReportedOnLoad(t *testing.T) {
+	service := testService(t)
+	yaml := "name: broken\nversion: 1\noutput:\n  policy: subfolder\nrules:\n" +
+		"  - match: [JPEG, JPG]\n    args:\n      -d: 2.9\n" +
+		"  - match: ['*']\n    args:\n      --bogus: 1\n"
+	if err := os.WriteFile(filepath.Join(service.paths.PresetsDir, "broken.yaml"), []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	core, err := service.GetPresetCore("broken")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"output.subfolder is required", `rule 1: unknown format "JPG"`, `rule 2: unknown cjxl flag "--bogus"`}
+	if len(core.Problems) != len(want) {
+		t.Fatalf("problems = %q, want %d", core.Problems, len(want))
+	}
+	for i, w := range want {
+		if !strings.Contains(core.Problems[i], w) || strings.HasPrefix(core.Problems[i], "preset:") {
+			t.Errorf("problem %d = %q, want it to contain %q without the preset: prefix", i, core.Problems[i], w)
+		}
+	}
+	summaries, err := service.ListPresets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summaries) != 1 || len(summaries[0].Problems) != len(want) {
+		t.Errorf("library summary problems = %+v", summaries)
 	}
 }
 
