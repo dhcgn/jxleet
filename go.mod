@@ -7,7 +7,7 @@ require (
 	github.com/spf13/fileflow v0.2.0
 	github.com/spf13/pathologize v1.1.0
 	github.com/wailsapp/wails/v3 v3.0.0
-	golang.org/x/sys v0.49.0
+	golang.org/x/sys v0.50.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
